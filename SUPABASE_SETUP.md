@@ -38,26 +38,18 @@ This guide walks you through setting up your Municipal Revenue Management System
 
 ---
 
-### 2. Get Database Connection Details
+### 2. Get Database Connection Details (The Easiest Way)
 
-1. **Navigate to Database Settings:**
-   - In left sidebar, click **Settings** (gear icon)
-   - Click **Database**
-
+1. **Click the "Connect" Button:**
+   - Look at the **top header** of your Supabase dashboard.
+   - Click the **Connect** button (it's between the project name and the Feedback button).
 2. **Copy Connection String:**
-   - Scroll to "Connection string" section
-   - **Important:** Select **"Connection pooling"** tab (not "Session mode")
-   - Mode: Choose **"Transaction"**
-   - Click on the connection string to copy it
-   
-   It will look like:
-   ```
-   postgresql://postgres.abcdefghijklmnop:[YOUR-PASSWORD]@aws-0-us-west-1.pooler.supabase.com:6543/postgres
-   ```
-
+   - In the popup, click on **"ORMs"** or **"Connection String"**.
+   - Select **"Transaction"** mode.
+   - Click the **Copy** icon next to the string.
 3. **Note Your Password:**
-   - Replace `[YOUR-PASSWORD]` in the connection string with the password you set in Step 1
-   - **Save this complete connection string** - you'll need it for the backend `.env` file
+   - Replace `[YOUR-PASSWORD]` in the string with your database password.
+   - **Save this complete string** (we'll paste it into `backend/.env`).
 
 ---
 

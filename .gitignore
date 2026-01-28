@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+.next/
+dist/
+build/
+*.log
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/

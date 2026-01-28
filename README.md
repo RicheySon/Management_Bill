@@ -186,10 +186,6 @@ cd frontend
 # Install dependencies
 npm install
 
-# Copy environment file (already created)
-# .env.local already contains:
-# NEXT_PUBLIC_API_URL=http://localhost:5000/api
-
 # Start development server
 npm run dev
 ```
