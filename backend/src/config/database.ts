@@ -3,17 +3,28 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const poolConfig: PoolConfig = {
-    host: process.env.DATABASE_HOST || 'localhost',
-    port: parseInt(process.env.DATABASE_PORT || '5432'),
-    database: process.env.DATABASE_NAME || 'municipal_revenue',
-    user: process.env.DATABASE_USER || 'postgres',
-    password: process.env.DATABASE_PASSWORD,
-    ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
-    max: 20, // Maximum number of clients in the pool
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
-};
+// Support both connection string (Supabase) and individual parameters (local PostgreSQL)
+const poolConfig: PoolConfig = process.env.DATABASE_URL
+    ? {
+        // Supabase connection string
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
+        max: 20,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 2000,
+    }
+    : {
+        // Individual connection parameters (local PostgreSQL)
+        host: process.env.DATABASE_HOST || 'localhost',
+        port: parseInt(process.env.DATABASE_PORT || '5432'),
+        database: process.env.DATABASE_NAME || 'municipal_revenue',
+        user: process.env.DATABASE_USER || 'postgres',
+        password: process.env.DATABASE_PASSWORD,
+        ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
+        max: 20,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 2000,
+    };
 
 // Create connection pool
 export const pool = new Pool(poolConfig);

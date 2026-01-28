@@ -64,15 +64,43 @@ A comprehensive web-based system for managing municipal revenue collection, incl
 
 ## 📋 Prerequisites
 
-Before you begin, ensure you have the following installed:
+Before you begin, ensure you have the following:
 
 - **Node.js** (v18 or higher)
-- **PostgreSQL** (v14 or higher)
 - **npm** or **yarn**
+- **Supabase Account** (recommended) OR **Local PostgreSQL** (v14 or higher)
 
 ## 🚀 Installation & Setup
 
 ### 1. Database Setup
+
+#### Option A: Supabase (Recommended for Production) ☁️
+
+1. **Create a Supabase Project:**
+   - Go to [https://supabase.com](https://supabase.com)
+   - Click "New Project"
+   - Choose organization and set project name: `municipal-revenue`
+   - Set a strong database password
+   - Select region closest to your users
+   - Wait for project to be created (~2 minutes)
+
+2. **Get Connection Details:**
+   - In your Supabase project dashboard, go to **Settings** → **Database**
+   - Under "Connection string", copy the **Connection pooling** URI (recommended for serverless)
+   - It looks like: `postgresql://postgres.xxxxx:password@aws-0-xx-xxxx.pooler.supabase.com:6543/postgres`
+
+3. **Run Database Schema:**
+   - In Supabase dashboard, go to **SQL Editor**
+   - Click "New Query"
+   - Copy and paste contents of `database/schema.sql`
+   - Click "Run" or press `Ctrl+Enter`
+   - You should see "Success. No rows returned"
+
+4. **Verify Setup:**
+   - Go to **Table Editor** in Supabase
+   - You should see all tables: `customers`, `properties`, `businesses`, `bills`, etc.
+
+#### Option B: Local PostgreSQL (Development)
 
 ```bash
 # Create PostgreSQL database
@@ -81,6 +109,8 @@ createdb municipal_revenue
 # Run the database schema
 psql -d municipal_revenue -f database/schema.sql
 ```
+
+> 📘 **Need help with Supabase?** See the detailed [Supabase Setup Guide](SUPABASE_SETUP.md) for step-by-step instructions with screenshots and troubleshooting.
 
 ### 2. Backend Setup
 
@@ -93,14 +123,51 @@ npm install
 
 # Copy environment file
 cp .env.example .env
+```
 
-# Edit .env file with your database credentials
-# DATABASE_HOST=localhost
-# DATABASE_PORT=5432
-# DATABASE_NAME=municipal_revenue
-# DATABASE_USER=postgres
-# DATABASE_PASSWORD=your_password
+**Edit `.env` file with your database credentials:**
 
+**For Supabase:**
+```env
+# Use the connection pooling URI from Supabase
+DATABASE_URL=postgresql://postgres.xxxxx:your-password@aws-0-xx-xxxx.pooler.supabase.com:6543/postgres
+DATABASE_SSL=true
+
+# Server Configuration
+PORT=5000
+NODE_ENV=development
+
+# CORS
+ALLOWED_ORIGINS=http://localhost:3000
+
+# Municipal Configuration
+MUNICIPAL_CODE=GN
+MUNICIPAL_NAME=GA NORTH MUNICIPAL
+```
+
+**For Local PostgreSQL:**
+```env
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_NAME=municipal_revenue
+DATABASE_USER=postgres
+DATABASE_PASSWORD=your_password
+DATABASE_SSL=false
+
+# Server Configuration  
+PORT=5000
+NODE_ENV=development
+
+# CORS
+ALLOWED_ORIGINS=http://localhost:3000
+
+# Municipal Configuration
+MUNICIPAL_CODE=GN
+MUNICIPAL_NAME=GA NORTH MUNICIPAL
+```
+
+**Start the server:**
+```bash
 # Build TypeScript
 npm run build
 
@@ -268,18 +335,55 @@ The system generates bills matching the **GA North Municipal** format exactly:
 
 ## 🚢 Deployment
 
-### Backend Deployment (Railway/Render)
+### Database (Supabase - Recommended)
 
-1. Create new PostgreSQL database instance
-2. Run `database/schema.sql` on production database
-3. Deploy backend with environment variables set
-4. Ensure `DATABASE_SSL=true` for production
+**Your database is already production-ready if using Supabase!**
 
-### Frontend Deployment (Vercel)
+No additional setup needed - Supabase provides:
+- ✅ Automatic backups
+- ✅ SSL/TLS encryption
+- ✅ Connection pooling
+- ✅ Global CDN
+- ✅ 99.9% uptime SLA
 
-1. Connect GitHub repository
-2. Set environment variable: `NEXT_PUBLIC_API_URL=https://your-backend-url.com/api`
-3. Deploy
+Just ensure you're using the **Connection Pooling** URI in production.
+
+### Backend Deployment (Railway/Render/Vercel)
+
+1. **Create new project** in your deployment platform
+2. **Connect GitHub repository**
+3. **Set Environment Variables:**
+   ```env
+   DATABASE_URL=your-supabase-connection-pooling-uri
+   DATABASE_SSL=true
+   NODE_ENV=production
+   PORT=5000
+   ALLOWED_ORIGINS=https://your-frontend-domain.com
+   MUNICIPAL_CODE=GN
+   MUNICIPAL_NAME=GA NORTH MUNICIPAL
+   ```
+4. **Deploy** - Platform will auto-build and start
+
+**Recommended Platforms:**
+- **Railway** - Best for Node.js backends, $5/month
+- **Render** - Free tier available, auto-deploy on push  
+- **Vercel** - Serverless functions (requires some refactoring)
+
+### Frontend Deployment (Vercel - Recommended)
+
+1. **Connect GitHub repository** to Vercel
+2. **Configure Project:**
+   - Framework Preset: Next.js
+   - Root Directory: `frontend`
+   - Build Command: `npm run build`
+   - Output Directory: `.next`
+3. **Set Environment Variable:**
+   ```env
+   NEXT_PUBLIC_API_URL=https://your-backend-url.com/api
+   ```
+4. **Deploy** - Auto-deploys on every push to main branch
+
+🎉 **Your system is now live!**
 
 ## 🐛 Troubleshooting
 
