@@ -1,0 +1,301 @@
+import { Router, Request, Response } from 'express';
+import Joi from 'joi';
+import { generateBill, recordPayment } from '../services/billing.service';
+import pool from '../config/database';
+
+const router = Router();
+
+/**
+ * POST /api/bills/generate
+ * Generate a new bill for property or business
+ */
+router.post('/generate', async (req: Request, res: Response) => {
+    try {
+        const schema = Joi.object({
+            bill_type: Joi.string().valid('PROPERTY_RATE', 'BOP').required(),
+            target_id: Joi.string().uuid().required(), // property_id or business_id
+            customer_id: Joi.string().uuid().required(),
+            bill_year: Joi.number().integer().min(2000).max(2100).optional(),
+        });
+
+        const { error, value } = schema.validate(req.body);
+
+        if (error) {
+            return res.status(400).json({
+                success: false,
+                error: error.details[0].message,
+            });
+        }
+
+        const { bill_type, target_id, customer_id, bill_year } = value;
+
+        const bill = await generateBill(bill_type, target_id, customer_id, bill_year);
+
+        res.status(201).json({
+            success: true,
+            data: bill,
+            message: `Bill generated successfully. Bill Number: ${bill.bill_number}`,
+        });
+    } catch (error: any) {
+        console.error('Error generating bill:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to generate bill',
+        });
+    }
+});
+
+/**
+ * GET /api/bills/:id
+ * Get bill details with customer info
+ */
+router.get('/:id', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+
+        const result = await pool.query(
+            `SELECT b.*,
+        c.full_name, c.phone_number, c.gps_address as customer_gps,
+        p.property_number, p.street_name, p.gps_address as property_gps,
+        p.landmark as property_landmark,
+        ea_p.name as property_electoral_area,
+        bus.business_number, bus.business_name, bus.business_activity,
+        bus.street_name as business_street, bus.gps_address as business_gps,
+        bus.landmark as business_landmark,
+        ea_b.name as business_electoral_area,
+        bc.name as business_category
+       FROM bills b
+       LEFT JOIN customers c ON b.customer_id = c.id
+       LEFT JOIN properties p ON b.property_id = p.id
+       LEFT JOIN electoral_areas ea_p ON p.electoral_area_id = ea_p.id
+       LEFT JOIN businesses bus ON b.business_id = bus.id
+       LEFT JOIN electoral_areas ea_b ON bus.electoral_area_id = ea_b.id
+       LEFT JOIN business_categories bc ON bus.category_id = bc.id
+       WHERE b.id = $1`,
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Bill not found',
+            });
+        }
+
+        // Get payments for this bill
+        const paymentsResult = await pool.query(
+            `SELECT * FROM payments WHERE bill_id = $1 ORDER BY payment_date DESC`,
+            [id]
+        );
+
+        res.json({
+            success: true,
+            data: {
+                bill: result.rows[0],
+                payments: paymentsResult.rows,
+            },
+        });
+    } catch (error: any) {
+        console.error('Error fetching bill:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch bill details',
+        });
+    }
+});
+
+/**
+ * GET /api/bills/customer/:customerId
+ * Get all bills for a customer
+ */
+router.get('/customer/:customerId', async (req: Request, res: Response) => {
+    try {
+        const { customerId } = req.params;
+        const { status, bill_type } = req.query;
+
+        let query = `
+      SELECT b.*,
+        p.property_number,
+        bus.business_number, bus.business_name
+      FROM bills b
+      LEFT JOIN properties p ON b.property_id = p.id
+      LEFT JOIN businesses bus ON b.business_id = bus.id
+      WHERE b.customer_id = $1
+    `;
+
+        const queryParams: any[] = [customerId];
+        let paramIndex = 2;
+
+        if (status) {
+            query += ` AND b.payment_status = $${paramIndex}`;
+            queryParams.push(status);
+            paramIndex++;
+        }
+
+        if (bill_type) {
+            query += ` AND b.bill_type = $${paramIndex}`;
+            queryParams.push(bill_type);
+        }
+
+        query += ` ORDER BY b.issue_date DESC`;
+
+        const result = await pool.query(query, queryParams);
+
+        res.json({
+            success: true,
+            data: result.rows,
+        });
+    } catch (error: any) {
+        console.error('Error fetching customer bills:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch bills',
+        });
+    }
+});
+
+/**
+ * GET /api/bills
+ * List all bills with filters
+ */
+router.get('/', async (req: Request, res: Response) => {
+    try {
+        const {
+            status,
+            bill_type,
+            electoral_area_id,
+            year,
+            search,
+            page = 1,
+            limit = 50,
+        } = req.query;
+
+        let query = `
+      SELECT b.*,
+        c.full_name,
+        p.property_number,
+        bus.business_number, bus.business_name,
+        ea.name as electoral_area
+      FROM bills b
+      LEFT JOIN customers c ON b.customer_id = c.id
+      LEFT JOIN properties p ON b.property_id = p.id
+      LEFT JOIN businesses bus ON b.business_id = bus.id
+      LEFT JOIN electoral_areas ea ON 
+        COALESCE(p.electoral_area_id, bus.electoral_area_id) = ea.id
+      WHERE 1=1
+    `;
+
+        const queryParams: any[] = [];
+        let paramIndex = 1;
+
+        if (status) {
+            query += ` AND b.payment_status = $${paramIndex}`;
+            queryParams.push(status);
+            paramIndex++;
+        }
+
+        if (bill_type) {
+            query += ` AND b.bill_type = $${paramIndex}`;
+            queryParams.push(bill_type);
+            paramIndex++;
+        }
+
+        if (year) {
+            query += ` AND b.bill_period_year = $${paramIndex}`;
+            queryParams.push(year);
+            paramIndex++;
+        }
+
+        if (electoral_area_id) {
+            query += ` AND (p.electoral_area_id = $${paramIndex} OR bus.electoral_area_id = $${paramIndex})`;
+            queryParams.push(electoral_area_id);
+            paramIndex++;
+        }
+
+        if (search) {
+            query += ` AND (b.bill_number ILIKE $${paramIndex} OR c.full_name ILIKE $${paramIndex})`;
+            queryParams.push(`%${search}%`);
+            paramIndex++;
+        }
+
+        query += ` ORDER BY b.issue_date DESC`;
+
+        // Pagination
+        const offset = (Number(page) - 1) * Number(limit);
+        query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+        queryParams.push(Number(limit), offset);
+
+        const result = await pool.query(query, queryParams);
+
+        // Get total
+        const countResult = await pool.query('SELECT COUNT(*) FROM bills');
+        const total = parseInt(countResult.rows[0].count);
+
+        res.json({
+            success: true,
+            data: result.rows,
+            pagination: {
+                page: Number(page),
+                limit: Number(limit),
+                total,
+                totalPages: Math.ceil(total / Number(limit)),
+            },
+        });
+    } catch (error: any) {
+        console.error('Error listing bills:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch bills',
+        });
+    }
+});
+
+/**
+ * POST /api/bills/:id/payment
+ * Record a payment for a bill
+ */
+router.post('/:id/payment', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+
+        const schema = Joi.object({
+            customer_id: Joi.string().uuid().required(),
+            amount: Joi.number().positive().required(),
+            payment_method: Joi.string().required(),
+            payment_reference: Joi.string().optional().allow(''),
+        });
+
+        const { error, value } = schema.validate(req.body);
+
+        if (error) {
+            return res.status(400).json({
+                success: false,
+                error: error.details[0].message,
+            });
+        }
+
+        const { customer_id, amount, payment_method, payment_reference } = value;
+
+        const payment = await recordPayment(
+            id,
+            customer_id,
+            amount,
+            payment_method,
+            payment_reference
+        );
+
+        res.status(201).json({
+            success: true,
+            data: payment,
+            message: `Payment recorded successfully. Receipt Number: ${payment.receipt_number}`,
+        });
+    } catch (error: any) {
+        console.error('Error recording payment:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to record payment',
+        });
+    }
+});
+
+export default router;
