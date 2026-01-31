@@ -10,8 +10,8 @@ const poolConfig: PoolConfig = process.env.DATABASE_URL
         connectionString: process.env.DATABASE_URL,
         ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
         max: 20,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
+        idleTimeoutMillis: 60000,
+        connectionTimeoutMillis: 10000,
     }
     : {
         // Individual connection parameters (local PostgreSQL)
@@ -22,8 +22,8 @@ const poolConfig: PoolConfig = process.env.DATABASE_URL
         password: process.env.DATABASE_PASSWORD,
         ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
         max: 20,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
+        idleTimeoutMillis: 60000,
+        connectionTimeoutMillis: 10000,
     };
 
 // Create connection pool

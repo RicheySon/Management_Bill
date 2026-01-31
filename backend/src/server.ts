@@ -13,6 +13,7 @@ import billingRoutes from './routes/billing.routes';
 import printRoutes from './routes/print.routes';
 import reportsRoutes from './routes/reports.routes';
 import lookupRoutes from './routes/lookup.routes';
+import authRoutes from './routes/auth.routes';
 
 // Load environment variables
 dotenv.config();
@@ -47,6 +48,7 @@ app.use('/api/bills', billingRoutes);
 app.use('/api/print', printRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/lookups', lookupRoutes);
+app.use('/api/auth', authRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import pool from '../config/database';
+import { authorize, AuthRequest } from '../middlewares/auth.middleware';
 import Joi from 'joi';
 
 const router = Router();
@@ -22,7 +23,7 @@ const customerSchema = Joi.object({
  * POST /api/customers
  * Register a new customer
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authorize(['create_customer']), async (req: AuthRequest, res: Response) => {
     try {
         const { error, value } = customerSchema.validate(req.body);
 
@@ -253,7 +254,7 @@ router.get('/', async (req: Request, res: Response) => {
  * PUT /api/customers/:id
  * Update customer information
  */
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authorize(['edit_customer']), async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
         const { error, value } = customerSchema.validate(req.body);
@@ -326,7 +327,7 @@ router.put('/:id', async (req: Request, res: Response) => {
  * DELETE /api/customers/:id
  * Soft delete customer (sets related records to inactive)
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authorize(['delete_customer']), async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
 

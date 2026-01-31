@@ -60,8 +60,160 @@ INSERT INTO business_categories (name, description, base_fee) VALUES
 ('GROCERY', 'General merchandise and groceries', 450.00),
 ('PHARMACY', 'Pharmaceutical and medical supplies', 550.00),
 ('HARDWARE', 'Hardware and construction materials', 500.00),
+('HARDWARE', 'Hardware and construction materials', 500.00),
 ('SALON/BARBER', 'Personal grooming services', 350.00),
 ('GENERAL MERCHANDISE', 'Various retail goods', 400.00);
+
+-- =====================================================
+-- RBAC TABLES (Role-Based Access Control)
+-- =====================================================
+
+-- Users Table
+CREATE TABLE system_users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    full_name VARCHAR(200) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    status VARCHAR(20) DEFAULT 'ACTIVE', -- ACTIVE, INACTIVE, SUSPENDED
+    last_login TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Roles Table
+CREATE TABLE roles (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Permissions Table
+CREATE TABLE permissions (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(50) NOT NULL UNIQUE, -- e.g., 'create_customer', 'generate_bill'
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Role-Permissions Join Table
+CREATE TABLE role_permissions (
+    role_id INTEGER REFERENCES roles(id) ON DELETE CASCADE,
+    permission_id INTEGER REFERENCES permissions(id) ON DELETE CASCADE,
+    PRIMARY KEY (role_id, permission_id)
+);
+
+-- User-Roles Join Table
+CREATE TABLE user_roles (
+    user_id UUID REFERENCES system_users(id) ON DELETE CASCADE,
+    role_id INTEGER REFERENCES roles(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, role_id)
+);
+
+-- Audit Logs Table
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES system_users(id) ON DELETE SET NULL,
+    action VARCHAR(100) NOT NULL, -- e.g., 'CREATE_CUSTOMER', 'DELETE_BILL'
+    entity_type VARCHAR(50), -- e.g., 'customers', 'bills'
+    entity_id VARCHAR(50),
+    old_values JSONB,
+    new_values JSONB,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insert Default Roles
+INSERT INTO roles (name, description) VALUES
+('Super Admin', 'Full system access'),
+('Admin', 'Management and approval access'),
+('Revenue Officer', 'Registration and billing access'),
+('Cashier', 'Payment recording only'),
+('Data Entry', 'Registration/Capturing only'),
+('Supervisor', 'Review and approval access'),
+('Auditor', 'Read-only access');
+
+-- Insert Granular Permissions
+INSERT INTO permissions (code, description) VALUES
+('manage_users', 'Full user and role management'),
+('configure_rates', 'Configure billing rates and system fees'),
+('create_customer', 'Register new customers'),
+('edit_customer', 'Modify customer details'),
+('delete_customer', 'Delete customer records'),
+('view_customer', 'View customer details'),
+('register_property', 'Register new properties'),
+('edit_property', 'Modify property details'),
+('register_business', 'Register new businesses'),
+('edit_business', 'Modify business details'),
+('generate_bill', 'Generate new invoices/bills'),
+('delete_bill', 'Cancel/Delete existing bills'),
+('print_bill', 'Print individual bills'),
+('bulk_print', 'Access bulk printing tools'),
+('record_payment', 'Recieve and record payments'),
+('void_payment', 'Void payment receipts'),
+('view_reports', 'Access financial and revenue reports'),
+('view_logs', 'View system audit logs');
+
+-- Map Permissions to Super Admin (All)
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = 'Super Admin';
+
+-- Map Permissions to Admin
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r, permissions p 
+WHERE r.name = 'Admin' AND p.code IN (
+    'create_customer', 'edit_customer', 'view_customer',
+    'register_property', 'edit_property',
+    'register_business', 'edit_business',
+    'generate_bill', 'print_bill', 'bulk_print', 'view_reports'
+);
+
+-- Map Permissions to Revenue Officer
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r, permissions p 
+WHERE r.name = 'Revenue Officer' AND p.code IN (
+    'create_customer', 'view_customer',
+    'register_property', 'register_business',
+    'generate_bill', 'print_bill', 'record_payment'
+);
+
+-- Map Permissions to Cashier
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r, permissions p 
+WHERE r.name = 'Cashier' AND p.code IN (
+    'view_customer', 'record_payment', 'print_bill'
+);
+
+-- Map Permissions to Data Entry
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r, permissions p 
+WHERE r.name = 'Data Entry' AND p.code IN (
+    'create_customer', 'view_customer', 'register_property', 'register_business'
+);
+
+-- Map Permissions to Supervisor
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r, permissions p 
+WHERE r.name = 'Supervisor' AND p.code IN (
+    'view_customer', 'view_reports', 'bulk_print'
+);
+
+-- Map Permissions to Auditor
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r, permissions p 
+WHERE r.name = 'Auditor' AND p.code IN (
+    'view_customer', 'view_reports', 'view_logs'
+);
+
+-- Seed Initial Super Admin (Password: admin123)
+-- Hash generated for 'admin123'
+INSERT INTO system_users (full_name, email, password_hash)
+VALUES ('System Administrator', 'admin@ganorth.gov.gh', '$2a$10$X86Y0mXvU/l.fPqK6Uf.A.8Z8c7NlRkS1l/1p1v5zL77.7.777777');
+
+INSERT INTO user_roles (user_id, role_id)
+SELECT u.id, r.id FROM system_users u, roles r 
+WHERE u.email = 'admin@ganorth.gov.gh' AND r.name = 'Super Admin';
 
 -- =====================================================
 -- CORE TABLES

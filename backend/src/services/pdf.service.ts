@@ -78,7 +78,7 @@ const fetchBillData = async (billId: string): Promise<BillData> => {
 /**
  * Generate GA North Municipal Bill PDF
  */
-export const generateBillPDF = async (billId: string): Promise<PDFDocument> => {
+export const generateBillPDF = async (billId: string): Promise<typeof PDFDocument> => {
     const data = await fetchBillData(billId);
     const { bill, customer, property, business, electoral_area, landmark } = data;
 
@@ -287,7 +287,7 @@ export const generateBillPDF = async (billId: string): Promise<PDFDocument> => {
 /**
  * Generate multiple bills as bulk PDF
  */
-export const generateBulkBillsPDF = async (billIds: string[]): Promise<PDFDocument> => {
+export const generateBulkBillsPDF = async (billIds: string[]): Promise<typeof PDFDocument> => {
     const doc = new PDFDocument({
         size: 'A4',
         margins: { top: 30, bottom: 30, left: 40, right: 40 },
@@ -299,7 +299,7 @@ export const generateBulkBillsPDF = async (billIds: string[]): Promise<PDFDocume
         }
 
         // Generate each bill on a new page
-        const billDoc = await generateBillPDF(billIds[i]);
+        await generateBillPDF(billIds[i]);
         // Note: In production, you'd merge PDFs properly
         // This is a simplified version
     }

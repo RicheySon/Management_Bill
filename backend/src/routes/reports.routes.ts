@@ -1,7 +1,12 @@
 import { Router, Request, Response } from 'express';
+import { authenticateToken, authorize } from '../middlewares/auth.middleware';
 import pool from '../config/database';
 
 const router = Router();
+
+// Apply authentication to all reports routes
+router.use(authenticateToken);
+router.use(authorize(['view_reports']));
 
 /**
  * GET /api/reports/revenue

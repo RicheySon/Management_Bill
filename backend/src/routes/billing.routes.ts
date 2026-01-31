@@ -1,15 +1,19 @@
 import { Router, Request, Response } from 'express';
 import Joi from 'joi';
 import { generateBill, recordPayment } from '../services/billing.service';
+import { authenticateToken, authorize } from '../middlewares/auth.middleware';
 import pool from '../config/database';
 
 const router = Router();
+
+// Apply authentication to all billing routes
+router.use(authenticateToken);
 
 /**
  * POST /api/bills/generate
  * Generate a new bill for property or business
  */
-router.post('/generate', async (req: Request, res: Response) => {
+router.post('/generate', authorize(['generate_bill']), async (req: Request, res: Response) => {
     try {
         const schema = Joi.object({
             bill_type: Joi.string().valid('PROPERTY_RATE', 'BOP').required(),
@@ -55,23 +59,23 @@ router.get('/:id', async (req: Request, res: Response) => {
 
         const result = await pool.query(
             `SELECT b.*,
-        c.full_name, c.phone_number, c.gps_address as customer_gps,
-        p.property_number, p.street_name, p.gps_address as property_gps,
-        p.landmark as property_landmark,
-        ea_p.name as property_electoral_area,
-        bus.business_number, bus.business_name, bus.business_activity,
-        bus.street_name as business_street, bus.gps_address as business_gps,
-        bus.landmark as business_landmark,
-        ea_b.name as business_electoral_area,
-        bc.name as business_category
-       FROM bills b
-       LEFT JOIN customers c ON b.customer_id = c.id
-       LEFT JOIN properties p ON b.property_id = p.id
-       LEFT JOIN electoral_areas ea_p ON p.electoral_area_id = ea_p.id
-       LEFT JOIN businesses bus ON b.business_id = bus.id
-       LEFT JOIN electoral_areas ea_b ON bus.electoral_area_id = ea_b.id
-       LEFT JOIN business_categories bc ON bus.category_id = bc.id
-       WHERE b.id = $1`,
+                c.full_name, c.phone_number, c.gps_address as customer_gps,
+                p.property_number, p.street_name, p.gps_address as property_gps,
+                p.landmark as property_landmark,
+                ea_p.name as property_electoral_area,
+                bus.business_number, bus.business_name, bus.business_activity,
+                bus.street_name as business_street, bus.gps_address as business_gps,
+                bus.landmark as business_landmark,
+                ea_b.name as business_electoral_area,
+                bc.name as business_category
+            FROM bills b
+            LEFT JOIN customers c ON b.customer_id = c.id
+            LEFT JOIN properties p ON b.property_id = p.id
+            LEFT JOIN electoral_areas ea_p ON p.electoral_area_id = ea_p.id
+            LEFT JOIN businesses bus ON b.business_id = bus.id
+            LEFT JOIN electoral_areas ea_b ON bus.electoral_area_id = ea_b.id
+            LEFT JOIN business_categories bc ON bus.category_id = bc.id
+            WHERE b.id = $1`,
             [id]
         );
 
@@ -114,14 +118,14 @@ router.get('/customer/:customerId', async (req: Request, res: Response) => {
         const { status, bill_type } = req.query;
 
         let query = `
-      SELECT b.*,
-        p.property_number,
-        bus.business_number, bus.business_name
-      FROM bills b
-      LEFT JOIN properties p ON b.property_id = p.id
-      LEFT JOIN businesses bus ON b.business_id = bus.id
-      WHERE b.customer_id = $1
-    `;
+            SELECT b.*,
+                p.property_number,
+                bus.business_number, bus.business_name
+            FROM bills b
+            LEFT JOIN properties p ON b.property_id = p.id
+            LEFT JOIN businesses bus ON b.business_id = bus.id
+            WHERE b.customer_id = $1
+        `;
 
         const queryParams: any[] = [customerId];
         let paramIndex = 2;
@@ -171,19 +175,18 @@ router.get('/', async (req: Request, res: Response) => {
         } = req.query;
 
         let query = `
-      SELECT b.*,
-        c.full_name,
-        p.property_number,
-        bus.business_number, bus.business_name,
-        ea.name as electoral_area
-      FROM bills b
-      LEFT JOIN customers c ON b.customer_id = c.id
-      LEFT JOIN properties p ON b.property_id = p.id
-      LEFT JOIN businesses bus ON b.business_id = bus.id
-      LEFT JOIN electoral_areas ea ON 
-        COALESCE(p.electoral_area_id, bus.electoral_area_id) = ea.id
-      WHERE 1=1
-    `;
+            SELECT b.*,
+                c.full_name,
+                p.property_number,
+                bus.business_number, bus.business_name,
+                ea.name as electoral_area
+            FROM bills b
+            LEFT JOIN customers c ON b.customer_id = c.id
+            LEFT JOIN properties p ON b.property_id = p.id
+            LEFT JOIN businesses bus ON b.business_id = bus.id
+            LEFT JOIN electoral_areas ea ON COALESCE(p.electoral_area_id, bus.electoral_area_id) = ea.id
+            WHERE 1 = 1
+        `;
 
         const queryParams: any[] = [];
         let paramIndex = 1;
@@ -254,7 +257,7 @@ router.get('/', async (req: Request, res: Response) => {
  * POST /api/bills/:id/payment
  * Record a payment for a bill
  */
-router.post('/:id/payment', async (req: Request, res: Response) => {
+router.post('/:id/payment', authorize(['record_payment']), async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
 

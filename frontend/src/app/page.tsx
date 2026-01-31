@@ -27,7 +27,7 @@ export default function HomePage() {
         return (
             <div className="flex items-center justify-center h-96">
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-municipal-blue mx-auto mb-4"></div>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-municipal-red mx-auto mb-4"></div>
                     <p className="text-gray-600">Loading dashboard...</p>
                 </div>
             </div>
@@ -61,7 +61,7 @@ export default function HomePage() {
                     title="Total Customers"
                     value={counts.customers || 0}
                     icon={<Users className="w-8 h-8" />}
-                    color="bg-blue-500"
+                    color="bg-municipal-red"
                 />
                 <StatCard
                     title="Active Properties"
@@ -172,9 +172,9 @@ function ActionButton({ href, label, icon }: any) {
     return (
         <a
             href={href}
-            className="flex items-center space-x-3 p-4 bg-blue-50 hover:bg-blue-100 rounded-lg border-2 border-blue-200 hover:border-blue-300 transition-all group"
+            className="flex items-center space-x-3 p-4 bg-red-50 hover:bg-red-100 rounded-lg border-2 border-red-200 hover:border-red-300 transition-all group"
         >
-            <div className="text-municipal-blue group-hover:scale-110 transition-transform">
+            <div className="text-municipal-red group-hover:scale-110 transition-transform">
                 {icon}
             </div>
             <span className="font-semibold text-gray-800">{label}</span>

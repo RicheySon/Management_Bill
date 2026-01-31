@@ -8,6 +8,8 @@ import {
     Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
 
+import Link from 'next/link';
+
 export default function ReportsPage() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('revenue');
@@ -104,8 +106,8 @@ export default function ReportsPage() {
                     title="Top Area"
                     value={revenueData[0]?.area_name || 'N/A'}
                     trend="Highest compliance"
-                    icon={<BarChart3 className="text-blue-600" />}
-                    color="border-l-4 border-l-blue-500"
+                    icon={<BarChart3 className="text-municipal-red" />}
+                    color="border-l-4 border-l-municipal-red"
                 />
             </div>
 
@@ -113,13 +115,13 @@ export default function ReportsPage() {
             <div className="border-b flex space-x-8">
                 <button
                     onClick={() => setActiveTab('revenue')}
-                    className={`pb-4 px-2 font-bold text-sm transition-all ${activeTab === 'revenue' ? 'border-b-2 border-municipal-blue text-municipal-blue' : 'text-gray-400'}`}
+                    className={`pb-4 px-2 font-bold text-sm transition-all ${activeTab === 'revenue' ? 'border-b-2 border-municipal-red text-municipal-red' : 'text-gray-400'}`}
                 >
                     REVENUE BY PERIOD
                 </button>
                 <button
                     onClick={() => setActiveTab('defaulters')}
-                    className={`pb-4 px-2 font-bold text-sm transition-all ${activeTab === 'defaulters' ? 'border-b-2 border-municipal-blue text-municipal-blue' : 'text-gray-400'}`}
+                    className={`pb-4 px-2 font-bold text-sm transition-all ${activeTab === 'defaulters' ? 'border-b-2 border-municipal-red text-municipal-red' : 'text-gray-400'}`}
                 >
                     DEFAULTERS LIST
                 </button>
@@ -137,7 +139,7 @@ export default function ReportsPage() {
                                 <XAxis dataKey="period_label" />
                                 <YAxis />
                                 <Tooltip />
-                                <Bar dataKey="total_collected" fill="#000080" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="total_collected" fill="#991B1B" radius={[4, 4, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -192,7 +194,7 @@ export default function ReportsPage() {
                                         <td className="p-4 text-gray-600">{item.area_name}</td>
                                         <td className="p-4 text-right font-black text-red-600">GHS {parseFloat(item.total_outstanding).toLocaleString()}</td>
                                         <td className="p-4 text-center">
-                                            <Link href={`/customers/${item.id}`} className="text-municipal-blue hover:underline text-xs font-bold">SEND REMINDER</Link>
+                                            <Link href={`/customers/${item.id}`} className="text-municipal-red hover:underline text-xs font-bold">SEND REMINDER</Link>
                                         </td>
                                     </tr>
                                 ))}
@@ -221,5 +223,5 @@ function SummaryCard({ title, value, trend, icon, color }: any) {
 }
 
 function Loader2() {
-    return <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-municipal-blue"></div>;
+    return <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-municipal-red"></div>;
 }

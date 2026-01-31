@@ -96,7 +96,7 @@ export default function NewBusinessPage() {
             )}
 
             {error && (
-                <div className="bg-red-50 border-2 border-red-500 text-red-800 px-6 py-4 rounded-lg mb-6">
+                <div className="bg-red-50 border-2 border-municipal-red text-red-800 px-6 py-4 rounded-lg mb-6">
                     <p className="font-semibold">✗ Error</p>
                     <p className="text-sm">{error}</p>
                 </div>
@@ -107,7 +107,7 @@ export default function NewBusinessPage() {
                     {/* Business Name */}
                     <div className="md:col-span-2">
                         <label className="label">
-                            Business Name <span className="text-red-500">*</span>
+                            Business Name <span className="text-municipal-red">*</span>
                         </label>
                         <input
                             type="text"
@@ -123,7 +123,7 @@ export default function NewBusinessPage() {
                     {/* Owner/Customer */}
                     <div>
                         <label className="label">
-                            Business Owner <span className="text-red-500">*</span>
+                            Business Owner <span className="text-municipal-red">*</span>
                         </label>
                         <select
                             {...register('customer_id', { required: 'Please select owner' })}
@@ -144,7 +144,7 @@ export default function NewBusinessPage() {
                     {/* Business Category */}
                     <div>
                         <label className="label">
-                            Business Category <span className="text-red-500">*</span>
+                            Business Category <span className="text-municipal-red">*</span>
                         </label>
                         <select
                             {...register('category_id', { required: 'Please select category' })}
@@ -165,7 +165,7 @@ export default function NewBusinessPage() {
                     {/* Business Activity */}
                     <div className="md:col-span-2">
                         <label className="label">
-                            Business Activity (What you sell/do) <span className="text-red-500">*</span>
+                            Business Activity (What you sell/do) <span className="text-municipal-red">*</span>
                         </label>
                         <textarea
                             {...register('business_activity', { required: 'Please describe business activity' })}
@@ -252,8 +252,8 @@ export default function NewBusinessPage() {
                     </div>
                 </div>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-sm text-blue-800">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p className="text-sm text-red-800">
                         <strong>Note:</strong> A unique Business Operating Permit (BOP) Number will be automatically
                         generated in the format <code className="font-mono bg-white px-2 py-1 rounded">GN-BOP-2026-NNNNNN</code>
                     </p>

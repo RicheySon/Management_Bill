@@ -106,7 +106,7 @@ export default function BillingPage() {
             <div className="card overflow-hidden">
                 {loading ? (
                     <div className="flex items-center justify-center h-64">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-municipal-blue"></div>
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-municipal-red"></div>
                     </div>
                 ) : bills.length > 0 ? (
                     <div className="overflow-x-auto">
@@ -125,7 +125,7 @@ export default function BillingPage() {
                                 {bills.map((bill) => (
                                     <tr key={bill.id} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-bold text-municipal-blue">{bill.bill_number}</div>
+                                            <div className="text-sm font-bold text-municipal-red">{bill.bill_number}</div>
                                             <div className="text-xs text-gray-500">{bill.bill_type} ({bill.billing_year})</div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
@@ -146,7 +146,7 @@ export default function BillingPage() {
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm space-x-2">
                                             <button
                                                 onClick={() => downloadBillPDF(bill.id)}
-                                                className="inline-flex items-center p-2 text-gray-600 hover:text-municipal-blue hover:bg-blue-50 rounded-lg transition-all"
+                                                className="inline-flex items-center p-2 text-gray-600 hover:text-municipal-red hover:bg-red-50 rounded-lg transition-all"
                                                 title="Download Bill"
                                             >
                                                 <Printer className="w-5 h-5" />

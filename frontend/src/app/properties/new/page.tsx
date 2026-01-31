@@ -109,7 +109,7 @@ export default function NewPropertyPage() {
             )}
 
             {error && (
-                <div className="bg-red-50 border-2 border-red-500 text-red-800 px-6 py-4 rounded-lg mb-6">
+                <div className="bg-red-50 border-2 border-municipal-red text-red-800 px-6 py-4 rounded-lg mb-6">
                     <p className="font-semibold">✗ Error</p>
                     <p className="text-sm">{error}</p>
                 </div>
@@ -120,7 +120,7 @@ export default function NewPropertyPage() {
                     {/* Customer/Owner */}
                     <div className="md:col-span-2">
                         <label className="label">
-                            Select Owner (Customer) <span className="text-red-500">*</span>
+                            Select Owner (Customer) <span className="text-municipal-red">*</span>
                         </label>
                         <select
                             {...register('customer_id', { required: 'Please select a customer' })}
@@ -141,7 +141,7 @@ export default function NewPropertyPage() {
                     {/* Property Classification */}
                     <div>
                         <label className="label">
-                            Property Type <span className="text-red-500">*</span>
+                            Property Type <span className="text-municipal-red">*</span>
                         </label>
                         <select
                             {...register('classification_id', { required: 'Please select property type' })}
@@ -242,8 +242,8 @@ export default function NewPropertyPage() {
                     </div>
                 </div>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-sm text-blue-800">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p className="text-red-800">
                         <strong>Note:</strong> A unique Property Number will be automatically generated upon registration
                         in the format <code className="font-mono bg-white px-2 py-1 rounded">GN-PR-2026-NNNNNN</code>
                     </p>

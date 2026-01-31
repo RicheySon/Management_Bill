@@ -69,7 +69,7 @@ export default function BulkPrintPage() {
                 <div className="md:col-span-2">
                     <form onSubmit={handlePrint} className="card space-y-6">
                         <h2 className="text-lg font-bold flex items-center space-x-2">
-                            <Filter className="w-5 h-5 text-municipal-blue" />
+                            <Filter className="w-5 h-5 text-municipal-red" />
                             <span>Define Print Queue</span>
                         </h2>
 
@@ -178,8 +178,8 @@ export default function BulkPrintPage() {
 
                 {/* Sidebar Info */}
                 <div className="space-y-6">
-                    <div className="card bg-blue-50 border-blue-100">
-                        <h3 className="font-bold text-municipal-blue flex items-center space-x-2 mb-3">
+                    <div className="card bg-red-50 border-blue-100">
+                        <h3 className="font-bold text-municipal-red flex items-center space-x-2 mb-3">
                             <Info className="w-5 h-5" />
                             <span>Printing Instructions</span>
                         </h3>

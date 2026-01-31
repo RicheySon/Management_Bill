@@ -8,20 +8,24 @@ const router = Router();
  * Get all electoral areas
  */
 router.get('/electoral-areas', async (req: Request, res: Response) => {
+    console.log('GET /api/lookups/electoral-areas - Fetching electoral areas');
     try {
         const result = await pool.query(
-            'SELECT * FROM electoral_areas ORDER BY name'
+            'SELECT id, name, code FROM electoral_areas ORDER BY name'
         );
+
+        console.log(`Found ${result.rows.length} electoral areas`);
 
         res.json({
             success: true,
-            data: result.rows,
+            data: result.rows || [],
         });
     } catch (error: any) {
         console.error('Error fetching electoral areas:', error);
         res.status(500).json({
             success: false,
             error: 'Failed to fetch electoral areas',
+            data: []
         });
     }
 });
@@ -31,13 +35,14 @@ router.get('/electoral-areas', async (req: Request, res: Response) => {
  * Get local areas, optionally filtered by electoral area
  */
 router.get('/local-areas', async (req: Request, res: Response) => {
-    try {
-        const { electoral_area_id } = req.query;
+    const { electoral_area_id } = req.query;
+    console.log(`GET /api/lookups/local-areas - Fetching local areas for electoral_area_id: ${electoral_area_id}`);
 
-        let query = 'SELECT la.*, ea.name as electoral_area_name FROM local_areas la LEFT JOIN electoral_areas ea ON la.electoral_area_id = ea.id WHERE 1=1';
+    try {
+        let query = 'SELECT la.id, la.name, la.electoral_area_id, ea.name as electoral_area_name FROM local_areas la LEFT JOIN electoral_areas ea ON la.electoral_area_id = ea.id WHERE 1=1';
         const queryParams: any[] = [];
 
-        if (electoral_area_id) {
+        if (electoral_area_id && electoral_area_id !== 'undefined' && electoral_area_id !== '') {
             query += ' AND la.electoral_area_id = $1';
             queryParams.push(electoral_area_id);
         }
@@ -45,16 +50,18 @@ router.get('/local-areas', async (req: Request, res: Response) => {
         query += ' ORDER BY la.name';
 
         const result = await pool.query(query, queryParams);
+        console.log(`Found ${result.rows.length} local areas`);
 
         res.json({
             success: true,
-            data: result.rows,
+            data: result.rows || [],
         });
     } catch (error: any) {
         console.error('Error fetching local areas:', error);
         res.status(500).json({
             success: false,
             error: 'Failed to fetch local areas',
+            data: []
         });
     }
 });

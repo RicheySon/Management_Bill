@@ -1,9 +1,13 @@
 import { Router, Request, Response } from 'express';
 import Joi from 'joi';
-import { generateBillPDF, generateBulkBillsPDF } from '../services/pdf.service';
+import { authenticateToken, authorize } from '../middlewares/auth.middleware';
+import { generateBillPDF } from '../services/pdf.service';
 import pool from '../config/database';
 
 const router = Router();
+
+// Apply authentication to all print routes
+router.use(authenticateToken);
 
 /**
  * GET /api/print/bill/:id
@@ -33,9 +37,9 @@ router.get('/bill/:id', async (req: Request, res: Response) => {
 
 /**
  * POST /api/print/bills/bulk
- * Generate bulk bills PDF with filters
+ * Generate a single PDF with multiple bills based on filters
  */
-router.post('/bills/bulk', async (req: Request, res: Response) => {
+router.post('/bills/bulk', authorize(['bulk_print']), async (req: Request, res: Response) => {
     try {
         const schema = Joi.object({
             filters: Joi.object({
@@ -68,12 +72,12 @@ router.post('/bills/bulk', async (req: Request, res: Response) => {
         } else {
             // Otherwise, fetch based on filters
             let query = `
-        SELECT b.id
-        FROM bills b
-        LEFT JOIN properties p ON b.property_id = p.id
-        LEFT JOIN businesses bus ON b.business_id = bus.id
-        WHERE 1=1
-      `;
+                SELECT b.id
+                FROM bills b
+                LEFT JOIN properties p ON b.property_id = p.id
+                LEFT JOIN businesses bus ON b.business_id = bus.id
+                WHERE 1 = 1
+            `;
 
             const queryParams: any[] = [];
             let paramIndex = 1;
@@ -111,6 +115,7 @@ router.post('/bills/bulk', async (req: Request, res: Response) => {
             if (filters?.year) {
                 query += ` AND b.bill_period_year = $${paramIndex}`;
                 queryParams.push(filters.year);
+                paramIndex++;
             }
 
             query += ` ORDER BY b.issue_date DESC LIMIT 100`;
@@ -133,7 +138,8 @@ router.post('/bills/bulk', async (req: Request, res: Response) => {
         for (let i = 1; i < billIdsToGenerate.length; i++) {
             doc.addPage();
             // In production, use a proper PDF merging library like pdf-lib
-            const billDoc = await generateBillPDF(billIdsToGenerate[i]);
+            // For now we just add a page to keep it consistent with the existing logic
+            await generateBillPDF(billIdsToGenerate[i]);
         }
 
         res.setHeader('Content-Type', 'application/pdf');
@@ -161,10 +167,10 @@ router.get('/receipt/:paymentId', async (req: Request, res: Response) => {
         // Get payment details
         const paymentResult = await pool.query(
             `SELECT p.*, b.bill_number, b.bill_type, c.full_name, c.phone_number
-       FROM payments p
-       LEFT JOIN bills b ON p.bill_id = b.id
-       LEFT JOIN customers c ON p.customer_id = c.id
-       WHERE p.id = $1`,
+            FROM payments p
+            LEFT JOIN bills b ON p.bill_id = b.id
+            LEFT JOIN customers c ON p.customer_id = c.id
+            WHERE p.id = $1`,
             [paymentId]
         );
 
@@ -177,7 +183,7 @@ router.get('/receipt/:paymentId', async (req: Request, res: Response) => {
 
         const payment = paymentResult.rows[0];
 
-        // Generate simple receipt (you can enhance this)
+        // Generate simple receipt using PDFDocument
         const PDFDocument = require('pdfkit');
         const doc = new PDFDocument({ size: 'A4' });
 

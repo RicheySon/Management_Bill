@@ -57,7 +57,7 @@ export default function BillDetailPage() {
         }
     };
 
-    if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-municipal-blue"></div></div>;
+    if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-municipal-red"></div></div>;
     if (!bill) return <div className="text-center py-20 text-red-500">Bill not found</div>;
 
     const balance = parseFloat(bill.total_amount) - parseFloat(bill.amount_paid);
@@ -84,7 +84,7 @@ export default function BillDetailPage() {
                 {/* Bill Info Card */}
                 <div className="lg:col-span-2 space-y-6">
                     <div className="card overflow-hidden">
-                        <div className={`px-6 py-4 flex justify-between items-center ${bill.status === 'PAID' ? 'bg-green-600' : 'bg-municipal-blue'} text-white`}>
+                        <div className={`px-6 py-4 flex justify-between items-center ${bill.status === 'PAID' ? 'bg-green-600' : 'bg-municipal-red'} text-white`}>
                             <div>
                                 <h2 className="text-2xl font-bold">{bill.bill_number}</h2>
                                 <p className="text-sm opacity-90">{bill.bill_type} Invoice - {bill.billing_year}</p>
@@ -164,7 +164,7 @@ export default function BillDetailPage() {
                     {/* Payment History */}
                     <div className="card">
                         <h3 className="text-lg font-bold mb-4 flex items-center space-x-2">
-                            <History className="w-5 h-5 text-municipal-blue" />
+                            <History className="w-5 h-5 text-municipal-red" />
                             <span>Payment History</span>
                         </h3>
                         {bill.payments && bill.payments.length > 0 ? (
@@ -191,7 +191,7 @@ export default function BillDetailPage() {
                 <div className="space-y-6">
                     <div className="card sticky top-6">
                         <h3 className="text-lg font-bold mb-4 flex items-center space-x-2">
-                            <CreditCard className="w-5 h-5 text-municipal-blue" />
+                            <CreditCard className="w-5 h-5 text-municipal-red" />
                             <span>Record Payment</span>
                         </h3>
 

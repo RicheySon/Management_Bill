@@ -24,25 +24,45 @@ export default apiClient;
 
 // Lookups
 export const fetchElectoralAreas = async () => {
-    const response = await apiClient.get('/lookups/electoral-areas');
-    return response.data.data;
+    try {
+        const response = await apiClient.get('/lookups/electoral-areas');
+        return response.data.data || [];
+    } catch (error) {
+        console.error('fetchElectoralAreas error:', error);
+        return [];
+    }
 };
 
 export const fetchLocalAreas = async (electoralAreaId?: number) => {
-    const response = await apiClient.get('/lookups/local-areas', {
-        params: { electoral_area_id: electoralAreaId },
-    });
-    return response.data.data;
+    try {
+        const response = await apiClient.get('/lookups/local-areas', {
+            params: { electoral_area_id: electoralAreaId },
+        });
+        return response.data.data || [];
+    } catch (error) {
+        console.error('fetchLocalAreas error:', error);
+        return [];
+    }
 };
 
 export const fetchPropertyClassifications = async () => {
-    const response = await apiClient.get('/lookups/property-classifications');
-    return response.data.data;
+    try {
+        const response = await apiClient.get('/lookups/property-classifications');
+        return response.data.data || [];
+    } catch (error) {
+        console.error('fetchPropertyClassifications error:', error);
+        return [];
+    }
 };
 
 export const fetchBusinessCategories = async () => {
-    const response = await apiClient.get('/lookups/business-categories');
-    return response.data.data;
+    try {
+        const response = await apiClient.get('/lookups/business-categories');
+        return response.data.data || [];
+    } catch (error) {
+        console.error('fetchBusinessCategories error:', error);
+        return [];
+    }
 };
 
 // Customers

@@ -32,26 +32,41 @@ export default function NewCustomerPage() {
     useEffect(() => {
         const loadLookups = async () => {
             try {
+                console.log('Fetching electoral areas...');
                 const areas = await fetchElectoralAreas();
-                setElectoralAreas(areas);
+                console.log('Received electoral areas:', areas);
+                if (Array.isArray(areas)) {
+                    setElectoralAreas(areas);
+                } else {
+                    console.error('Electoral areas is not an array:', areas);
+                }
             } catch (err) {
                 console.error('Failed to load electoral areas:', err);
+                setError('Failed to connect to backend service');
             }
         };
         loadLookups();
     }, []);
 
     useEffect(() => {
-        if (selectedElectoralArea) {
+        if (selectedElectoralArea && selectedElectoralArea !== '') {
             const loadLocalAreas = async () => {
                 try {
+                    console.log(`Fetching local areas for ID: ${selectedElectoralArea}`);
                     const areas = await fetchLocalAreas(Number(selectedElectoralArea));
-                    setLocalAreas(areas);
+                    console.log('Received local areas:', areas);
+                    if (Array.isArray(areas)) {
+                        setLocalAreas(areas);
+                    } else {
+                        setLocalAreas([]);
+                    }
                 } catch (err) {
                     console.error('Failed to load local areas:', err);
                 }
             };
             loadLocalAreas();
+        } else {
+            setLocalAreas([]);
         }
     }, [selectedElectoralArea]);
 
@@ -90,7 +105,7 @@ export default function NewCustomerPage() {
             )}
 
             {error && (
-                <div className="bg-red-50 border-2 border-red-500 text-red-800 px-6 py-4 rounded-lg mb-6">
+                <div className="bg-red-50 border-2 border-municipal-red text-red-800 px-6 py-4 rounded-lg mb-6">
                     <p className="font-semibold">✗ Error</p>
                     <p className="text-sm">{error}</p>
                 </div>
@@ -101,7 +116,7 @@ export default function NewCustomerPage() {
                     {/* Full Name */}
                     <div className="md:col-span-2">
                         <label className="label">
-                            Full Name <span className="text-red-500">*</span>
+                            Full Name <span className="text-municipal-red">*</span>
                         </label>
                         <input
                             type="text"
@@ -117,7 +132,7 @@ export default function NewCustomerPage() {
                     {/* Phone Number */}
                     <div>
                         <label className="label">
-                            Phone Number <span className="text-red-500">*</span>
+                            Phone Number <span className="text-municipal-red">*</span>
                         </label>
                         <input
                             type="tel"

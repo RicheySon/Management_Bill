@@ -34,7 +34,7 @@ export default function CustomerDetailPage() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-96">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-municipal-blue"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-municipal-red"></div>
             </div>
         );
     }
@@ -57,7 +57,7 @@ export default function CustomerDetailPage() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center space-x-4">
-                    <div className="w-16 h-16 bg-municipal-blue text-white rounded-full flex items-center justify-center">
+                    <div className="w-16 h-16 bg-municipal-red text-white rounded-full flex items-center justify-center">
                         <User className="w-8 h-8" />
                     </div>
                     <div>
@@ -86,7 +86,7 @@ export default function CustomerDetailPage() {
                 {/* Contact Info Card */}
                 <div className="card space-y-6">
                     <h2 className="text-xl font-bold border-b pb-2 flex items-center space-x-2">
-                        <User className="w-5 h-5 text-municipal-blue" />
+                        <User className="w-5 h-5 text-municipal-red" />
                         <span>Contact Information</span>
                     </h2>
                     <div className="space-y-4">
@@ -128,10 +128,10 @@ export default function CustomerDetailPage() {
                     <div className="card">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-xl font-bold flex items-center space-x-2">
-                                <Building2 className="w-5 h-5 text-municipal-blue" />
+                                <Building2 className="w-5 h-5 text-municipal-red" />
                                 <span>Properties</span>
                             </h2>
-                            <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                            <span className="bg-red-50 text-red-700 text-xs font-bold px-2.5 py-0.5 rounded-full">
                                 {customer.properties?.length || 0} Total
                             </span>
                         </div>
@@ -149,7 +149,7 @@ export default function CustomerDetailPage() {
                                     <tbody className="bg-white divide-y divide-gray-200">
                                         {customer.properties.map((prop: any) => (
                                             <tr key={prop.id} className="hover:bg-gray-50">
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-municipal-blue">
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-municipal-red">
                                                     <Link href={`/properties/${prop.id}`}>{prop.property_number}</Link>
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{prop.classification_name}</td>
@@ -169,10 +169,10 @@ export default function CustomerDetailPage() {
                     <div className="card">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-xl font-bold flex items-center space-x-2">
-                                <Briefcase className="w-5 h-5 text-municipal-blue" />
+                                <Briefcase className="w-5 h-5 text-municipal-red" />
                                 <span>Businesses (BOP)</span>
                             </h2>
-                            <span className="bg-orange-100 text-orange-800 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                            <span className="bg-orange-50 text-orange-700 text-xs font-bold px-2.5 py-0.5 rounded-full">
                                 {customer.businesses?.length || 0} Total
                             </span>
                         </div>
@@ -190,7 +190,7 @@ export default function CustomerDetailPage() {
                                     <tbody className="bg-white divide-y divide-gray-200">
                                         {customer.businesses.map((biz: any) => (
                                             <tr key={biz.id} className="hover:bg-gray-50">
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-municipal-blue">
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-municipal-red">
                                                     <Link href={`/businesses/${biz.id}`}>{biz.business_number}</Link>
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">{biz.business_name}</td>
@@ -210,15 +210,15 @@ export default function CustomerDetailPage() {
                     <div className="card">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-xl font-bold flex items-center space-x-2">
-                                <FileText className="w-5 h-5 text-municipal-blue" />
+                                <FileText className="w-5 h-5 text-municipal-red" />
                                 <span>Recent Billing History</span>
                             </h2>
-                            <Link href="/billing" className="text-municipal-blue text-sm hover:underline">View All Bills</Link>
+                            <Link href="/billing" className="text-municipal-red text-sm hover:underline">View All Bills</Link>
                         </div>
                         {customer.bills && customer.bills.length > 0 ? (
                             <div className="space-y-3">
                                 {customer.bills.slice(0, 5).map((bill: any) => (
-                                    <div key={bill.id} className="flex items-center justify-between p-4 border rounded-lg hover:border-municipal-blue transition-colors">
+                                    <div key={bill.id} className="flex items-center justify-between p-4 border rounded-lg hover:border-municipal-red transition-colors">
                                         <div className="flex items-center space-x-4">
                                             <div className={`p-2 rounded-full ${bill.status === 'PAID' ? 'bg-green-100 text-green-600' : bill.status === 'PARTIAL' ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'}`}>
                                                 <FileText className="w-5 h-5" />
@@ -238,7 +238,7 @@ export default function CustomerDetailPage() {
                                             <div className="flex items-center space-x-2">
                                                 <button
                                                     onClick={() => downloadBillPDF(bill.id)}
-                                                    className="p-2 text-gray-500 hover:text-municipal-blue transition-colors"
+                                                    className="p-2 text-gray-500 hover:text-municipal-red transition-colors"
                                                     title="Download PDF"
                                                 >
                                                     <Printer className="w-5 h-5" />

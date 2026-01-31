@@ -117,18 +117,18 @@ export default function GenerateBillPage() {
                     <div>
                         <label className="label">What type of bill are you generating?</label>
                         <div className="grid grid-cols-2 gap-4">
-                            <label className={`flex items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all ${watchBillType === 'PROPERTY' ? 'border-municipal-blue bg-blue-50' : 'border-gray-200'}`}>
+                            <label className={`flex items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all ${watchBillType === 'PROPERTY' ? 'border-municipal-red bg-red-50' : 'border-gray-200'}`}>
                                 <input type="radio" value="PROPERTY" {...register('bill_type')} className="hidden" />
                                 <div className="text-center">
-                                    <Building2 className={`w-8 h-8 mx-auto mb-2 ${watchBillType === 'PROPERTY' ? 'text-municipal-blue' : 'text-gray-400'}`} />
-                                    <span className={`font-bold ${watchBillType === 'PROPERTY' ? 'text-municipal-blue' : 'text-gray-500'}`}>Property Rate</span>
+                                    <Building2 className={`w-8 h-8 mx-auto mb-2 ${watchBillType === 'PROPERTY' ? 'text-municipal-red' : 'text-gray-400'}`} />
+                                    <span className={`font-bold ${watchBillType === 'PROPERTY' ? 'text-municipal-red' : 'text-gray-500'}`}>Property Rate</span>
                                 </div>
                             </label>
-                            <label className={`flex items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all ${watchBillType === 'BOP' ? 'border-orange-500 bg-orange-50' : 'border-gray-200'}`}>
+                            <label className={`flex items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all ${watchBillType === 'BOP' ? 'border-municipal-red bg-red-50' : 'border-gray-200'}`}>
                                 <input type="radio" value="BOP" {...register('bill_type')} className="hidden" />
                                 <div className="text-center">
-                                    <Briefcase className={`w-8 h-8 mx-auto mb-2 ${watchBillType === 'BOP' ? 'text-orange-600' : 'text-gray-400'}`} />
-                                    <span className={`font-bold ${watchBillType === 'BOP' ? 'text-orange-600' : 'text-gray-500'}`}>BOP Permit</span>
+                                    <Briefcase className={`w-8 h-8 mx-auto mb-2 ${watchBillType === 'BOP' ? 'text-municipal-red' : 'text-gray-400'}`} />
+                                    <span className={`font-bold ${watchBillType === 'BOP' ? 'text-municipal-red' : 'text-gray-500'}`}>BOP Permit</span>
                                 </div>
                             </label>
                         </div>
@@ -163,7 +163,7 @@ export default function GenerateBillPage() {
                                     {selectedCustomerData.properties?.length > 0 ? (
                                         <div className="grid gap-3">
                                             {selectedCustomerData.properties.map((p: any) => (
-                                                <label key={p.id} className={`flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 ${watch('property_id') === p.id ? 'border-municipal-blue bg-blue-50 ring-1 ring-municipal-blue' : ''}`}>
+                                                <label key={p.id} className={`flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 ${watch('property_id') === p.id ? 'border-municipal-red bg-red-50 ring-1 ring-municipal-red' : ''}`}>
                                                     <input type="radio" value={p.id} {...register('property_id', { required: watchBillType === 'PROPERTY' ? 'Please select a property' : false })} className="mr-3" />
                                                     <div>
                                                         <p className="font-bold text-sm">{p.property_number}</p>
@@ -185,7 +185,7 @@ export default function GenerateBillPage() {
                                     {selectedCustomerData.businesses?.length > 0 ? (
                                         <div className="grid gap-3">
                                             {selectedCustomerData.businesses.map((b: any) => (
-                                                <label key={b.id} className={`flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 ${watch('business_id') === b.id ? 'border-orange-500 bg-orange-50 ring-1 ring-orange-500' : ''}`}>
+                                                <label key={b.id} className={`flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 ${watch('business_id') === b.id ? 'border-municipal-red bg-red-50 ring-1 ring-municipal-red' : ''}`}>
                                                     <input type="radio" value={b.id} {...register('business_id', { required: watchBillType === 'BOP' ? 'Please select a business' : false })} className="mr-3" />
                                                     <div>
                                                         <p className="font-bold text-sm">{b.business_name}</p>
