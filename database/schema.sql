@@ -207,9 +207,9 @@ WHERE r.name = 'Auditor' AND p.code IN (
 );
 
 -- Seed Initial Super Admin (Password: admin123)
--- Hash generated for 'admin123'
+-- Hash generated for 'admin123' using bcrypt
 INSERT INTO system_users (full_name, email, password_hash)
-VALUES ('System Administrator', 'admin@ganorth.gov.gh', '$2a$10$X86Y0mXvU/l.fPqK6Uf.A.8Z8c7NlRkS1l/1p1v5zL77.7.777777');
+VALUES ('System Administrator', 'admin@ganorth.gov.gh', '$2b$10$79baPeV16rXtK2yFKJkrK.IQZ4L9pHrVrJDQkfS3SaQawCAI65w1W');
 
 INSERT INTO user_roles (user_id, role_id)
 SELECT u.id, r.id FROM system_users u, roles r 
@@ -526,21 +526,21 @@ GROUP BY DATE_TRUNC('month', b.issue_date), b.bill_type;
 -- SAMPLE DATA (Optional - for testing)
 -- =====================================================
 
--- Sample Electoral Areas
+-- GA North Municipal Electoral Areas
 INSERT INTO electoral_areas (name, code) VALUES
-('TANTRAL HILL', 'TH'),
-('ACCRA CENTRAL', 'AC'),
-('HAATSO', 'HA'),
-('MADINA', 'MD');
-
--- Sample Local Areas
-INSERT INTO local_areas (name, electoral_area_id) VALUES
-('GOIL Filling Station Area', 1),
-('Nii Ayi Kushie Street', 1),
-('Central Market', 2);
-
--- Sample Customer
-INSERT INTO customers (full_name, phone_number, gps_address, physical_location, landmark, electoral_area_id)
-VALUES ('INSPIRE EVENT & GIFTS', '0279685400', 'GG-845-8731', 'NII AYI KUSHIE ST', 'GOIL filling Station', 1);
+('OFANKOR NORTH', 'OFN'),
+('OFANKOR SOUTH', 'OFS'),
+('AFIAMAN', 'AFI'),
+('ABEASE', 'ABE'),
+('AYAWASO', 'AYA'),
+('AMANFROM', 'AMF'),
+('AMAMORLEY', 'AML'),
+('FISE', 'FIS'),
+('ASOFAN', 'ASO'),
+('OMANJOR', 'OMA'),
+('POKUASE', 'POK'),
+('TANTRA', 'TAN'),
+('TROBU', 'TRO'),
+('ABENSU', 'ABN');
 
 COMMENT ON DATABASE postgres IS 'Municipal Revenue Management System - Production Database';

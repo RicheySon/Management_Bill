@@ -33,7 +33,7 @@ export default function LoginPage() {
                     <div className="flex justify-center mb-6">
                         <div className="w-24 h-24 relative p-4 bg-white rounded-2xl shadow-sm border border-red-100 flex items-center justify-center">
                             <Image
-                                src="/logo.png"
+                                src="/logo.jpg"
                                 alt="GA North Logo"
                                 width={80}
                                 height={80}

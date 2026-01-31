@@ -22,8 +22,8 @@ export default function NewCustomerPage() {
     const router = useRouter();
     const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<CustomerForm>();
 
-    const [electoralAreas, setElectoralAreas] = useState([]);
-    const [localAreas, setLocalAreas] = useState([]);
+    const [electoralAreas, setElectoralAreas] = useState<any[]>([]);
+    const [localAreas, setLocalAreas] = useState<any[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
@@ -49,7 +49,7 @@ export default function NewCustomerPage() {
     }, []);
 
     useEffect(() => {
-        if (selectedElectoralArea && selectedElectoralArea !== '') {
+        if (selectedElectoralArea) {
             const loadLocalAreas = async () => {
                 try {
                     console.log(`Fetching local areas for ID: ${selectedElectoralArea}`);

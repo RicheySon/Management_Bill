@@ -9,6 +9,23 @@ const apiClient = axios.create({
     },
 });
 
+// Request interceptor to add auth token
+apiClient.interceptors.request.use(
+    (config) => {
+        // Only run in browser environment
+        if (typeof window !== 'undefined') {
+            const token = localStorage.getItem('auth_token');
+            if (token) {
+                config.headers.Authorization = `Bearer ${token}`;
+            }
+        }
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
+    }
+);
+
 // Response interceptor for error handling
 apiClient.interceptors.response.use(
     (response) => response,
@@ -178,4 +195,31 @@ export const downloadBulkBillsPDF = async (filters: any) => {
     document.body.appendChild(link);
     link.click();
     link.remove();
+};
+
+// Users & Roles
+export const fetchUsers = async () => {
+    const response = await apiClient.get('/users');
+    return response.data.data;
+};
+
+export const fetchRoles = async () => {
+    const response = await apiClient.get('/users/roles');
+    return response.data.data;
+};
+
+export const createUser = async (data: any) => {
+    const response = await apiClient.post('/users', data);
+    return response.data;
+};
+
+export const updateUserStatus = async (id: string, status: string) => {
+    const response = await apiClient.patch(`/users/${id}/status`, { status });
+    return response.data;
+};
+
+// Audit Logs
+export const fetchAuditLogs = async (params?: any) => {
+    const response = await apiClient.get('/audit', { params });
+    return response.data.data;
 };
