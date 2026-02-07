@@ -16,6 +16,8 @@ const customerSchema = Joi.object({
     gender: Joi.string().optional().allow(''),
     marital_status: Joi.string().optional().allow(''),
     gps_address: Joi.string().optional().allow('').max(50),
+    latitude: Joi.number().precision(8).min(-90).max(90).optional().allow(null),
+    longitude: Joi.number().precision(8).min(-180).max(180).optional().allow(null),
     physical_location: Joi.string().optional().allow(''),
     landmark: Joi.string().optional().allow(''),
     electoral_area_id: Joi.number().integer().optional(),
@@ -48,6 +50,8 @@ router.post('/', authorize(['create_customer']), async (req: AuthRequest, res: R
             gender,
             marital_status,
             gps_address,
+            latitude,
+            longitude,
             physical_location,
             landmark,
             electoral_area_id,
@@ -60,10 +64,10 @@ router.post('/', authorize(['create_customer']), async (req: AuthRequest, res: R
         const result = await pool.query(
             `INSERT INTO customers (
                 full_name, phone_number, email, address, gender, marital_status,
-                gps_address, physical_location, landmark,
+                gps_address, latitude, longitude, physical_location, landmark,
                 electoral_area_id, local_area_id,
                 next_of_kin_name, next_of_kin_contact, ghana_card_no
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             RETURNING *`,
             [
                 full_name,
@@ -73,6 +77,8 @@ router.post('/', authorize(['create_customer']), async (req: AuthRequest, res: R
                 gender || null,
                 marital_status || null,
                 gps_address || null,
+                latitude || null,
+                longitude || null,
                 physical_location || null,
                 landmark || null,
                 electoral_area_id || null,
@@ -294,6 +300,8 @@ router.put('/:id', authorize(['edit_customer']), async (req: AuthRequest, res: R
             gender,
             marital_status,
             gps_address,
+            latitude,
+            longitude,
             physical_location,
             landmark,
             electoral_area_id,
@@ -312,14 +320,16 @@ router.put('/:id', authorize(['edit_customer']), async (req: AuthRequest, res: R
                 gender = $5,
                 marital_status = $6,
                 gps_address = $7,
-                physical_location = $8,
-                landmark = $9,
-                electoral_area_id = $10,
-                local_area_id = $11,
-                next_of_kin_name = $12,
-                next_of_kin_contact = $13,
-                ghana_card_no = $14
-            WHERE id = $15
+                latitude = $8,
+                longitude = $9,
+                physical_location = $10,
+                landmark = $11,
+                electoral_area_id = $12,
+                local_area_id = $13,
+                next_of_kin_name = $14,
+                next_of_kin_contact = $15,
+                ghana_card_no = $16
+            WHERE id = $17
             RETURNING *`,
             [
                 full_name,
@@ -329,6 +339,8 @@ router.put('/:id', authorize(['edit_customer']), async (req: AuthRequest, res: R
                 gender || null,
                 marital_status || null,
                 gps_address || null,
+                latitude || null,
+                longitude || null,
                 physical_location || null,
                 landmark || null,
                 electoral_area_id || null,

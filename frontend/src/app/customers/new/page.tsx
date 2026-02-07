@@ -12,6 +12,8 @@ interface CustomerForm {
     phone_number: string;
     email?: string;
     gps_address?: string;
+    latitude?: number;
+    longitude?: number;
     physical_location?: string;
     landmark?: string;
     electoral_area_id?: number;
@@ -164,6 +166,30 @@ export default function NewCustomerPage() {
                             {...register('gps_address')}
                             className="input-field"
                             placeholder="GG-845-8731"
+                        />
+                    </div>
+
+                    {/* Latitude */}
+                    <div>
+                        <label className="label">Latitude</label>
+                        <input
+                            type="number"
+                            step="any"
+                            {...register('latitude', { valueAsNumber: true })}
+                            className="input-field"
+                            placeholder="5.6037"
+                        />
+                    </div>
+
+                    {/* Longitude */}
+                    <div>
+                        <label className="label">Longitude</label>
+                        <input
+                            type="number"
+                            step="any"
+                            {...register('longitude', { valueAsNumber: true })}
+                            className="input-field"
+                            placeholder="-0.1870"
                         />
                     </div>
 

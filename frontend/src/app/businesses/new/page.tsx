@@ -38,6 +38,8 @@ interface BusinessForm {
     block_number?: string;
     // Location fields
     gps_address?: string;
+    latitude?: number;
+    longitude?: number;
     town?: string;
     street_name?: string;
     landmark?: string;
@@ -140,6 +142,8 @@ export default function NewBusinessPage() {
                 division_number: data.division_number,
                 block_number: data.block_number,
                 gps_address: data.gps_address,
+                latitude: data.latitude,
+                longitude: data.longitude,
                 town: data.town,
                 street_name: data.street_name,
                 landmark: data.landmark,
@@ -489,6 +493,28 @@ export default function NewBusinessPage() {
                                 {...register('gps_address')}
                                 className="input-field"
                                 placeholder="GPS address"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">Latitude</label>
+                            <input
+                                type="number"
+                                step="any"
+                                {...register('latitude', { valueAsNumber: true })}
+                                className="input-field"
+                                placeholder="5.6037"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">Longitude</label>
+                            <input
+                                type="number"
+                                step="any"
+                                {...register('longitude', { valueAsNumber: true })}
+                                className="input-field"
+                                placeholder="-0.1870"
                             />
                         </div>
 
