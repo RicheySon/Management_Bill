@@ -5,27 +5,67 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import {
     createBusiness,
+    createCustomer,
     fetchCustomers,
     fetchBusinessCategories,
     fetchElectoralAreas,
-    fetchProperties
 } from '@/lib/api-client';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, UserPlus, UserCheck } from 'lucide-react';
 import Link from 'next/link';
 
 interface BusinessForm {
+    // Business Owner fields
+    full_name: string;
+    phone_number: string;
+    address?: string;
+    gender?: string;
+    marital_status?: string;
+    email?: string;
+    ghana_card_no?: string;
+    // Business fields
+    customer_id?: string;
     business_name: string;
-    customer_id: string;
+    business_contact?: string;
     category_id: number;
+    business_type_main?: string;
+    business_type_sub?: string;
+    business_category_class?: string;
+    business_email?: string;
     business_activity: string;
-    property_id?: string;
-    street_name?: string;
+    description?: string;
+    account_number?: string;
+    division_number?: string;
+    block_number?: string;
+    // Location fields
     gps_address?: string;
-    physical_location?: string;
+    town?: string;
+    street_name?: string;
     landmark?: string;
     electoral_area_id?: number;
-    year_registered?: number;
 }
+
+const BUSINESS_TYPE_MAIN_OPTIONS = [
+    'ADVERTISING',
+    'ARTISAN',
+    'AUTOMOBILE',
+    'COMMERCE',
+    'COMMUNICATION',
+    'CONSTRUCTION',
+    'EDUCATION',
+    'ELECTRICAL',
+    'ENERGY',
+    'ENTERTAINMENT',
+    'ESTATE',
+    'FASHION/DECORATION',
+    'FINANCIAL',
+    'FOOD/DRINKS',
+    'FORESTRY',
+    'GENERAL',
+    'HEALTH',
+    'MANUFACTURING',
+    'TOURISM',
+    'WAREHOUSE',
+];
 
 export default function NewBusinessPage() {
     const router = useRouter();
@@ -34,24 +74,22 @@ export default function NewBusinessPage() {
     const [customers, setCustomers] = useState([]);
     const [categories, setCategories] = useState([]);
     const [electoralAreas, setElectoralAreas] = useState([]);
-    const [properties, setProperties] = useState([]);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const [businessNumber, setBusinessNumber] = useState<string | null>(null);
+    const [isNewOwner, setIsNewOwner] = useState(true);
 
     useEffect(() => {
         const loadData = async () => {
             try {
-                const [customersData, categoriesData, areasData, propertiesData] = await Promise.all([
+                const [customersData, categoriesData, areasData] = await Promise.all([
                     fetchCustomers({ limit: 1000 }),
                     fetchBusinessCategories(),
                     fetchElectoralAreas(),
-                    fetchProperties({ limit: 1000 }),
                 ]);
                 setCustomers(customersData.data);
                 setCategories(categoriesData);
                 setElectoralAreas(areasData);
-                setProperties(propertiesData.data);
             } catch (err) {
                 console.error('Failed to load data:', err);
             }
@@ -62,7 +100,52 @@ export default function NewBusinessPage() {
     const onSubmit = async (data: BusinessForm) => {
         setError(null);
         try {
-            const result = await createBusiness(data);
+            let customerId = data.customer_id;
+
+            // If creating new business owner, register them first
+            if (isNewOwner) {
+                if (!data.full_name || !data.phone_number) {
+                    setError('Full Name and Phone Number are required for new business owner');
+                    return;
+                }
+                const customerResult = await createCustomer({
+                    full_name: data.full_name,
+                    phone_number: data.phone_number,
+                    email: data.email,
+                    address: data.address,
+                    gender: data.gender,
+                    marital_status: data.marital_status,
+                    ghana_card_no: data.ghana_card_no,
+                });
+                customerId = customerResult.data.id;
+            }
+
+            if (!customerId) {
+                setError('Please select an existing business owner or create a new one');
+                return;
+            }
+
+            const result = await createBusiness({
+                business_name: data.business_name,
+                customer_id: customerId,
+                category_id: data.category_id,
+                business_activity: data.business_activity,
+                business_contact: data.business_contact,
+                business_type_main: data.business_type_main,
+                business_type_sub: data.business_type_sub,
+                business_category_class: data.business_category_class,
+                business_email: data.business_email,
+                description: data.description,
+                account_number: data.account_number,
+                division_number: data.division_number,
+                block_number: data.block_number,
+                gps_address: data.gps_address,
+                town: data.town,
+                street_name: data.street_name,
+                landmark: data.landmark,
+                electoral_area_id: data.electoral_area_id,
+            });
+
             setBusinessNumber(result.data.business_number);
             setSuccess(true);
 
@@ -78,18 +161,18 @@ export default function NewBusinessPage() {
         <div className="max-w-4xl mx-auto">
             <div className="mb-6 flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Register New Business (BOP)</h1>
-                    <p className="text-gray-600 mt-1">Add a new Business Operating Permit</p>
+                    <h1 className="text-3xl font-bold text-gray-900">New Business</h1>
+                    <p className="text-gray-600 mt-1">Register a new Business Operating Permit (BOP)</p>
                 </div>
                 <Link href="/businesses" className="btn-secondary flex items-center space-x-2">
                     <ArrowLeft className="w-4 h-4" />
-                    <span>Back</span>
+                    <span>Go back</span>
                 </Link>
             </div>
 
             {success && businessNumber && (
                 <div className="bg-green-50 border-2 border-green-500 text-green-800 px-6 py-4 rounded-lg mb-6">
-                    <p className="font-semibold">✓ Business registered successfully!</p>
+                    <p className="font-semibold">Business registered successfully!</p>
                     <p className="text-sm mt-1">BOP Number: <span className="font-mono font-bold">{businessNumber}</span></p>
                     <p className="text-sm">Redirecting...</p>
                 </div>
@@ -97,186 +180,383 @@ export default function NewBusinessPage() {
 
             {error && (
                 <div className="bg-red-50 border-2 border-municipal-red text-red-800 px-6 py-4 rounded-lg mb-6">
-                    <p className="font-semibold">✗ Error</p>
+                    <p className="font-semibold">Error</p>
                     <p className="text-sm">{error}</p>
                 </div>
             )}
 
-            <form onSubmit={handleSubmit(onSubmit)} className="card space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Business Name */}
-                    <div className="md:col-span-2">
-                        <label className="label">
-                            Business Name <span className="text-municipal-red">*</span>
-                        </label>
-                        <input
-                            type="text"
-                            {...register('business_name', { required: 'Business name is required' })}
-                            className="input-field"
-                            placeholder="INSPIRE EVENT & GIFTS"
-                        />
-                        {errors.business_name && (
-                            <p className="text-red-500 text-sm mt-1">{errors.business_name.message}</p>
-                        )}
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                {/* ============================================= */}
+                {/* Owner Toggle */}
+                {/* ============================================= */}
+                <div className="flex space-x-2">
+                    <button
+                        type="button"
+                        onClick={() => setIsNewOwner(true)}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${isNewOwner ? 'bg-municipal-teal text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                    >
+                        <UserPlus className="w-4 h-4" />
+                        <span>Add New</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setIsNewOwner(false)}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${!isNewOwner ? 'bg-municipal-teal text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                    >
+                        <UserCheck className="w-4 h-4" />
+                        <span>Add Existing</span>
+                    </button>
+                </div>
+
+                {/* ============================================= */}
+                {/* SECTION: Business Owner Information */}
+                {/* ============================================= */}
+                <div className="card">
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 mb-6">
+                        <h2 className="text-municipal-teal font-bold text-lg text-center">Business Owner Information</h2>
                     </div>
 
-                    {/* Owner/Customer */}
-                    <div>
-                        <label className="label">
-                            Business Owner <span className="text-municipal-red">*</span>
-                        </label>
-                        <select
-                            {...register('customer_id', { required: 'Please select owner' })}
-                            className="input-field"
-                        >
-                            <option value="">-- Select Owner --</option>
-                            {customers.map((customer: any) => (
-                                <option key={customer.id} value={customer.id}>
-                                    {customer.full_name} ({customer.phone_number})
-                                </option>
-                            ))}
-                        </select>
-                        {errors.customer_id && (
-                            <p className="text-red-500 text-sm mt-1">{errors.customer_id.message}</p>
-                        )}
+                    {isNewOwner ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="md:col-span-2">
+                                <label className="label">Full Name</label>
+                                <input
+                                    type="text"
+                                    {...register('full_name')}
+                                    className="input-field"
+                                    placeholder="Full name"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="label">
+                                    Phone Number <span className="text-municipal-red">*</span>
+                                </label>
+                                <div className="flex">
+                                    <span className="inline-flex items-center px-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg text-sm text-gray-600">+233</span>
+                                    <input
+                                        type="tel"
+                                        {...register('phone_number')}
+                                        className="input-field rounded-l-none"
+                                        placeholder="245678901"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="label">Address</label>
+                                <input
+                                    type="text"
+                                    {...register('address')}
+                                    className="input-field"
+                                    placeholder="Enter address"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="label">
+                                    Gender <span className="text-municipal-red">*</span>
+                                </label>
+                                <select {...register('gender')} className="input-field">
+                                    <option value="">Gender</option>
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="label">
+                                    Marital Status <span className="text-municipal-red">*</span>
+                                </label>
+                                <select {...register('marital_status')} className="input-field">
+                                    <option value="">Marital Status</option>
+                                    <option value="Single">Single</option>
+                                    <option value="Married">Married</option>
+                                    <option value="Divorced">Divorced</option>
+                                    <option value="Widowed">Widowed</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="label">Email</label>
+                                <input
+                                    type="email"
+                                    {...register('email')}
+                                    className="input-field"
+                                    placeholder="Email"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="label">Ghana Card No</label>
+                                <input
+                                    type="text"
+                                    {...register('ghana_card_no')}
+                                    className="input-field"
+                                    placeholder="GHA-XXXXXXXXX-X"
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        <div>
+                            <label className="label">
+                                Select Existing Business Owner <span className="text-municipal-red">*</span>
+                            </label>
+                            <select
+                                {...register('customer_id')}
+                                className="input-field"
+                            >
+                                <option value="">-- Select Business Owner --</option>
+                                {customers.map((customer: any) => (
+                                    <option key={customer.id} value={customer.id}>
+                                        {customer.full_name} ({customer.phone_number})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                </div>
+
+                {/* ============================================= */}
+                {/* SECTION: Property Information (Business Details) */}
+                {/* ============================================= */}
+                <div className="card">
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 mb-6">
+                        <h2 className="text-municipal-teal font-bold text-lg text-center">Property Information</h2>
                     </div>
 
-                    {/* Business Category */}
-                    <div>
-                        <label className="label">
-                            Business Category <span className="text-municipal-red">*</span>
-                        </label>
-                        <select
-                            {...register('category_id', { required: 'Please select category' })}
-                            className="input-field"
-                        >
-                            <option value="">-- Select Category --</option>
-                            {categories.map((category: any) => (
-                                <option key={category.id} value={category.id}>
-                                    {category.name} (Fee: GHS {category.base_fee})
-                                </option>
-                            ))}
-                        </select>
-                        {errors.category_id && (
-                            <p className="text-red-500 text-sm mt-1">{errors.category_id.message}</p>
-                        )}
-                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div className="md:col-span-2">
+                            <label className="label">
+                                Business Name <span className="text-municipal-red">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                {...register('business_name', { required: 'Business name is required' })}
+                                className="input-field"
+                                placeholder="Business name"
+                            />
+                            {errors.business_name && (
+                                <p className="text-red-500 text-sm mt-1">{errors.business_name.message}</p>
+                            )}
+                        </div>
 
-                    {/* Business Activity */}
-                    <div className="md:col-span-2">
-                        <label className="label">
-                            Business Activity (What you sell/do) <span className="text-municipal-red">*</span>
-                        </label>
-                        <textarea
-                            {...register('business_activity', { required: 'Please describe business activity' })}
-                            className="input-field"
-                            rows={3}
-                            placeholder="e.g., Event planning services, Sales of gift items and decorations"
-                        />
-                        {errors.business_activity && (
-                            <p className="text-red-500 text-sm mt-1">{errors.business_activity.message}</p>
-                        )}
-                    </div>
+                        <div>
+                            <label className="label">Business Contact</label>
+                            <div className="flex">
+                                <span className="inline-flex items-center px-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg text-sm text-gray-600">+233</span>
+                                <input
+                                    type="tel"
+                                    {...register('business_contact')}
+                                    className="input-field rounded-l-none"
+                                    placeholder="245678901"
+                                />
+                            </div>
+                        </div>
 
-                    {/* Linked Property (Optional) */}
-                    <div className="md:col-span-2">
-                        <label className="label">Linked Property (Optional)</label>
-                        <select {...register('property_id')} className="input-field">
-                            <option value="">-- None --</option>
-                            {properties.map((property: any) => (
-                                <option key={property.id} value={property.id}>
-                                    {property.property_number} - {property.owner_name}
-                                </option>
-                            ))}
-                        </select>
-                        <p className="text-xs text-gray-500 mt-1">
-                            Link to a property if this business operates from a registered property
-                        </p>
-                    </div>
+                        <div>
+                            <label className="label">
+                                Business Type (Main) <span className="text-municipal-red">*</span>
+                            </label>
+                            <select
+                                {...register('business_type_main')}
+                                className="input-field"
+                            >
+                                <option value="">Select business type</option>
+                                {BUSINESS_TYPE_MAIN_OPTIONS.map((type) => (
+                                    <option key={type} value={type}>
+                                        {type}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
 
-                    {/* Street Name */}
-                    <div>
-                        <label className="label">Street Name</label>
-                        <input
-                            type="text"
-                            {...register('street_name')}
-                            className="input-field"
-                            placeholder="NII AYI KUSHIE ST"
-                        />
-                    </div>
+                        <div>
+                            <label className="label">Business Type (Sub)</label>
+                            <input
+                                type="text"
+                                {...register('business_type_sub')}
+                                className="input-field"
+                                placeholder="Sub type"
+                            />
+                        </div>
 
-                    {/* GPS Address */}
-                    <div>
-                        <label className="label">GPS Address</label>
-                        <input
-                            type="text"
-                            {...register('gps_address')}
-                            className="input-field"
-                            placeholder="GG-845-8731"
-                        />
-                    </div>
+                        <div>
+                            <label className="label">
+                                Business Category <span className="text-municipal-red">*</span>
+                            </label>
+                            <select
+                                {...register('business_category_class')}
+                                className="input-field"
+                            >
+                                <option value="">Select category</option>
+                                <option value="Category A">Category A</option>
+                                <option value="Category B">Category B</option>
+                                <option value="Category C">Category C</option>
+                            </select>
+                        </div>
 
-                    {/* Electoral Area */}
-                    <div>
-                        <label className="label">Electoral Area</label>
-                        <select {...register('electoral_area_id')} className="input-field">
-                            <option value="">Select Electoral Area</option>
-                            {electoralAreas.map((area: any) => (
-                                <option key={area.id} value={area.id}>
-                                    {area.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                        <div>
+                            <label className="label">
+                                Fee Category <span className="text-municipal-red">*</span>
+                            </label>
+                            <select
+                                {...register('category_id', { required: 'Please select fee category' })}
+                                className="input-field"
+                            >
+                                <option value="">Select fee category</option>
+                                {categories.map((category: any) => (
+                                    <option key={category.id} value={category.id}>
+                                        {category.name} (GHS {category.base_fee})
+                                    </option>
+                                ))}
+                            </select>
+                            {errors.category_id && (
+                                <p className="text-red-500 text-sm mt-1">{errors.category_id.message}</p>
+                            )}
+                        </div>
 
-                    {/* Landmark */}
-                    <div>
-                        <label className="label">Landmark</label>
-                        <input
-                            type="text"
-                            {...register('landmark')}
-                            className="input-field"
-                            placeholder="GOIL filling Station"
-                        />
-                    </div>
+                        <div>
+                            <label className="label">Business Email</label>
+                            <input
+                                type="email"
+                                {...register('business_email')}
+                                className="input-field"
+                                placeholder="Business email"
+                            />
+                        </div>
 
-                    {/* Physical Location */}
-                    <div className="md:col-span-2">
-                        <label className="label">Physical Location</label>
-                        <input
-                            type="text"
-                            {...register('physical_location')}
-                            className="input-field"
-                            placeholder="Detailed business location"
-                        />
+                        <div className="md:col-span-2">
+                            <label className="label">
+                                Description / Business Activity <span className="text-municipal-red">*</span>
+                            </label>
+                            <textarea
+                                {...register('business_activity', { required: 'Please describe business activity' })}
+                                className="input-field"
+                                rows={3}
+                                placeholder="What the business sells or does"
+                            />
+                            {errors.business_activity && (
+                                <p className="text-red-500 text-sm mt-1">{errors.business_activity.message}</p>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="label">Account Number</label>
+                            <input
+                                type="text"
+                                {...register('account_number')}
+                                className="input-field"
+                                placeholder="Account no"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">Division Number</label>
+                            <input
+                                type="text"
+                                {...register('division_number')}
+                                className="input-field"
+                                placeholder="Division no"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">Block Number</label>
+                            <input
+                                type="text"
+                                {...register('block_number')}
+                                className="input-field"
+                                placeholder="Block no"
+                            />
+                        </div>
                     </div>
                 </div>
 
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <p className="text-sm text-red-800">
-                        <strong>Note:</strong> A unique Business Operating Permit (BOP) Number will be automatically
-                        generated in the format <code className="font-mono bg-white px-2 py-1 rounded">GN-BOP-2026-NNNNNN</code>
-                    </p>
+                {/* ============================================= */}
+                {/* SECTION: Location Information */}
+                {/* ============================================= */}
+                <div className="card">
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 mb-6">
+                        <h2 className="text-municipal-teal font-bold text-lg text-center">Location Information</h2>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div>
+                            <label className="label">GPS Address</label>
+                            <input
+                                type="text"
+                                {...register('gps_address')}
+                                className="input-field"
+                                placeholder="GPS address"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">Town</label>
+                            <input
+                                type="text"
+                                {...register('town')}
+                                className="input-field"
+                                placeholder="Town"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">Street Name</label>
+                            <input
+                                type="text"
+                                {...register('street_name')}
+                                className="input-field"
+                                placeholder="Name of street"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">Landmark</label>
+                            <input
+                                type="text"
+                                {...register('landmark')}
+                                className="input-field"
+                                placeholder="Landmark"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">Electoral Area</label>
+                            <select {...register('electoral_area_id')} className="input-field">
+                                <option value="">Electoral area</option>
+                                {electoralAreas.map((area: any) => (
+                                    <option key={area.id} value={area.id}>
+                                        {area.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="flex justify-end space-x-4 pt-4 border-t">
+                {/* ============================================= */}
+                {/* Submit */}
+                {/* ============================================= */}
+                <div className="flex justify-end space-x-4">
                     <Link href="/businesses" className="btn-secondary">
                         Cancel
                     </Link>
                     <button
                         type="submit"
                         disabled={isSubmitting}
-                        className="btn-primary flex items-center space-x-2"
+                        className="btn-primary flex items-center space-x-2 px-8"
                     >
                         {isSubmitting ? (
                             <>
                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                <span>Saving...</span>
+                                <span>Submitting...</span>
                             </>
                         ) : (
                             <>
                                 <Save className="w-4 h-4" />
-                                <span>Register Business</span>
+                                <span>Submit</span>
                             </>
                         )}
                     </button>

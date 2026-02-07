@@ -132,7 +132,8 @@ INSERT INTO roles (name, description) VALUES
 ('Cashier', 'Payment recording only'),
 ('Data Entry', 'Registration/Capturing only'),
 ('Supervisor', 'Review and approval access'),
-('Auditor', 'Read-only access');
+('Auditor', 'Read-only access'),
+('Revenue Collector', 'Field data collection and registration');
 
 -- Insert Granular Permissions
 INSERT INTO permissions (code, description) VALUES
@@ -201,9 +202,18 @@ WHERE r.name = 'Supervisor' AND p.code IN (
 
 -- Map Permissions to Auditor
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r, permissions p 
+SELECT r.id, p.id FROM roles r, permissions p
 WHERE r.name = 'Auditor' AND p.code IN (
     'view_customer', 'view_reports', 'view_logs'
+);
+
+-- Map Permissions to Revenue Collector
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r, permissions p
+WHERE r.name = 'Revenue Collector' AND p.code IN (
+    'create_customer', 'view_customer',
+    'register_property',
+    'register_business'
 );
 
 -- Seed Initial Super Admin (Password: admin123)
@@ -219,17 +229,23 @@ WHERE u.email = 'admin@ganorth.gov.gh' AND r.name = 'Super Admin';
 -- CORE TABLES
 -- =====================================================
 
--- Customers / Citizens
+-- Customers / Citizens / Rate Payers
 CREATE TABLE customers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     full_name VARCHAR(200) NOT NULL,
     phone_number VARCHAR(20) NOT NULL,
     email VARCHAR(100),
+    address TEXT,
+    gender VARCHAR(20),
+    marital_status VARCHAR(20),
     gps_address VARCHAR(50),
     physical_location TEXT,
     landmark TEXT,
     electoral_area_id INTEGER REFERENCES electoral_areas(id),
     local_area_id INTEGER REFERENCES local_areas(id),
+    next_of_kin_name VARCHAR(200),
+    next_of_kin_contact VARCHAR(20),
+    ghana_card_no VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -244,12 +260,30 @@ CREATE TABLE properties (
     property_number VARCHAR(30) NOT NULL UNIQUE,
     customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     classification_id INTEGER NOT NULL REFERENCES property_classifications(id),
+    property_use VARCHAR(50),
+    building_type VARCHAR(50),
+    no_of_storeys INTEGER DEFAULT 0,
+    ownership VARCHAR(50),
+    building_permit_status VARCHAR(50),
+    account_number VARCHAR(50),
+    parcel_number VARCHAR(50),
+    house_number VARCHAR(50),
+    source_of_water VARCHAR(50),
+    sanitation_facility VARCHAR(50),
+    solid_waste_disposal VARCHAR(50),
+    liquid_waste_disposal VARCHAR(50),
+    no_of_people INTEGER DEFAULT 0,
+    no_of_bedrooms INTEGER DEFAULT 0,
+    no_of_washrooms INTEGER DEFAULT 0,
+    no_of_other_rooms INTEGER DEFAULT 0,
     street_name VARCHAR(200),
     gps_address VARCHAR(50),
+    town VARCHAR(100),
     physical_location TEXT,
     landmark TEXT,
     electoral_area_id INTEGER REFERENCES electoral_areas(id),
     local_area_id INTEGER REFERENCES local_areas(id),
+    population_density VARCHAR(50),
     property_size DECIMAL(10, 2), -- in square meters
     year_registered INTEGER NOT NULL,
     status VARCHAR(20) DEFAULT 'ACTIVE', -- ACTIVE, INACTIVE, DEMOLISHED
@@ -270,9 +304,19 @@ CREATE TABLE businesses (
     customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     category_id INTEGER NOT NULL REFERENCES business_categories(id),
     business_activity TEXT NOT NULL, -- What they sell/do
+    business_contact VARCHAR(20),
+    business_type_main VARCHAR(50),
+    business_type_sub VARCHAR(100),
+    business_category_class VARCHAR(20), -- Category A, B, C
+    business_email VARCHAR(100),
+    description TEXT,
+    account_number VARCHAR(50),
+    division_number VARCHAR(50),
+    block_number VARCHAR(50),
     property_id UUID REFERENCES properties(id) ON DELETE SET NULL,
     street_name VARCHAR(200),
     gps_address VARCHAR(50),
+    town VARCHAR(100),
     physical_location TEXT,
     landmark TEXT,
     electoral_area_id INTEGER REFERENCES electoral_areas(id),

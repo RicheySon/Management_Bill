@@ -33,14 +33,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const pathname = usePathname();
 
     useEffect(() => {
-        const storedToken = localStorage.getItem('auth_token');
-        const storedUser = localStorage.getItem('auth_user');
+        const validateToken = async () => {
+            const storedToken = localStorage.getItem('auth_token');
+            const storedUser = localStorage.getItem('auth_user');
 
-        if (storedToken && storedUser) {
-            setToken(storedToken);
-            setUser(JSON.parse(storedUser));
-        }
-        setIsLoading(false);
+            if (storedToken && storedUser) {
+                try {
+                    // Validate token with timeout
+                    await axios.get(`${API_BASE_URL}/auth/validate`, {
+                        headers: { Authorization: `Bearer ${storedToken}` },
+                        timeout: 5000 // 5 second timeout
+                    });
+                    setToken(storedToken);
+                    setUser(JSON.parse(storedUser));
+                } catch (error) {
+                    // Token is invalid or server unreachable, clear storage
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('auth_user');
+                }
+            }
+            setIsLoading(false);
+        };
+
+        validateToken();
     }, []);
 
     const login = async (email: string, password: string) => {

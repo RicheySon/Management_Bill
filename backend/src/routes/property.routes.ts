@@ -14,12 +14,30 @@ router.use(authenticateToken);
 const propertySchema = Joi.object({
     customer_id: Joi.string().uuid().required(),
     classification_id: Joi.number().integer().required(),
+    property_use: Joi.string().optional().allow(''),
+    building_type: Joi.string().optional().allow(''),
+    no_of_storeys: Joi.number().integer().min(0).optional(),
+    ownership: Joi.string().optional().allow(''),
+    building_permit_status: Joi.string().optional().allow(''),
+    account_number: Joi.string().optional().allow(''),
+    parcel_number: Joi.string().optional().allow(''),
+    house_number: Joi.string().optional().allow(''),
+    source_of_water: Joi.string().optional().allow(''),
+    sanitation_facility: Joi.string().optional().allow(''),
+    solid_waste_disposal: Joi.string().optional().allow(''),
+    liquid_waste_disposal: Joi.string().optional().allow(''),
+    no_of_people: Joi.number().integer().min(0).optional(),
+    no_of_bedrooms: Joi.number().integer().min(0).optional(),
+    no_of_washrooms: Joi.number().integer().min(0).optional(),
+    no_of_other_rooms: Joi.number().integer().min(0).optional(),
     street_name: Joi.string().optional().allow(''),
     gps_address: Joi.string().optional().allow('').max(50),
+    town: Joi.string().optional().allow(''),
     physical_location: Joi.string().optional().allow(''),
     landmark: Joi.string().optional().allow(''),
     electoral_area_id: Joi.number().integer().optional(),
     local_area_id: Joi.number().integer().optional(),
+    population_density: Joi.string().optional().allow(''),
     property_size: Joi.number().positive().optional(),
     year_registered: Joi.number().integer().min(2000).max(2100).optional(),
 });
@@ -40,16 +58,14 @@ router.post('/', authorize(['register_property']), async (req: AuthRequest, res:
         }
 
         const {
-            customer_id,
-            classification_id,
-            street_name,
-            gps_address,
-            physical_location,
-            landmark,
-            electoral_area_id,
-            local_area_id,
-            property_size,
-            year_registered,
+            customer_id, classification_id,
+            property_use, building_type, no_of_storeys, ownership,
+            building_permit_status, account_number, parcel_number, house_number,
+            source_of_water, sanitation_facility, solid_waste_disposal, liquid_waste_disposal,
+            no_of_people, no_of_bedrooms, no_of_washrooms, no_of_other_rooms,
+            street_name, gps_address, town, physical_location, landmark,
+            electoral_area_id, local_area_id, population_density,
+            property_size, year_registered,
         } = value;
 
         const currentYear = new Date().getFullYear();
@@ -57,22 +73,25 @@ router.post('/', authorize(['register_property']), async (req: AuthRequest, res:
 
         const result = await pool.query(
             `INSERT INTO properties (
-                customer_id, classification_id, street_name, gps_address,
-                physical_location, landmark, electoral_area_id, local_area_id,
+                customer_id, classification_id,
+                property_use, building_type, no_of_storeys, ownership,
+                building_permit_status, account_number, parcel_number, house_number,
+                source_of_water, sanitation_facility, solid_waste_disposal, liquid_waste_disposal,
+                no_of_people, no_of_bedrooms, no_of_washrooms, no_of_other_rooms,
+                street_name, gps_address, town, physical_location, landmark,
+                electoral_area_id, local_area_id, population_density,
                 property_size, year_registered
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
             RETURNING *`,
             [
-                customer_id,
-                classification_id,
-                street_name || null,
-                gps_address || null,
-                physical_location || null,
-                landmark || null,
-                electoral_area_id || null,
-                local_area_id || null,
-                property_size || null,
-                regYear,
+                customer_id, classification_id,
+                property_use || null, building_type || null, no_of_storeys || 0, ownership || null,
+                building_permit_status || null, account_number || null, parcel_number || null, house_number || null,
+                source_of_water || null, sanitation_facility || null, solid_waste_disposal || null, liquid_waste_disposal || null,
+                no_of_people || 0, no_of_bedrooms || 0, no_of_washrooms || 0, no_of_other_rooms || 0,
+                street_name || null, gps_address || null, town || null, physical_location || null, landmark || null,
+                electoral_area_id || null, local_area_id || null, population_density || null,
+                property_size || null, regYear,
             ]
         );
 

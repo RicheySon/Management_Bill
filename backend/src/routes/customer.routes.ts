@@ -12,11 +12,17 @@ const customerSchema = Joi.object({
     full_name: Joi.string().required().max(200),
     phone_number: Joi.string().required().max(20),
     email: Joi.string().email().optional().allow(''),
+    address: Joi.string().optional().allow(''),
+    gender: Joi.string().optional().allow(''),
+    marital_status: Joi.string().optional().allow(''),
     gps_address: Joi.string().optional().allow('').max(50),
     physical_location: Joi.string().optional().allow(''),
     landmark: Joi.string().optional().allow(''),
     electoral_area_id: Joi.number().integer().optional(),
     local_area_id: Joi.number().integer().optional(),
+    next_of_kin_name: Joi.string().optional().allow('').max(200),
+    next_of_kin_contact: Joi.string().optional().allow('').max(20),
+    ghana_card_no: Joi.string().optional().allow('').max(50),
 });
 
 /**
@@ -38,28 +44,42 @@ router.post('/', authorize(['create_customer']), async (req: AuthRequest, res: R
             full_name,
             phone_number,
             email,
+            address,
+            gender,
+            marital_status,
             gps_address,
             physical_location,
             landmark,
             electoral_area_id,
             local_area_id,
+            next_of_kin_name,
+            next_of_kin_contact,
+            ghana_card_no,
         } = value;
 
         const result = await pool.query(
             `INSERT INTO customers (
-        full_name, phone_number, email, gps_address, 
-        physical_location, landmark, electoral_area_id, local_area_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING *`,
+                full_name, phone_number, email, address, gender, marital_status,
+                gps_address, physical_location, landmark,
+                electoral_area_id, local_area_id,
+                next_of_kin_name, next_of_kin_contact, ghana_card_no
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            RETURNING *`,
             [
                 full_name,
                 phone_number,
                 email || null,
+                address || null,
+                gender || null,
+                marital_status || null,
                 gps_address || null,
                 physical_location || null,
                 landmark || null,
                 electoral_area_id || null,
                 local_area_id || null,
+                next_of_kin_name || null,
+                next_of_kin_contact || null,
+                ghana_card_no || null,
             ]
         );
 
@@ -270,34 +290,52 @@ router.put('/:id', authorize(['edit_customer']), async (req: AuthRequest, res: R
             full_name,
             phone_number,
             email,
+            address,
+            gender,
+            marital_status,
             gps_address,
             physical_location,
             landmark,
             electoral_area_id,
             local_area_id,
+            next_of_kin_name,
+            next_of_kin_contact,
+            ghana_card_no,
         } = value;
 
         const result = await pool.query(
             `UPDATE customers SET
-        full_name = $1,
-        phone_number = $2,
-        email = $3,
-        gps_address = $4,
-        physical_location = $5,
-        landmark = $6,
-        electoral_area_id = $7,
-        local_area_id = $8
-       WHERE id = $9
-       RETURNING *`,
+                full_name = $1,
+                phone_number = $2,
+                email = $3,
+                address = $4,
+                gender = $5,
+                marital_status = $6,
+                gps_address = $7,
+                physical_location = $8,
+                landmark = $9,
+                electoral_area_id = $10,
+                local_area_id = $11,
+                next_of_kin_name = $12,
+                next_of_kin_contact = $13,
+                ghana_card_no = $14
+            WHERE id = $15
+            RETURNING *`,
             [
                 full_name,
                 phone_number,
                 email || null,
+                address || null,
+                gender || null,
+                marital_status || null,
                 gps_address || null,
                 physical_location || null,
                 landmark || null,
                 electoral_area_id || null,
                 local_area_id || null,
+                next_of_kin_name || null,
+                next_of_kin_contact || null,
+                ghana_card_no || null,
                 id,
             ]
         );

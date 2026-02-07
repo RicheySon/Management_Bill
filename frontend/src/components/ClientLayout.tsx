@@ -4,7 +4,8 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
     Home, Users, Building2, FileText,
-    DollarSign, BarChart3, Printer, LogOut, Loader2, Shield
+    DollarSign, BarChart3, Printer, LogOut, Loader2, Shield,
+    Briefcase, ClipboardList
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
@@ -24,6 +25,76 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     // Also if user is not logged in and not on login page, AuthContext will redirect
     if (!user || pathname === '/login') {
         return <main className="min-h-screen bg-gray-50">{children}</main>;
+    }
+
+    const isRevenueCollector = user.roles?.includes('Revenue Collector');
+
+    if (isRevenueCollector) {
+        return (
+            <div className="flex min-h-screen bg-gray-50">
+                {/* Revenue Collector Sidebar - Teal Theme */}
+                <aside className="w-64 bg-white border-r shadow-sm flex flex-col fixed h-full z-10">
+                    <div className="p-6 flex justify-center">
+                        <div className="w-36 h-36 rounded-full overflow-hidden border-2 border-gray-100">
+                            <img src="/logo.jpg" alt="GA North Logo" className="w-full h-full object-cover" />
+                        </div>
+                    </div>
+
+                    <div className="mx-6 border-b-2 border-municipal-teal"></div>
+
+                    <nav className="flex-1 overflow-y-auto py-6 px-4">
+                        <ul className="space-y-4">
+                            <CollectorNavLink href="/" icon={<Home className="w-6 h-6" />} label="Home" />
+                            <CollectorNavLink href="/customers" icon={<Users className="w-6 h-6" />} label="Rate Payers" />
+                            <CollectorNavLink href="/properties" icon={<Building2 className="w-6 h-6" />} label="Property Rates" />
+                            <CollectorNavLink href="/businesses" icon={<Briefcase className="w-6 h-6" />} label="Business Owners" />
+                            <CollectorNavLink href="/businesses#permits" icon={<ClipboardList className="w-6 h-6" />} label="Business Operation Permits" />
+                        </ul>
+                    </nav>
+
+                    <div className="mx-6 border-b-2 border-municipal-teal"></div>
+
+                    <div className="p-4">
+                        <button
+                            onClick={logout}
+                            className="flex items-center space-x-3 w-full px-4 py-3 bg-red-800 text-white rounded-lg hover:bg-red-900 transition-all"
+                        >
+                            <LogOut className="w-5 h-5" />
+                            <span className="font-semibold text-sm">Logout</span>
+                        </button>
+                        <div className="mt-4 text-sm text-center text-municipal-teal font-medium">
+                            Version 1.0.3
+                        </div>
+                    </div>
+                </aside>
+
+                {/* Main Content Area */}
+                <div className="flex-1 ml-64 flex flex-col">
+                    <header className="bg-white border-b h-16 flex items-center px-8 justify-between sticky top-0 z-10">
+                        <div className="flex items-center text-gray-400">
+                            <span className="text-sm font-medium">Municipal Revenue Management System</span>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                            <div className="text-right">
+                                <p className="text-sm font-bold text-gray-900">{user.full_name}</p>
+                                <p className="text-[10px] text-municipal-teal font-bold uppercase tracking-tighter">
+                                    Revenue Collector
+                                </p>
+                            </div>
+                            <div className="w-10 h-10 bg-municipal-teal rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-teal-500/20">
+                                {user.full_name.split(' ').map((n: string) => n[0]).join('')}
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="flex-1 p-8">
+                        <div className="container mx-auto">
+                            {children}
+                        </div>
+                    </main>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -95,7 +166,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                         <span className="font-semibold text-sm">Logout</span>
                     </button>
                     <div className="mt-4 text-[10px] text-center text-gray-400 font-medium uppercase tracking-widest">
-                        v1.1.0-RBAC
+                        v1.0.3
                     </div>
                 </div>
             </aside>
@@ -147,6 +218,22 @@ function NavLink({ href, icon, label }: { href: string; icon: React.ReactNode; l
                     {icon}
                 </div>
                 <span className="text-sm">{label}</span>
+            </Link>
+        </li>
+    );
+}
+
+function CollectorNavLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
+    return (
+        <li>
+            <Link
+                href={href}
+                className="flex items-center space-x-4 px-4 py-3 rounded-lg text-municipal-teal hover:bg-teal-50 transition-all group"
+            >
+                <div className="text-municipal-teal">
+                    {icon}
+                </div>
+                <span className="text-base font-semibold">{label}</span>
             </Link>
         </li>
     );

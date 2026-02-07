@@ -75,4 +75,32 @@ router.post('/login', async (req, res) => {
     }
 });
 
+// Validate Token Endpoint
+router.get('/validate', async (req, res) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ success: false, error: 'No token provided' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+
+        // Check if user still exists and is active
+        const result = await pool.query(
+            'SELECT id, status FROM system_users WHERE id = $1',
+            [decoded.id]
+        );
+
+        if (!result.rows[0] || result.rows[0].status !== 'ACTIVE') {
+            return res.status(401).json({ success: false, error: 'User not found or inactive' });
+        }
+
+        res.json({ success: true, valid: true });
+    } catch (err) {
+        res.status(401).json({ success: false, error: 'Invalid or expired token' });
+    }
+});
+
 export default router;
