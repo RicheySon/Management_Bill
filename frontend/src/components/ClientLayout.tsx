@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
     Home, Users, Building2, FileText,
     DollarSign, BarChart3, Printer, LogOut, Loader2, Shield,
-    Briefcase, ClipboardList
+    Briefcase, ClipboardList, Settings
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
@@ -142,14 +142,19 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                         }
 
                         {/* Admin Links */}
-                        {hasPermission('manage_users') && (
-                            <>
-                                <div className="pt-4 pb-2">
-                                    <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Administration</p>
-                                </div>
-                                <NavLink href="/admin/users" icon={<Shield className="w-5 h-5" />} label="User Management" />
-                            </>
+                        {(hasPermission('manage_users') || hasPermission('configure_rates') || hasPermission('view_audit_logs')) && (
+                            <div className="pt-4 pb-2">
+                                <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Administration</p>
+                            </div>
                         )}
+
+                        {hasPermission('manage_users') &&
+                            <NavLink href="/admin/users" icon={<Shield className="w-5 h-5" />} label="User Management" />
+                        }
+
+                        {hasPermission('configure_rates') &&
+                            <NavLink href="/admin/configuration" icon={<Settings className="w-5 h-5" />} label="Fee Configuration" />
+                        }
 
                         {hasPermission('view_audit_logs') &&
                             <NavLink href="/admin/audit" icon={<FileText className="w-5 h-5" />} label="Audit Logs" />

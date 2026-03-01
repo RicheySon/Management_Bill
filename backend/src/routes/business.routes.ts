@@ -36,6 +36,7 @@ const businessSchema = Joi.object({
     electoral_area_id: Joi.number().integer().optional(),
     local_area_id: Joi.number().integer().optional(),
     year_registered: Joi.number().integer().min(2000).max(2100).optional(),
+    fee_item_id: Joi.number().integer().optional().allow(null),
 });
 
 /**
@@ -78,6 +79,7 @@ router.post('/', authorize(['register_business']), async (req: AuthRequest, res:
             electoral_area_id,
             local_area_id,
             year_registered,
+            fee_item_id,
         } = value;
 
         const currentYear = new Date().getFullYear();
@@ -90,8 +92,8 @@ router.post('/', authorize(['register_business']), async (req: AuthRequest, res:
                 business_category_class, business_email, description,
                 account_number, division_number, block_number,
                 property_id, street_name, gps_address, latitude, longitude, town, physical_location,
-                landmark, electoral_area_id, local_area_id, year_registered
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+                landmark, electoral_area_id, local_area_id, year_registered, fee_item_id
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
             RETURNING *`,
             [
                 business_name,
@@ -118,6 +120,7 @@ router.post('/', authorize(['register_business']), async (req: AuthRequest, res:
                 electoral_area_id || null,
                 local_area_id || null,
                 regYear,
+                fee_item_id || null,
             ]
         );
 

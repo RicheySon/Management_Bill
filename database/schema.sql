@@ -537,6 +537,84 @@ FOR EACH ROW
 EXECUTE FUNCTION trg_update_timestamp();
 
 -- =====================================================
+-- FEE CONFIGURATION TABLES
+-- =====================================================
+
+-- Fee Schedules - versioned fee schedules by year
+CREATE TABLE fee_schedules (
+    id SERIAL PRIMARY KEY,
+    year INTEGER NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    effective_date DATE NOT NULL,
+    status VARCHAR(20) DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')),
+    notes TEXT,
+    created_by UUID REFERENCES system_users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_fee_schedules_year ON fee_schedules(year);
+CREATE INDEX idx_fee_schedules_status ON fee_schedules(status);
+
+-- Property Rate Zones - rating zones linked to a fee schedule
+CREATE TABLE property_rate_zones (
+    id SERIAL PRIMARY KEY,
+    fee_schedule_id INTEGER NOT NULL REFERENCES fee_schedules(id) ON DELETE CASCADE,
+    zone_name VARCHAR(100) NOT NULL,
+    zone_type VARCHAR(50) NOT NULL CHECK (zone_type IN ('RESIDENTIAL', 'COMMERCIAL', 'INDUSTRIAL', 'MIXED_USE')),
+    zone_class INTEGER DEFAULT 1,
+    rate_impost_min DECIMAL(10,6) NOT NULL,
+    rate_impost_max DECIMAL(10,6),
+    minimum_rate_min DECIMAL(10,2) NOT NULL,
+    minimum_rate_max DECIMAL(10,2),
+    affected_areas TEXT,
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_property_rate_zones_schedule ON property_rate_zones(fee_schedule_id);
+CREATE INDEX idx_property_rate_zones_type ON property_rate_zones(zone_type);
+
+-- Business Fee Items - hierarchical business license items
+CREATE TABLE business_fee_items (
+    id SERIAL PRIMARY KEY,
+    fee_schedule_id INTEGER NOT NULL REFERENCES fee_schedules(id) ON DELETE CASCADE,
+    main_item_number INTEGER NOT NULL,
+    sub_item_code VARCHAR(20),
+    description VARCHAR(500) NOT NULL,
+    parent_id INTEGER REFERENCES business_fee_items(id) ON DELETE CASCADE,
+    frequency VARCHAR(50),
+    cat_a_fee DECIMAL(10,2),
+    cat_b_fee DECIMAL(10,2),
+    cat_c_fee DECIMAL(10,2),
+    cat_d_fee DECIMAL(10,2),
+    cat_e_fee DECIMAL(10,2),
+    cat_f_fee DECIMAL(10,2),
+    is_group_header BOOLEAN DEFAULT FALSE,
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_business_fee_items_schedule ON business_fee_items(fee_schedule_id);
+CREATE INDEX idx_business_fee_items_parent ON business_fee_items(parent_id);
+CREATE INDEX idx_business_fee_items_main ON business_fee_items(main_item_number);
+
+-- Triggers
+CREATE TRIGGER update_fee_schedules_timestamp
+BEFORE UPDATE ON fee_schedules
+FOR EACH ROW EXECUTE FUNCTION trg_update_timestamp();
+
+CREATE TRIGGER update_property_rate_zones_timestamp
+BEFORE UPDATE ON property_rate_zones
+FOR EACH ROW EXECUTE FUNCTION trg_update_timestamp();
+
+CREATE TRIGGER update_business_fee_items_timestamp
+BEFORE UPDATE ON business_fee_items
+FOR EACH ROW EXECUTE FUNCTION trg_update_timestamp();
+
+-- =====================================================
 -- VIEWS FOR REPORTING
 -- =====================================================
 

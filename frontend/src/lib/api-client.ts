@@ -223,3 +223,103 @@ export const fetchAuditLogs = async (params?: any) => {
     const response = await apiClient.get('/audit', { params });
     return response.data.data;
 };
+
+// =====================================================
+// FEE CONFIGURATION
+// =====================================================
+
+// Fee Schedules
+export const fetchFeeSchedules = async (year?: number) => {
+    const response = await apiClient.get('/fee-config/schedules', { params: { year } });
+    return response.data.data;
+};
+
+export const fetchFeeSchedule = async (id: number) => {
+    const response = await apiClient.get(`/fee-config/schedules/${id}`);
+    return response.data.data;
+};
+
+export const createFeeSchedule = async (data: any) => {
+    const response = await apiClient.post('/fee-config/schedules', data);
+    return response.data;
+};
+
+export const updateFeeSchedule = async (id: number, data: any) => {
+    const response = await apiClient.put(`/fee-config/schedules/${id}`, data);
+    return response.data;
+};
+
+export const activateFeeSchedule = async (id: number) => {
+    const response = await apiClient.put(`/fee-config/schedules/${id}/activate`);
+    return response.data;
+};
+
+// Property Rate Zones
+export const fetchPropertyRateZones = async (scheduleId: number) => {
+    const response = await apiClient.get(`/fee-config/schedules/${scheduleId}/property-zones`);
+    return response.data.data;
+};
+
+export const createPropertyRateZone = async (scheduleId: number, data: any) => {
+    const response = await apiClient.post(`/fee-config/schedules/${scheduleId}/property-zones`, data);
+    return response.data;
+};
+
+export const updatePropertyRateZone = async (zoneId: number, data: any) => {
+    const response = await apiClient.put(`/fee-config/property-zones/${zoneId}`, data);
+    return response.data;
+};
+
+export const deletePropertyRateZone = async (zoneId: number) => {
+    const response = await apiClient.delete(`/fee-config/property-zones/${zoneId}`);
+    return response.data;
+};
+
+// Business Fee Items
+export const fetchBusinessFeeItems = async (scheduleId: number) => {
+    const response = await apiClient.get(`/fee-config/schedules/${scheduleId}/business-items`);
+    return response.data.data;
+};
+
+export const createBusinessFeeItem = async (scheduleId: number, data: any) => {
+    const response = await apiClient.post(`/fee-config/schedules/${scheduleId}/business-items`, data);
+    return response.data;
+};
+
+export const updateBusinessFeeItem = async (itemId: number, data: any) => {
+    const response = await apiClient.put(`/fee-config/business-items/${itemId}`, data);
+    return response.data;
+};
+
+export const deleteBusinessFeeItem = async (itemId: number) => {
+    const response = await apiClient.delete(`/fee-config/business-items/${itemId}`);
+    return response.data;
+};
+
+// Excel Import
+export const previewFeeScheduleImport = async (scheduleId: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post(
+        `/fee-config/schedules/${scheduleId}/import/preview`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
+};
+
+export const commitFeeScheduleImport = async (scheduleId: number, data: any) => {
+    const response = await apiClient.post(`/fee-config/schedules/${scheduleId}/import/commit`, data);
+    return response.data;
+};
+
+// Active Fee Schedule Lookups (for forms)
+export const fetchActivePropertyRateZones = async (year?: number) => {
+    const response = await apiClient.get('/fee-config/active/property-zones', { params: { year } });
+    return response.data.data;
+};
+
+export const fetchActiveBusinessFeeItems = async (year?: number) => {
+    const response = await apiClient.get('/fee-config/active/business-items', { params: { year } });
+    return response.data.data;
+};

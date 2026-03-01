@@ -365,19 +365,21 @@ Just ensure you're using the **Connection Pooling** URI in production.
 - **Render** - Free tier available, auto-deploy on push  
 - **Vercel** - Serverless functions (requires some refactoring)
 
-### Frontend Deployment (Vercel - Recommended)
+### Deployment to Vercel (Unified)
 
-1. **Connect GitHub repository** to Vercel
-2. **Configure Project:**
-   - Framework Preset: Next.js
-   - Root Directory: `frontend`
-   - Build Command: `npm run build`
-   - Output Directory: `.next`
-3. **Set Environment Variable:**
-   ```env
-   NEXT_PUBLIC_API_URL=https://your-backend-url.com/api
-   ```
-4. **Deploy** - Auto-deploys on every push to main branch
+The project is pre-configured with a root `vercel.json` to handle both the Next.js frontend and Express backend in a single deployment.
+
+1.  **Push your code** to a GitHub/GitLab/Bitbucket repository.
+2.  **Import to Vercel**:
+    *   Framework Preset: **Other** (Vercel will detect Next.js automatically for the frontend builds)
+    *   Root Directory: Leave empty (Project Root)
+3.  **Configure Environment Variables**:
+    *   `DATABASE_URL`: Your Supabase connection string
+    *   `JWT_SECRET`: A strong random string for auth tokens
+    *   `NEXT_PUBLIC_API_URL`: Your Vercel deployment URL + `/api` (e.g., `https://my-app.vercel.app/api`)
+    *   `NODE_ENV`: `production`
+
+4.  **Deploy**: Vercel will build the frontend and serve backend routes as serverless functions.
 
 🎉 **Your system is now live!**
 

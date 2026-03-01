@@ -42,6 +42,7 @@ const propertySchema = Joi.object({
     population_density: Joi.string().optional().allow(''),
     property_size: Joi.number().positive().optional(),
     year_registered: Joi.number().integer().min(2000).max(2100).optional(),
+    property_rate_zone_id: Joi.number().integer().optional().allow(null),
 });
 
 /**
@@ -67,7 +68,7 @@ router.post('/', authorize(['register_property']), async (req: AuthRequest, res:
             no_of_people, no_of_bedrooms, no_of_washrooms, no_of_other_rooms,
             street_name, gps_address, latitude, longitude, town, physical_location, landmark,
             electoral_area_id, local_area_id, population_density,
-            property_size, year_registered,
+            property_size, year_registered, property_rate_zone_id,
         } = value;
 
         const currentYear = new Date().getFullYear();
@@ -82,8 +83,8 @@ router.post('/', authorize(['register_property']), async (req: AuthRequest, res:
                 no_of_people, no_of_bedrooms, no_of_washrooms, no_of_other_rooms,
                 street_name, gps_address, latitude, longitude, town, physical_location, landmark,
                 electoral_area_id, local_area_id, population_density,
-                property_size, year_registered
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)
+                property_size, year_registered, property_rate_zone_id
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
             RETURNING *`,
             [
                 customer_id, classification_id,
@@ -93,7 +94,7 @@ router.post('/', authorize(['register_property']), async (req: AuthRequest, res:
                 no_of_people || 0, no_of_bedrooms || 0, no_of_washrooms || 0, no_of_other_rooms || 0,
                 street_name || null, gps_address || null, latitude || null, longitude || null, town || null, physical_location || null, landmark || null,
                 electoral_area_id || null, local_area_id || null, population_density || null,
-                property_size || null, regYear,
+                property_size || null, regYear, property_rate_zone_id || null,
             ]
         );
 

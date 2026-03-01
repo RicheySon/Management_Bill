@@ -16,6 +16,7 @@ import lookupRoutes from './routes/lookup.routes';
 import usersRoutes from './routes/users.routes';
 import auditRoutes from './routes/audit.routes';
 import authRoutes from './routes/auth.routes';
+import feeConfigRoutes from './routes/fee-config.routes';
 
 // Load environment variables
 dotenv.config();
@@ -53,6 +54,7 @@ app.use('/api/lookups', lookupRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/fee-config', feeConfigRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
@@ -117,6 +119,9 @@ const startServer = async () => {
     }
 };
 
-startServer();
+// Start server only if this file is run directly
+if (process.env.NODE_ENV !== 'test' && require.main === module) {
+    startServer();
+}
 
 export default app;

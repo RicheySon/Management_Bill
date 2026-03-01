@@ -9,6 +9,7 @@ import {
     fetchCustomers,
     fetchBusinessCategories,
     fetchElectoralAreas,
+    fetchActiveBusinessFeeItems,
 } from '@/lib/api-client';
 import { ArrowLeft, Save, UserPlus, UserCheck } from 'lucide-react';
 import Link from 'next/link';
@@ -36,6 +37,7 @@ interface BusinessForm {
     account_number?: string;
     division_number?: string;
     block_number?: string;
+    fee_item_id?: number;
     // Location fields
     gps_address?: string;
     latitude?: number;
@@ -76,6 +78,9 @@ export default function NewBusinessPage() {
     const [customers, setCustomers] = useState([]);
     const [categories, setCategories] = useState([]);
     const [electoralAreas, setElectoralAreas] = useState([]);
+    const [feeItems, setFeeItems] = useState<any[]>([]);
+    const [selectedFeeItemId, setSelectedFeeItemId] = useState<string>('');
+    const [selectedFeeAmount, setSelectedFeeAmount] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const [businessNumber, setBusinessNumber] = useState<string | null>(null);
@@ -84,14 +89,16 @@ export default function NewBusinessPage() {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const [customersData, categoriesData, areasData] = await Promise.all([
+                const [customersData, categoriesData, areasData, feeItemsData] = await Promise.all([
                     fetchCustomers({ limit: 1000 }),
                     fetchBusinessCategories(),
                     fetchElectoralAreas(),
+                    fetchActiveBusinessFeeItems(new Date().getFullYear()),
                 ]);
                 setCustomers(customersData.data);
                 setCategories(categoriesData);
                 setElectoralAreas(areasData);
+                setFeeItems(feeItemsData || []);
             } catch (err) {
                 console.error('Failed to load data:', err);
             }
@@ -148,6 +155,7 @@ export default function NewBusinessPage() {
                 street_name: data.street_name,
                 landmark: data.landmark,
                 electoral_area_id: data.electoral_area_id,
+                fee_item_id: selectedFeeItemId ? parseInt(selectedFeeItemId) : null,
             });
 
             setBusinessNumber(result.data.business_number);
@@ -419,6 +427,44 @@ export default function NewBusinessPage() {
                                 <p className="text-red-500 text-sm mt-1">{errors.category_id.message}</p>
                             )}
                         </div>
+
+                        {/* Fee Schedule Item (from configured fee schedule) */}
+                        {feeItems.length > 0 && (
+                            <div className="md:col-span-2">
+                                <label className="label">
+                                    Fee Schedule Item (Configured Rate)
+                                </label>
+                                <select
+                                    className="input-field"
+                                    value={selectedFeeItemId}
+                                    onChange={(e) => {
+                                        setSelectedFeeItemId(e.target.value);
+                                        if (e.target.value) {
+                                            const item = feeItems.find((fi: any) => fi.id === parseInt(e.target.value));
+                                            if (item) {
+                                                const fee = item.cat_a_fee || item.cat_b_fee || item.cat_c_fee || 0;
+                                                setSelectedFeeAmount(fee ? `GHS ${Number(fee).toLocaleString('en-GH', { minimumFractionDigits: 2 })}` : '');
+                                            }
+                                        } else {
+                                            setSelectedFeeAmount('');
+                                        }
+                                    }}
+                                >
+                                    <option value="">Select from fee schedule (optional)</option>
+                                    {feeItems.filter((fi: any) => !fi.is_group_header).map((item: any) => (
+                                        <option key={item.id} value={item.id}>
+                                            {item.main_item_number}. {item.description}
+                                            {item.cat_a_fee ? ` - CAT A: GHS ${Number(item.cat_a_fee).toFixed(2)}` : ''}
+                                            {item.cat_b_fee ? ` | CAT B: GHS ${Number(item.cat_b_fee).toFixed(2)}` : ''}
+                                            {item.cat_c_fee ? ` | CAT C: GHS ${Number(item.cat_c_fee).toFixed(2)}` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                {selectedFeeAmount && (
+                                    <p className="text-sm text-green-700 font-medium mt-1">Selected fee: {selectedFeeAmount}</p>
+                                )}
+                            </div>
+                        )}
 
                         <div>
                             <label className="label">Business Email</label>

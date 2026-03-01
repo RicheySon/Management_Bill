@@ -16,6 +16,7 @@ interface BillCalculation {
 
 /**
  * Calculate property rate bill
+ * Uses configured fee schedule rates if available, falls back to legacy base_rate * property_size
  */
 export const calculatePropertyBill = async (
     propertyId: string,
@@ -35,27 +36,77 @@ export const calculatePropertyBill = async (
     }
 
     const property = propertyResult.rows[0];
-    const baseRate = parseFloat(property.base_rate);
-    const propertySize = parseFloat(property.property_size) || 50; // Default 50 sqm if not specified
+    const propertySize = parseFloat(property.property_size) || 50;
+    let current_rate: number;
+    let rateDescription = '';
 
-    // Calculate current rate: base_rate * property_size
-    const current_rate = baseRate * propertySize;
+    // Try to use configured fee schedule rates
+    const activeSchedule = await pool.query(
+        `SELECT id FROM fee_schedules WHERE year = $1 AND status = 'ACTIVE'`,
+        [billYear]
+    );
+
+    if (activeSchedule.rows.length > 0) {
+        let zone = null;
+
+        // First, check if property has a specific rate zone assigned
+        if (property.property_rate_zone_id) {
+            const zoneResult = await pool.query(
+                'SELECT * FROM property_rate_zones WHERE id = $1',
+                [property.property_rate_zone_id]
+            );
+            if (zoneResult.rows.length > 0) zone = zoneResult.rows[0];
+        }
+
+        // Otherwise, match by classification type
+        if (!zone && property.classification_name) {
+            const zoneTypeMap: Record<string, string> = {
+                'Residential': 'RESIDENTIAL',
+                'Commercial': 'COMMERCIAL',
+                'Industrial': 'INDUSTRIAL',
+            };
+            const zoneType = zoneTypeMap[property.classification_name] || 'RESIDENTIAL';
+
+            const zoneResult = await pool.query(
+                `SELECT * FROM property_rate_zones
+                 WHERE fee_schedule_id = $1 AND zone_type = $2
+                 ORDER BY zone_class ASC LIMIT 1`,
+                [activeSchedule.rows[0].id, zoneType]
+            );
+            if (zoneResult.rows.length > 0) zone = zoneResult.rows[0];
+        }
+
+        if (zone) {
+            const rateImpost = parseFloat(zone.rate_impost_min);
+            const minimumRate = parseFloat(zone.minimum_rate_min);
+            const calculatedRate = rateImpost * propertySize;
+            current_rate = Math.max(calculatedRate, minimumRate);
+            rateDescription = `${zone.zone_name} - Rate Impost: ${rateImpost}`;
+        } else {
+            // Fallback to legacy
+            const baseRate = parseFloat(property.base_rate) || 0;
+            current_rate = baseRate * propertySize;
+            rateDescription = `Legacy Rate: ${baseRate}`;
+        }
+    } else {
+        // No active schedule - use legacy calculation
+        const baseRate = parseFloat(property.base_rate) || 0;
+        current_rate = baseRate * propertySize;
+        rateDescription = `Legacy Rate: ${baseRate}`;
+    }
 
     // Check for arrears (previous unpaid bills)
     const arrearsResult = await pool.query(
         `SELECT COALESCE(SUM(amount_due), 0) as total_arrears
      FROM bills
-     WHERE property_id = $1 
-       AND bill_period_year < $2 
+     WHERE property_id = $1
+       AND bill_period_year < $2
        AND payment_status != 'PAID'`,
         [propertyId, billYear]
     );
 
     const arrears = parseFloat(arrearsResult.rows[0].total_arrears);
-
-    // No rebates for now (can be configured later)
     const rebate = 0;
-
     const total_amount = current_rate + arrears - rebate;
     const amount_due = total_amount;
 
@@ -63,8 +114,9 @@ export const calculatePropertyBill = async (
         bill_type: 'PROPERTY_RATE',
         items: [
             {
-                description: `Basic Rate Charge - CAT ${property.classification_name.charAt(0)}`,
-                current_rate: baseRate.toFixed(2),
+                description: `Property Rate - ${property.classification_name || 'Standard'}`,
+                rate_info: rateDescription,
+                current_rate: current_rate.toFixed(2),
                 area: propertySize.toFixed(2),
                 arrears: arrears.toFixed(2),
                 rebate: rebate.toFixed(2),
@@ -85,6 +137,7 @@ export const calculatePropertyBill = async (
 
 /**
  * Calculate Business Operating Permit (BOP) bill
+ * Uses configured fee schedule items if available, falls back to legacy base_fee
  */
 export const calculateBusinessBill = async (
     businessId: string,
@@ -104,24 +157,64 @@ export const calculateBusinessBill = async (
     }
 
     const business = businessResult.rows[0];
-    const baseFee = parseFloat(business.base_fee);
+    let current_rate: number;
+    let feeDescription = '';
 
-    // For BOP, the current rate is simply the base fee
-    const current_rate = baseFee;
+    // Try to use configured fee schedule rates
+    if (business.fee_item_id) {
+        const activeSchedule = await pool.query(
+            `SELECT id FROM fee_schedules WHERE year = $1 AND status = 'ACTIVE'`,
+            [billYear]
+        );
+
+        if (activeSchedule.rows.length > 0) {
+            const feeItemResult = await pool.query(
+                'SELECT * FROM business_fee_items WHERE id = $1 AND fee_schedule_id = $2',
+                [business.fee_item_id, activeSchedule.rows[0].id]
+            );
+
+            if (feeItemResult.rows.length > 0) {
+                const feeItem = feeItemResult.rows[0];
+                // Determine which category fee to use based on business_category_class
+                const catClass = (business.business_category_class || 'Category A')
+                    .replace('Category ', '').toLowerCase().trim();
+                const feeColumn = `cat_${catClass}_fee`;
+                const configuredFee = parseFloat(feeItem[feeColumn]);
+
+                if (!isNaN(configuredFee) && configuredFee > 0) {
+                    current_rate = configuredFee;
+                    feeDescription = `${feeItem.description} - ${business.business_category_class || 'Category A'}`;
+                } else {
+                    // Try cat_a_fee as default
+                    current_rate = parseFloat(feeItem.cat_a_fee) || parseFloat(business.base_fee) || 0;
+                    feeDescription = `${feeItem.description} - Category A (default)`;
+                }
+            } else {
+                current_rate = parseFloat(business.base_fee) || 0;
+                feeDescription = `Legacy: ${business.category_name}`;
+            }
+        } else {
+            current_rate = parseFloat(business.base_fee) || 0;
+            feeDescription = `Legacy: ${business.category_name}`;
+        }
+    } else {
+        // No fee_item_id - use legacy base_fee
+        current_rate = parseFloat(business.base_fee) || 0;
+        feeDescription = `Legacy: ${business.category_name}`;
+    }
 
     // Check for arrears
     const arrearsResult = await pool.query(
         `SELECT COALESCE(SUM(amount_due), 0) as total_arrears
      FROM bills
-     WHERE business_id = $1 
-       AND bill_period_year < $2 
+     WHERE business_id = $1
+       AND bill_period_year < $2
        AND payment_status != 'PAID'`,
         [businessId, billYear]
     );
 
     const arrears = parseFloat(arrearsResult.rows[0].total_arrears);
     const rebate = 0;
-
     const total_amount = current_rate + arrears - rebate;
     const amount_due = total_amount;
 
@@ -129,8 +222,8 @@ export const calculateBusinessBill = async (
         bill_type: 'BOP',
         items: [
             {
-                description: `Basic Rate Charge - CAT A`,
-                current_rate: baseFee.toFixed(2),
+                description: feeDescription || `BOP Fee - ${business.category_name}`,
+                current_rate: current_rate.toFixed(2),
                 area: '0.00',
                 arrears: arrears.toFixed(2),
                 rebate: rebate.toFixed(2),

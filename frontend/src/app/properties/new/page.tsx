@@ -9,7 +9,8 @@ import {
     fetchCustomers,
     fetchPropertyClassifications,
     fetchElectoralAreas,
-    fetchLocalAreas
+    fetchLocalAreas,
+    fetchActivePropertyRateZones,
 } from '@/lib/api-client';
 import { ArrowLeft, Save, UserPlus, UserCheck } from 'lucide-react';
 import Link from 'next/link';
@@ -62,6 +63,9 @@ export default function NewPropertyPage() {
     const [customers, setCustomers] = useState([]);
     const [classifications, setClassifications] = useState([]);
     const [electoralAreas, setElectoralAreas] = useState([]);
+    const [rateZones, setRateZones] = useState<any[]>([]);
+    const [selectedRateZoneId, setSelectedRateZoneId] = useState<string>('');
+    const [selectedRateInfo, setSelectedRateInfo] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const [propertyNumber, setPropertyNumber] = useState<string | null>(null);
@@ -70,14 +74,16 @@ export default function NewPropertyPage() {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const [customersData, classificationsData, areasData] = await Promise.all([
+                const [customersData, classificationsData, areasData, rateZonesData] = await Promise.all([
                     fetchCustomers({ limit: 1000 }),
                     fetchPropertyClassifications(),
                     fetchElectoralAreas(),
+                    fetchActivePropertyRateZones(new Date().getFullYear()),
                 ]);
                 setCustomers(customersData.data);
                 setClassifications(classificationsData);
                 setElectoralAreas(areasData);
+                setRateZones(rateZonesData || []);
             } catch (err) {
                 console.error('Failed to load data:', err);
             }
@@ -142,6 +148,7 @@ export default function NewPropertyPage() {
                 electoral_area_id: data.electoral_area_id,
                 population_density: data.population_density,
                 property_size: data.property_size,
+                property_rate_zone_id: selectedRateZoneId ? parseInt(selectedRateZoneId) : null,
             });
 
             setPropertyNumber(propertyResult.data.property_number);
@@ -371,6 +378,44 @@ export default function NewPropertyPage() {
                                 <p className="text-red-500 text-sm mt-1">{errors.classification_id.message}</p>
                             )}
                         </div>
+
+                        {/* Rating Zone (from configured fee schedule) */}
+                        {rateZones.length > 0 && (
+                            <div>
+                                <label className="label">Rating Zone (Fee Schedule)</label>
+                                <select
+                                    className="input-field"
+                                    value={selectedRateZoneId}
+                                    onChange={(e) => {
+                                        setSelectedRateZoneId(e.target.value);
+                                        if (e.target.value) {
+                                            const zone = rateZones.find((z: any) => z.id === parseInt(e.target.value));
+                                            if (zone) {
+                                                const rateStr = zone.rate_impost_max
+                                                    ? `${zone.rate_impost_min} - ${zone.rate_impost_max}`
+                                                    : `${zone.rate_impost_min}`;
+                                                const minStr = zone.minimum_rate_max
+                                                    ? `GHS ${Number(zone.minimum_rate_min).toLocaleString()} - ${Number(zone.minimum_rate_max).toLocaleString()}`
+                                                    : `GHS ${Number(zone.minimum_rate_min).toLocaleString()}`;
+                                                setSelectedRateInfo(`Rate Impost: ${rateStr} | Min: ${minStr}`);
+                                            }
+                                        } else {
+                                            setSelectedRateInfo('');
+                                        }
+                                    }}
+                                >
+                                    <option value="">Select rating zone (optional)</option>
+                                    {rateZones.map((zone: any) => (
+                                        <option key={zone.id} value={zone.id}>
+                                            {zone.zone_name} ({zone.zone_type}) - Min: GHS {Number(zone.minimum_rate_min).toLocaleString()}
+                                        </option>
+                                    ))}
+                                </select>
+                                {selectedRateInfo && (
+                                    <p className="text-sm text-green-700 font-medium mt-1">{selectedRateInfo}</p>
+                                )}
+                            </div>
+                        )}
 
                         <div>
                             <label className="label">Building Type</label>
