@@ -100,6 +100,11 @@ export const fetchCustomer = async (id: string) => {
     return response.data.data;
 };
 
+export const updateCustomer = async (id: string, data: any) => {
+    const response = await apiClient.put(`/customers/${id}`, data);
+    return response.data;
+};
+
 export const fetchCustomers = async (params?: any) => {
     const response = await apiClient.get('/customers', { params });
     return response.data;

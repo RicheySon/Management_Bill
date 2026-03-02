@@ -21,7 +21,13 @@ export default function CustomerDetailPage() {
         const loadCustomer = async () => {
             try {
                 const data = await fetchCustomer(id as string);
-                setCustomer(data);
+                // The backend returns { customer, properties, businesses, outstanding_bills }
+                setCustomer({
+                    ...data.customer,
+                    properties: data.properties,
+                    businesses: data.businesses,
+                    bills: data.outstanding_bills
+                });
             } catch (err: any) {
                 setError(err.response?.data?.error || 'Failed to load customer details');
             } finally {
