@@ -21,7 +21,11 @@ export default function BusinessDetailPage() {
         const loadBusiness = async () => {
             try {
                 const data = await fetchBusiness(id as string);
-                setBusiness(data);
+                // Correctly destructure business and bills from the response
+                setBusiness({
+                    ...data.business,
+                    bills: data.bills
+                });
             } catch (err: any) {
                 setError(err.response?.data?.error || 'Failed to load business details');
             } finally {

@@ -20,7 +20,11 @@ export default function PropertyDetailPage() {
         const loadProperty = async () => {
             try {
                 const data = await fetchProperty(id as string);
-                setProperty(data);
+                // Correctly destructure property and bills from the response
+                setProperty({
+                    ...data.property,
+                    bills: data.bills
+                });
             } catch (err: any) {
                 setError(err.response?.data?.error || 'Failed to load property details');
             } finally {
