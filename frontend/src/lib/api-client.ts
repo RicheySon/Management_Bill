@@ -15,13 +15,20 @@ apiClient.interceptors.request.use(
         // Only run in browser environment
         if (typeof window !== 'undefined') {
             const token = localStorage.getItem('auth_token');
+            console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`, {
+                hasToken: !!token,
+                tokenPrefix: token ? `${token.substring(0, 10)}...` : 'none'
+            });
             if (token) {
                 config.headers.Authorization = `Bearer ${token}`;
+            } else {
+                console.warn('No auth token found in localStorage for request:', config.url);
             }
         }
         return config;
     },
     (error) => {
+        console.error('Request interceptor error:', error);
         return Promise.reject(error);
     }
 );

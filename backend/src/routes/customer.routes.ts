@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import pool from '../config/database';
-import { authorize, AuthRequest } from '../middlewares/auth.middleware';
+import { authenticateToken, authorize, AuthRequest } from '../middlewares/auth.middleware';
 import Joi from 'joi';
 
 const router = Router();
@@ -31,7 +31,7 @@ const customerSchema = Joi.object({
  * POST /api/customers
  * Register a new customer
  */
-router.post('/', authorize(['create_customer']), async (req: AuthRequest, res: Response) => {
+router.post('/', authenticateToken, authorize(['create_customer']), async (req: AuthRequest, res: Response) => {
     try {
         const { error, value } = customerSchema.validate(req.body);
 
@@ -107,7 +107,7 @@ router.post('/', authorize(['create_customer']), async (req: AuthRequest, res: R
  * GET /api/customers/:id
  * Get customer details with related properties and businesses
  */
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', authenticateToken, async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
 
@@ -178,7 +178,7 @@ router.get('/:id', async (req: Request, res: Response) => {
  * GET /api/customers
  * List customers with filters
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
     try {
         const {
             search,
@@ -280,7 +280,7 @@ router.get('/', async (req: Request, res: Response) => {
  * PUT /api/customers/:id
  * Update customer information
  */
-router.put('/:id', authorize(['edit_customer']), async (req: AuthRequest, res: Response) => {
+router.put('/:id', authenticateToken, authorize(['edit_customer']), async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
         const { error, value } = customerSchema.validate(req.body);
@@ -377,7 +377,7 @@ router.put('/:id', authorize(['edit_customer']), async (req: AuthRequest, res: R
  * DELETE /api/customers/:id
  * Soft delete customer (sets related records to inactive)
  */
-router.delete('/:id', authorize(['delete_customer']), async (req: AuthRequest, res: Response) => {
+router.delete('/:id', authenticateToken, authorize(['delete_customer']), async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
 

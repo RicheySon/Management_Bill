@@ -371,9 +371,9 @@ function parseRateRange(val: any): { min: number; max?: number } | null {
 
 function detectZoneType(zoneName: string): string {
     const lower = zoneName.toLowerCase();
-    if (lower.includes('mixed')) return 'MIXED_USE';
     if (lower.includes('industrial')) return 'INDUSTRIAL';
     if (lower.includes('commercial')) return 'COMMERCIAL';
+    if (lower.includes('mixed')) return 'MIXED_USE';
     return 'RESIDENTIAL';
 }
 
@@ -385,159 +385,106 @@ function detectZoneClass(zoneName: string): number {
 
 export const parseExcelFeeSchedule = (buffer: Buffer): ParsedFeeData => {
     const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-
     const propertyZones: ParsedPropertyZone[] = [];
     const businessItems: ParsedBusinessItem[] = [];
 
-    let currentSection: 'UNKNOWN' | 'PROPERTY' | 'BUSINESS' = 'UNKNOWN';
-    let currentMainItemNumber = 0;
-    let currentMainDescription = '';
+    for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName];
+        const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
-    for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        if (!row || row.every((cell: any) => cell === '' || cell === null || cell === undefined)) continue;
+        let currentSection: 'UNKNOWN' | 'PROPERTY' | 'BUSINESS' = 'UNKNOWN';
+        let sectionLocked = false;
 
-        const rowStr = row.map((c: any) => String(c || '').toLowerCase()).join(' ');
-
-        // Detect property rates section
-        if (rowStr.includes('rating zone') && rowStr.includes('rate impost')) {
-            currentSection = 'PROPERTY';
-            continue;
-        }
-
-        // Detect business licenses section
-        if (rowStr.includes('main item') && rowStr.includes('sub item') && rowStr.includes('description')) {
+        if (sheetName.toLowerCase().includes('table')) {
             currentSection = 'BUSINESS';
-            continue;
+            sectionLocked = true;
         }
 
-        // Also detect business section by "BUSINESS LICENCES" header
-        if (rowStr.includes('business licence')) {
-            currentSection = 'BUSINESS';
-            continue;
-        }
+        let currentMainItemNumber = 0;
+        let currentMainDescription = '';
 
-        if (currentSection === 'PROPERTY') {
-            // Property zone rows: [zone_name, rate_impost, (empty), min_rate, affected_areas]
-            // Column mapping may vary - look for zone name in first non-empty cell
-            const zoneName = String(row[0] || row[1] || '').trim();
-            if (!zoneName || zoneName.length < 3) continue;
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row || row.every((cell: any) => cell === '' || cell === null || cell === undefined)) continue;
 
-            // Skip if it looks like a header row
-            if (zoneName.toLowerCase().includes('rating zone') || zoneName.toLowerCase().includes('rate')) continue;
+            const rowStr = row.map((c: any) => String(c || '').toLowerCase()).join(' ');
 
-            // Find rate impost - usually col 2 or 3
-            let rateImpost: ReturnType<typeof parseRateRange> = null;
-            let minRate: ReturnType<typeof parseRateRange> = null;
-            let affectedAreas = '';
-
-            for (let c = 1; c < row.length; c++) {
-                const cellStr = String(row[c] || '').trim();
-                if (!cellStr) continue;
-
-                const parsed = parseRateRange(cellStr);
-                if (parsed) {
-                    if (!rateImpost && parsed.min < 1) {
-                        rateImpost = parsed;
-                    } else if (!minRate && parsed.min >= 1) {
-                        minRate = parsed;
-                    }
-                } else if (cellStr.length > 10 && !rateImpost) {
-                    // Probably affected areas text
-                } else if (cellStr.length > 10) {
-                    affectedAreas = cellStr;
+            // Section Detection - Only if not already locked by sheet name
+            if (!sectionLocked) {
+                if (rowStr.includes('rating zone') || rowStr.includes('property rates')) {
+                    currentSection = 'PROPERTY';
+                    continue;
+                }
+                if (rowStr.includes('main item') && rowStr.includes('sub item')) {
+                    currentSection = 'BUSINESS';
+                    sectionLocked = true;
+                    continue;
+                }
+                if (rowStr.includes('business licence')) {
+                    currentSection = 'BUSINESS';
+                    sectionLocked = true;
+                    continue;
                 }
             }
 
-            if (rateImpost && minRate) {
-                propertyZones.push({
-                    zone_name: zoneName,
-                    zone_type: detectZoneType(zoneName),
-                    zone_class: detectZoneClass(zoneName),
-                    rate_impost_min: rateImpost.min,
-                    rate_impost_max: rateImpost.max,
-                    minimum_rate_min: minRate.min,
-                    minimum_rate_max: minRate.max,
-                    affected_areas: affectedAreas || undefined,
-                });
-            }
+            const fees = extractFees(row);
+            const hasFees = Object.keys(fees).length > 0;
+            const desc = String(row[0] || row[1] || row[2] || '').trim();
 
-            // Stop property section when we hit an empty section or business section starts
-            if (rowStr.includes('business') || rowStr.includes('general') || rowStr.includes('resolved')) {
-                currentSection = 'UNKNOWN';
-            }
-        }
+            if (desc && desc.length > 2 && !desc.toLowerCase().includes('page') && !desc.toLowerCase().includes('municipal')) {
+                // Property Zone Catch-all: ONLY in PROPERTY section or very first rows
+                if (currentSection === 'PROPERTY') {
+                    const vals = Object.values(fees) as number[];
+                    const rateImpost = vals.find(v => v < 1) || 0;
+                    const minRate = vals.find(v => v >= 1) || 0;
 
-        if (currentSection === 'BUSINESS') {
-            // Business item rows: [main_item#, sub_item, description, (empty), (empty), frequency, fee_amount]
-            // Or: [main_item#, sub_item, description, freq, fee_cols...]
+                    if (rateImpost > 0 || minRate > 0) {
+                        propertyZones.push({
+                            zone_name: desc,
+                            zone_type: detectZoneType(desc),
+                            zone_class: detectZoneClass(desc),
+                            rate_impost_min: rateImpost,
+                            minimum_rate_min: minRate,
+                        });
+                        continue;
+                    }
+                }
 
-            const col0 = String(row[0] || '').trim();
-            const col1 = String(row[1] || '').trim();
-            const col2 = String(row[2] || '').trim();
+                // Business Item Logic
+                const col0 = String(row[0] || '').trim();
+                const mainItemNum = parseInt(col0);
 
-            // Detect main item number
-            const mainItemNum = parseInt(col0);
+                if (!isNaN(mainItemNum) && mainItemNum > 0) {
+                    currentMainItemNumber = mainItemNum;
+                    currentMainDescription = String(row[2] || row[1] || '').trim();
+                }
 
-            if (!isNaN(mainItemNum) && mainItemNum > 0) {
-                currentMainItemNumber = mainItemNum;
-                // Description could be in col2 or col1
-                const desc = col2 || col1;
-                if (desc) {
-                    currentMainDescription = desc;
-                    // Check if this row has fees or is just a header
-                    const hasFees = row.slice(3).some((c: any) => {
-                        const n = cleanNumber(c);
-                        return n !== undefined && n > 0;
+                if (hasFees || currentMainItemNumber > 0) {
+                    // Filter out rows that are clearly property rates being misclassified (extremely small first value)
+                    if (currentSection === 'UNKNOWN' && hasFees && (fees as any).cat_a_fee < 1) {
+                        // This looks like a property rate impost, maybe treat as property if section not locked
+                        propertyZones.push({
+                            zone_name: desc,
+                            zone_type: detectZoneType(desc),
+                            zone_class: detectZoneClass(desc),
+                            rate_impost_min: (fees as any).cat_a_fee,
+                            minimum_rate_min: (fees as any).cat_b_fee || 0,
+                        });
+                        currentSection = 'PROPERTY';
+                        continue;
+                    }
+
+                    businessItems.push({
+                        main_item_number: currentMainItemNumber || 999,
+                        sub_item_code: String(row[1] || '').length <= 10 ? String(row[1] || '') : undefined,
+                        description: desc,
+                        parent_description: currentMainDescription !== desc ? currentMainDescription : undefined,
+                        is_group_header: !hasFees,
+                        frequency: findFrequency(row),
+                        ...fees,
                     });
-
-                    if (!hasFees) {
-                        businessItems.push({
-                            main_item_number: currentMainItemNumber,
-                            description: desc,
-                            is_group_header: true,
-                            frequency: findFrequency(row),
-                        });
-                    } else {
-                        // Main item with direct fees
-                        const fees = extractFees(row);
-                        businessItems.push({
-                            main_item_number: currentMainItemNumber,
-                            description: desc,
-                            is_group_header: false,
-                            frequency: findFrequency(row),
-                            ...fees,
-                        });
-                    }
+                    if (currentSection === 'UNKNOWN') currentSection = 'BUSINESS';
                 }
-            } else if (currentMainItemNumber > 0) {
-                // Sub-item or category row
-                const desc = col2 || col1 || col0;
-                if (!desc || desc.length < 2) continue;
-
-                // Skip pure text/header rows
-                const descLower = desc.toLowerCase();
-                if (descLower.includes('main item') || descLower.includes('sub item') || descLower.includes('description of item')) continue;
-
-                const hasFees = row.slice(1).some((c: any) => {
-                    const n = cleanNumber(c);
-                    return n !== undefined && n > 0;
-                });
-
-                const subCode = col1 || undefined;
-                const fees = extractFees(row);
-
-                businessItems.push({
-                    main_item_number: currentMainItemNumber,
-                    sub_item_code: subCode && subCode.length <= 10 ? subCode : undefined,
-                    description: desc,
-                    parent_description: currentMainDescription,
-                    is_group_header: !hasFees,
-                    frequency: findFrequency(row),
-                    ...(hasFees ? fees : {}),
-                });
             }
         }
     }
@@ -546,7 +493,7 @@ export const parseExcelFeeSchedule = (buffer: Buffer): ParsedFeeData => {
 };
 
 function findFrequency(row: any[]): string | undefined {
-    const freqKeywords = ['per annum', 'per month', 'per day', 'per event', 'per trip', 'per load', 'per item', 'per week', 'annual'];
+    const freqKeywords = ['per annum', 'per month', 'per day', 'per event', 'per trip', 'per load', 'per item', 'per week', 'annual', 'per visit', 'per animal', 'per offe', 'per message', 'per unit', 'per year'];
     for (const cell of row) {
         const str = String(cell || '').toLowerCase().trim();
         if (freqKeywords.some(kw => str.includes(kw))) {
@@ -557,19 +504,17 @@ function findFrequency(row: any[]): string | undefined {
 }
 
 function extractFees(row: any[]): { cat_a_fee?: number; cat_b_fee?: number; cat_c_fee?: number; cat_d_fee?: number; cat_e_fee?: number; cat_f_fee?: number } {
-    // Find fee columns - they're usually the last numeric values in the row
     const fees: number[] = [];
-    for (let c = row.length - 1; c >= 0; c--) {
+    for (let c = 1; c < row.length; c++) {
         const n = cleanNumber(row[c]);
         if (n !== undefined && n > 0) {
-            fees.unshift(n);
-        } else if (fees.length > 0) {
-            break; // Stop when we hit a non-numeric gap after finding fees
+            const str = String(row[c]).toLowerCase();
+            if (['per', 'annum', 'month', 'year', 'visit', 'offence', 'animal', 'message', 'meter', 'foot'].some(k => str.includes(k))) continue;
+            if (n === 2026 || n === 2025) continue;
+            fees.push(n);
         }
     }
 
-    // If only one fee, it's cat_a
-    if (fees.length === 1) return { cat_a_fee: fees[0] };
     if (fees.length === 0) return {};
 
     const result: any = {};

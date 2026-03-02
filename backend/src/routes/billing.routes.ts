@@ -1,7 +1,7 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import Joi from 'joi';
 import { generateBill, recordPayment } from '../services/billing.service';
-import { authenticateToken, authorize } from '../middlewares/auth.middleware';
+import { authenticateToken, authorize, AuthRequest } from '../middlewares/auth.middleware';
 import pool from '../config/database';
 
 const router = Router();
@@ -13,7 +13,7 @@ router.use(authenticateToken);
  * POST /api/bills/generate
  * Generate a new bill for property or business
  */
-router.post('/generate', authorize(['generate_bill']), async (req: Request, res: Response) => {
+router.post('/generate', authenticateToken, authorize(['generate_bill']), async (req: AuthRequest, res: Response) => {
     try {
         const schema = Joi.object({
             bill_type: Joi.string().valid('PROPERTY_RATE', 'BOP').required(),
@@ -53,7 +53,7 @@ router.post('/generate', authorize(['generate_bill']), async (req: Request, res:
  * GET /api/bills/:id
  * Get bill details with customer info
  */
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', authenticateToken, async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
 
@@ -112,7 +112,7 @@ router.get('/:id', async (req: Request, res: Response) => {
  * GET /api/bills/customer/:customerId
  * Get all bills for a customer
  */
-router.get('/customer/:customerId', async (req: Request, res: Response) => {
+router.get('/customer/:customerId', authenticateToken, async (req: AuthRequest, res: Response) => {
     try {
         const { customerId } = req.params;
         const { status, bill_type } = req.query;
@@ -162,7 +162,7 @@ router.get('/customer/:customerId', async (req: Request, res: Response) => {
  * GET /api/bills
  * List all bills with filters
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
     try {
         const {
             status,
@@ -257,7 +257,7 @@ router.get('/', async (req: Request, res: Response) => {
  * POST /api/bills/:id/payment
  * Record a payment for a bill
  */
-router.post('/:id/payment', authorize(['record_payment']), async (req: Request, res: Response) => {
+router.post('/:id/payment', authenticateToken, authorize(['record_payment']), async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
 
