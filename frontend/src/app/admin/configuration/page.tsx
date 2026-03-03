@@ -66,6 +66,11 @@ interface BusinessFeeItem {
 
 const ZONE_TYPES = ['RESIDENTIAL', 'COMMERCIAL', 'INDUSTRIAL', 'MIXED_USE'];
 
+const formatFee = (fee: any) => {
+    if (fee === null || fee === undefined || fee === '') return '-';
+    return Number(fee).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
 // =====================================================
 // MAIN PAGE COMPONENT
 // =====================================================
@@ -220,8 +225,8 @@ export default function FeeConfigurationPage() {
                     {selectedSchedule && (
                         <div className="flex items-end">
                             <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${selectedSchedule.status === 'ACTIVE' ? 'bg-green-100 text-green-700' :
-                                    selectedSchedule.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-700' :
-                                        'bg-gray-100 text-gray-600'
+                                selectedSchedule.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-700' :
+                                    'bg-gray-100 text-gray-600'
                                 }`}>
                                 {selectedSchedule.status}
                             </span>
@@ -455,9 +460,9 @@ function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
                                     <td className="px-4 py-3 font-medium text-gray-900">{zone.zone_name}</td>
                                     <td className="px-4 py-3">
                                         <span className={`px-2 py-1 rounded text-xs font-medium ${zone.zone_type === 'RESIDENTIAL' ? 'bg-blue-100 text-blue-700' :
-                                                zone.zone_type === 'COMMERCIAL' ? 'bg-purple-100 text-purple-700' :
-                                                    zone.zone_type === 'INDUSTRIAL' ? 'bg-orange-100 text-orange-700' :
-                                                        'bg-teal-100 text-teal-700'
+                                            zone.zone_type === 'COMMERCIAL' ? 'bg-purple-100 text-purple-700' :
+                                                zone.zone_type === 'INDUSTRIAL' ? 'bg-orange-100 text-orange-700' :
+                                                    'bg-teal-100 text-teal-700'
                                             }`}>
                                             {zone.zone_type}
                                         </span>
@@ -692,10 +697,6 @@ function BusinessLicensesTab({ scheduleId, canConfigure, showMessage }: {
 
     if (loading) return <div className="flex justify-center py-8"><Loader2 className="w-8 h-8 animate-spin text-municipal-red" /></div>;
 
-    const formatFee = (fee: any) => {
-        if (fee === null || fee === undefined || fee === '') return '-';
-        return Number(fee).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    };
 
     return (
         <div className="card">
