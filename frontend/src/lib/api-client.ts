@@ -188,7 +188,7 @@ export const sendBulkSMS = async (data: any) => {
     return response.data;
 };
 
-export const recordPayment = async (billId: string, data: any) => {
+export const recordPayment = async (billId: string, data: { amount: number; payment_method: string; customer_id: string; payment_reference?: string }) => {
     const response = await apiClient.post(`/bills/${billId}/payment`, data);
     return response.data;
 };
@@ -220,7 +220,6 @@ export const downloadBillPDF = async (billId: string) => {
         responseType: 'blob',
     });
 
-    // Create download link
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement('a');
     link.href = url;
@@ -228,6 +227,31 @@ export const downloadBillPDF = async (billId: string) => {
     document.body.appendChild(link);
     link.click();
     link.remove();
+    window.URL.revokeObjectURL(url);
+};
+
+export const printBillPDF = async (billId: string) => {
+    const response = await apiClient.get(`/print/bill/${billId}`, {
+        responseType: 'blob',
+    });
+
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+
+    // Create hidden iframe for printing
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = url;
+    document.body.appendChild(iframe);
+
+    iframe.onload = () => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        setTimeout(() => {
+            document.body.removeChild(iframe);
+            window.URL.revokeObjectURL(url);
+        }, 1000);
+    };
 };
 
 export const downloadBulkBillsPDF = async (filters: any) => {

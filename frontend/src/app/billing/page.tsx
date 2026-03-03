@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { fetchBills, downloadBillPDF, fetchElectoralAreas, deleteBill } from '@/lib/api-client';
+import { fetchBills, downloadBillPDF, printBillPDF, fetchElectoralAreas, deleteBill } from '@/lib/api-client';
 import {
     FileText, Search, Filter, Printer,
-    CreditCard, Plus, CheckCircle2, AlertCircle, Clock, Trash, Pencil
+    CreditCard, Plus, CheckCircle2, AlertCircle, Clock, Trash, Pencil,
+    FileDown
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -169,14 +170,21 @@ export default function BillingPage() {
                                             <button
                                                 onClick={() => downloadBillPDF(bill.id)}
                                                 className="inline-flex items-center p-2 text-gray-600 hover:text-municipal-red hover:bg-red-50 rounded-lg transition-all"
-                                                title="Download Bill"
+                                                title="Download PDF"
+                                            >
+                                                <FileDown className="w-5 h-5" />
+                                            </button>
+                                            <button
+                                                onClick={() => printBillPDF(bill.id)}
+                                                className="inline-flex items-center p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-all"
+                                                title="Print Hardcopy"
                                             >
                                                 <Printer className="w-5 h-5" />
                                             </button>
                                             <Link
-                                                href={`/billing/${bill.id}/edit`}
+                                                href={`/customers/${bill.customer_id}/edit`}
                                                 className="inline-flex items-center p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                                title="Edit Bill"
+                                                title="Edit Customer Details"
                                             >
                                                 <Pencil className="w-5 h-5" />
                                             </Link>

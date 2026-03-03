@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { fetchBill, recordPayment, downloadBillPDF } from '@/lib/api-client';
+import { fetchBill, recordPayment, downloadBillPDF, printBillPDF } from '@/lib/api-client';
 import {
     ArrowLeft, Printer, CreditCard,
     User, Building2, Briefcase, Calendar,
-    Wallet, CheckCircle2, AlertCircle, History
+    Wallet, CheckCircle2, AlertCircle, History,
+    FileDown
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -45,8 +46,9 @@ export default function BillDetailPage() {
             await recordPayment(id as string, {
                 amount: parseFloat(paymentAmount),
                 payment_method: paymentMethod,
+                customer_id: bill.customer_id,
                 notes: `Manual payment for ${bill.bill_number}`
-            });
+            } as any);
             setSuccess(true);
             await loadBill();
             setTimeout(() => setSuccess(false), 3000);
@@ -71,10 +73,17 @@ export default function BillDetailPage() {
                 </button>
                 <div className="flex space-x-3">
                     <button
+                        onClick={() => printBillPDF(bill.id)}
+                        className="btn-primary flex items-center space-x-2"
+                    >
+                        <Printer className="w-4 h-4" />
+                        <span>Print Hardcopy</span>
+                    </button>
+                    <button
                         onClick={() => downloadBillPDF(bill.id)}
                         className="btn-secondary flex items-center space-x-2"
                     >
-                        <Printer className="w-4 h-4" />
+                        <FileDown className="w-4 h-4" />
                         <span>Download PDF</span>
                     </button>
                 </div>
@@ -135,15 +144,15 @@ export default function BillDetailPage() {
                             <div className="flex flex-col space-y-2">
                                 <div className="flex justify-between text-gray-600">
                                     <span>Current Charge</span>
-                                    <span>GHS {parseFloat(bill.current_rate_amount || 0).toFixed(2)}</span>
+                                    <span>GHS {parseFloat(bill.current_rate || 0).toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between text-gray-600">
                                     <span>Arrears</span>
-                                    <span>GHS {parseFloat(bill.arrears_amount || 0).toFixed(2)}</span>
+                                    <span>GHS {parseFloat(bill.arrears || 0).toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between text-gray-600 border-b pb-2">
                                     <span>Rebate / Discount</span>
-                                    <span className="text-green-600">- GHS {parseFloat(bill.rebate_amount || 0).toFixed(2)}</span>
+                                    <span className="text-green-600">- GHS {parseFloat(bill.rebate || 0).toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between text-lg font-bold pt-2 text-gray-900">
                                     <span>Total Bill Amount</span>
