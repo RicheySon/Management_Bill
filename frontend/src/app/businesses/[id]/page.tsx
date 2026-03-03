@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { fetchBusiness } from '@/lib/api-client';
+import { fetchBusiness, deleteBusiness } from '@/lib/api-client';
 import {
     ShoppingBag, User, MapPin, Tag, Calendar,
     ArrowLeft, History, FileText, Plus, AlertCircle,
-    Info, Building2
+    Info, Building2, Trash2, Edit
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -34,6 +34,16 @@ export default function BusinessDetailPage() {
         };
         loadBusiness();
     }, [id]);
+
+    const handleDelete = async () => {
+        if (!confirm('Are you sure you want to delete this business? This will also affect associated bills.')) return;
+        try {
+            await deleteBusiness(id as string);
+            router.push('/businesses');
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Failed to delete business');
+        }
+    };
 
     if (loading) {
         return (
@@ -71,6 +81,14 @@ export default function BusinessDetailPage() {
                     </div>
                 </div>
                 <div className="flex items-center space-x-3">
+                    <Link href={`/businesses/${id}/edit`} className="btn-secondary flex items-center space-x-2">
+                        <Edit className="w-4 h-4" />
+                        <span>Edit</span>
+                    </Link>
+                    <button onClick={handleDelete} className="btn-secondary text-red-600 border-red-100 hover:bg-red-50 flex items-center space-x-2">
+                        <Trash2 className="w-4 h-4" />
+                        <span>Delete</span>
+                    </button>
                     <Link href={`/billing/generate?business_id=${id}`} className="btn-primary flex items-center space-x-2">
                         <Plus className="w-4 h-4" />
                         <span>Issue BOP Bill</span>

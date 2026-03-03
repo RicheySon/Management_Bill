@@ -126,6 +126,16 @@ export const fetchProperties = async (params?: any) => {
     return response.data;
 };
 
+export const updateProperty = async (id: string, data: any) => {
+    const response = await apiClient.put(`/properties/${id}`, data);
+    return response.data;
+};
+
+export const deleteProperty = async (id: string) => {
+    const response = await apiClient.delete(`/properties/${id}`);
+    return response.data;
+};
+
 // Businesses
 export const createBusiness = async (data: any) => {
     const response = await apiClient.post('/businesses', data);
@@ -139,6 +149,16 @@ export const fetchBusiness = async (id: string) => {
 
 export const fetchBusinesses = async (params?: any) => {
     const response = await apiClient.get('/businesses', { params });
+    return response.data;
+};
+
+export const updateBusiness = async (id: string, data: any) => {
+    const response = await apiClient.put(`/businesses/${id}`, data);
+    return response.data;
+};
+
+export const deleteBusiness = async (id: string) => {
+    const response = await apiClient.delete(`/businesses/${id}`);
     return response.data;
 };
 
@@ -158,8 +178,18 @@ export const fetchBills = async (params?: any) => {
     return response.data;
 };
 
+export const sendBulkSMS = async (data: any) => {
+    const response = await apiClient.post('/bills/bulk-sms', data);
+    return response.data;
+};
+
 export const recordPayment = async (billId: string, data: any) => {
     const response = await apiClient.post(`/bills/${billId}/payment`, data);
+    return response.data;
+};
+
+export const deleteBill = async (id: string) => {
+    const response = await apiClient.delete(`/bills/${id}`);
     return response.data;
 };
 

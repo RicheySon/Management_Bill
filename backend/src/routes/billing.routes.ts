@@ -248,7 +248,36 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
         console.error('Error listing bills:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to fetch bills',
+            error: 'Failed to list bills',
+        });
+    }
+});
+
+/**
+ * DELETE /api/bills/:id
+ * Delete a bill
+ */
+router.delete('/:id', authenticateToken, authorize(['delete_bill']), async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query('DELETE FROM bills WHERE id = $1 RETURNING id', [id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Bill not found',
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Bill deleted successfully',
+        });
+    } catch (error: any) {
+        console.error('Error deleting bill:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete bill',
         });
     }
 });

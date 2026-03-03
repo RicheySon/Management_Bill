@@ -34,6 +34,9 @@ export default function GenerateBillPage() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
+    const [showPreview, setShowPreview] = useState(false);
+    const [previewData, setPreviewData] = useState<any>(null);
+
     const watchBillType = watch('bill_type');
     const watchCustomerId = watch('customer_id');
 
@@ -71,16 +74,39 @@ export default function GenerateBillPage() {
         }
     }, [watchCustomerId, setValue]);
 
+    const handlePreview = (data: GenerateBillForm) => {
+        const targetId = data.bill_type === 'PROPERTY' ? data.property_id : data.business_id;
+        const target = data.bill_type === 'PROPERTY'
+            ? selectedCustomerData.properties.find((p: any) => p.id === targetId)
+            : selectedCustomerData.businesses.find((b: any) => b.id === targetId);
+
+        setPreviewData({
+            ...data,
+            customer_name: selectedCustomerData.customer.full_name,
+            target_name: data.bill_type === 'PROPERTY' ? target.property_number : target.business_name,
+            target_details: data.bill_type === 'PROPERTY' ? target.classification_name : target.category_name
+        });
+        setShowPreview(true);
+    };
+
     const onSubmit = async (data: GenerateBillForm) => {
         setError(null);
         try {
-            const result = await generateBill(data);
+            const apiData = {
+                bill_type: data.bill_type === 'PROPERTY' ? 'PROPERTY_RATE' : 'BOP',
+                target_id: data.bill_type === 'PROPERTY' ? data.property_id : data.business_id,
+                customer_id: data.customer_id,
+                bill_year: parseInt(data.billing_year as any)
+            };
+
+            const result = await generateBill(apiData);
             setSuccess(true);
             setTimeout(() => {
                 router.push(`/billing/${result.data.id}`);
             }, 1500);
         } catch (err: any) {
             setError(err.response?.data?.error || 'Failed to generate bill');
+            setShowPreview(false);
         }
     };
 
@@ -226,8 +252,17 @@ export default function GenerateBillPage() {
                 <div className="flex justify-end space-x-4 pt-6">
                     <Link href="/billing" className="btn-secondary">Cancel</Link>
                     <button
+                        type="button"
+                        onClick={handleSubmit(handlePreview)}
+                        disabled={isSubmitting || (watchBillType === 'PROPERTY' && !watch('property_id')) || (watchBillType === 'BOP' && !watch('business_id'))}
+                        className="btn-secondary flex items-center space-x-2"
+                    >
+                        <Search className="w-4 h-4" />
+                        <span>Preview Bill</span>
+                    </button>
+                    <button
                         type="submit"
-                        disabled={isSubmitting || (watchBillType === 'PROPERTY' && !selectedCustomerData?.properties?.length) || (watchBillType === 'BOP' && !selectedCustomerData?.businesses?.length)}
+                        disabled={isSubmitting || (watchBillType === 'PROPERTY' && !watch('property_id')) || (watchBillType === 'BOP' && !watch('business_id'))}
                         className="btn-primary flex items-center space-x-2"
                     >
                         {isSubmitting ? (
@@ -235,10 +270,71 @@ export default function GenerateBillPage() {
                         ) : (
                             <FileText className="w-4 h-4" />
                         )}
-                        <span>Generate Bill</span>
+                        <span>Generate Bill Now</span>
                     </button>
                 </div>
             </form>
+
+            {/* Preview Modal */}
+            {showPreview && previewData && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="bg-municipal-red p-6 text-white">
+                            <h3 className="text-xl font-bold flex items-center">
+                                <FileText className="w-6 h-6 mr-2" />
+                                Bill Preview
+                            </h3>
+                            <p className="text-red-100 text-sm mt-1">Review bill details before final generation</p>
+                        </div>
+
+                        <div className="p-8 space-y-6">
+                            <div className="grid grid-cols-2 gap-y-4 text-sm">
+                                <div className="text-gray-500 font-medium">Customer:</div>
+                                <div className="font-bold text-gray-900">{previewData.customer_name}</div>
+
+                                <div className="text-gray-500 font-medium">Bill Type:</div>
+                                <div className="font-bold text-gray-900">{previewData.bill_type === 'PROPERTY' ? 'Property Rate' : 'BOP Permit'}</div>
+
+                                <div className="text-gray-500 font-medium">{previewData.bill_type === 'PROPERTY' ? 'Property No:' : 'Business:'}</div>
+                                <div className="font-bold text-municipal-red">{previewData.target_name}</div>
+
+                                <div className="text-gray-500 font-medium">Category:</div>
+                                <div className="font-bold text-gray-900">{previewData.target_details}</div>
+
+                                <div className="text-gray-500 font-medium">Billing Year:</div>
+                                <div className="font-bold text-gray-900">{previewData.billing_year}</div>
+                            </div>
+
+                            <div className="bg-yellow-50 border border-yellow-100 p-4 rounded-xl">
+                                <p className="text-xs text-yellow-800 leading-relaxed italic">
+                                    Note: Final amount including current year rate and any outstanding arrears will be calculated upon generation.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="bg-gray-50 p-6 flex justify-end space-x-3">
+                            <button
+                                onClick={() => setShowPreview(false)}
+                                className="px-6 py-2.5 rounded-xl font-bold text-gray-600 hover:bg-gray-100 transition-all text-sm"
+                            >
+                                Back to Edit
+                            </button>
+                            <button
+                                onClick={handleSubmit(onSubmit)}
+                                disabled={isSubmitting}
+                                className="px-8 py-2.5 bg-municipal-red text-white rounded-xl font-bold shadow-lg shadow-red-200 hover:bg-red-700 transition-all flex items-center space-x-2 text-sm"
+                            >
+                                {isSubmitting ? (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                ) : (
+                                    <Send className="w-4 h-4" />
+                                )}
+                                <span>Confirm & Generate</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

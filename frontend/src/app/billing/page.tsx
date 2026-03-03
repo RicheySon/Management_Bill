@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { fetchBills, downloadBillPDF, fetchElectoralAreas } from '@/lib/api-client';
+import { fetchBills, downloadBillPDF, fetchElectoralAreas, deleteBill } from '@/lib/api-client';
 import {
     FileText, Search, Filter, Printer,
-    CreditCard, Plus, CheckCircle2, AlertCircle, Clock
+    CreditCard, Plus, CheckCircle2, AlertCircle, Clock, Trash
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -22,8 +22,15 @@ export default function BillingPage() {
     const loadData = async () => {
         setLoading(true);
         try {
+            // Map 'type' to 'bill_type' for backend compatibility
+            const apiParams = {
+                ...filters,
+                bill_type: filters.type,
+            };
+            delete (apiParams as any).type;
+
             const [billsData, areasData] = await Promise.all([
-                fetchBills(filters),
+                fetchBills(apiParams),
                 fetchElectoralAreas()
             ]);
             setBills(billsData.data);
@@ -36,8 +43,23 @@ export default function BillingPage() {
     };
 
     useEffect(() => {
-        loadData();
-    }, [filters.status, filters.type, filters.electoral_area_id]);
+        const timer = setTimeout(() => {
+            loadData();
+        }, filters.search ? 500 : 0); // Debounce search
+
+        return () => clearTimeout(timer);
+    }, [filters.status, filters.type, filters.electoral_area_id, filters.search]);
+
+    const handleDelete = async (id: string) => {
+        if (!confirm('Are you sure you want to delete this bill?')) return;
+        try {
+            await deleteBill(id);
+            loadData();
+        } catch (error) {
+            console.error('Delete failed:', error);
+            alert('Failed to delete bill');
+        }
+    };
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -141,7 +163,7 @@ export default function BillingPage() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <StatusBadge status={bill.status} />
+                                            <StatusBadge status={bill.payment_status} />
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm space-x-2">
                                             <button
@@ -152,12 +174,26 @@ export default function BillingPage() {
                                                 <Printer className="w-5 h-5" />
                                             </button>
                                             <Link
+                                                href={`/billing/${bill.id}/edit`}
+                                                className="inline-flex items-center p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                                title="Edit Bill"
+                                            >
+                                                <Pencil className="w-5 h-5" />
+                                            </Link>
+                                            <Link
                                                 href={`/billing/${bill.id}`}
                                                 className="inline-flex items-center p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
                                                 title="View & Pay"
                                             >
                                                 <CreditCard className="w-5 h-5" />
                                             </Link>
+                                            <button
+                                                onClick={() => handleDelete(bill.id)}
+                                                className="inline-flex items-center p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                                title="Delete Bill"
+                                            >
+                                                <Trash className="w-5 h-5" />
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}

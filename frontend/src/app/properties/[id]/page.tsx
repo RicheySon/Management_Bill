@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { fetchProperty } from '@/lib/api-client';
+import { fetchProperty, deleteProperty } from '@/lib/api-client';
 import {
     Building2, User, MapPin, Tag, Calendar,
-    ArrowLeft, History, FileText, Plus, AlertCircle
+    ArrowLeft, History, FileText, Plus, AlertCircle, Trash2, Edit
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -33,6 +33,16 @@ export default function PropertyDetailPage() {
         };
         loadProperty();
     }, [id]);
+
+    const handleDelete = async () => {
+        if (!confirm('Are you sure you want to delete this property? This will also affect associated bills and records.')) return;
+        try {
+            await deleteProperty(id as string);
+            router.push('/properties');
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Failed to delete property');
+        }
+    };
 
     if (loading) {
         return (
@@ -70,6 +80,14 @@ export default function PropertyDetailPage() {
                     </div>
                 </div>
                 <div className="flex items-center space-x-3">
+                    <Link href={`/properties/${id}/edit`} className="btn-secondary flex items-center space-x-2">
+                        <Edit className="w-4 h-4" />
+                        <span>Edit</span>
+                    </Link>
+                    <button onClick={handleDelete} className="btn-secondary text-red-600 border-red-100 hover:bg-red-50 flex items-center space-x-2">
+                        <Trash2 className="w-4 h-4" />
+                        <span>Delete</span>
+                    </button>
                     <Link href={`/billing/generate?property_id=${id}`} className="btn-primary flex items-center space-x-2">
                         <Plus className="w-4 h-4" />
                         <span>Generate Bill</span>

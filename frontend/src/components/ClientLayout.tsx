@@ -138,7 +138,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                         }
 
                         {hasPermission('bulk_print') &&
-                            <NavLink href="/print" icon={<Printer className="w-5 h-5" />} label="Print" />
+                            <NavLink href="/print" icon={<Printer className="w-5 h-5" />} label="Bulk Printing" />
                         }
 
                         {/* Admin Links */}
@@ -215,8 +215,8 @@ function NavLink({ href, icon, label }: { href: string; icon: React.ReactNode; l
             <Link
                 href={href}
                 className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all group ${isActive
-                        ? 'bg-red-50 text-municipal-red font-medium shadow-sm'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-municipal-red'
+                    ? 'bg-red-50 text-municipal-red font-medium shadow-sm'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-municipal-red'
                     }`}
             >
                 <div className={`transition-colors ${isActive ? 'text-municipal-red' : 'text-gray-400 group-hover:text-municipal-red'}`}>

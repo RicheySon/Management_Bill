@@ -38,6 +38,10 @@ interface PropertyRateZone {
     rate_impost_max?: number;
     minimum_rate_min: number;
     minimum_rate_max?: number;
+    cat_a_fee?: number;
+    cat_b_fee?: number;
+    cat_c_fee?: number;
+    cat_d_fee?: number;
     affected_areas?: string;
     sort_order: number;
 }
@@ -215,11 +219,10 @@ export default function FeeConfigurationPage() {
 
                     {selectedSchedule && (
                         <div className="flex items-end">
-                            <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${
-                                selectedSchedule.status === 'ACTIVE' ? 'bg-green-100 text-green-700' :
-                                selectedSchedule.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-700' :
-                                'bg-gray-100 text-gray-600'
-                            }`}>
+                            <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${selectedSchedule.status === 'ACTIVE' ? 'bg-green-100 text-green-700' :
+                                    selectedSchedule.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-700' :
+                                        'bg-gray-100 text-gray-600'
+                                }`}>
                                 {selectedSchedule.status}
                             </span>
                         </div>
@@ -419,6 +422,7 @@ function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
 
             {showForm && (
                 <PropertyZoneForm
+                    key={editingZone?.id || 'new'}
                     zone={editingZone}
                     onSubmit={handleSaveZone}
                     onCancel={() => { setShowForm(false); setEditingZone(null); }}
@@ -435,12 +439,13 @@ function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Zone Name</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Property Name</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Type</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Class</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Rate Impost (GHc)</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Minimum Rate (GHc)</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Affected Areas</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Rate Impost</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">CAT A</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">CAT B</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">CAT C</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">CAT D</th>
                                 {canConfigure && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>}
                             </tr>
                         </thead>
@@ -449,25 +454,21 @@ function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
                                 <tr key={zone.id} className="hover:bg-gray-50">
                                     <td className="px-4 py-3 font-medium text-gray-900">{zone.zone_name}</td>
                                     <td className="px-4 py-3">
-                                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                            zone.zone_type === 'RESIDENTIAL' ? 'bg-blue-100 text-blue-700' :
-                                            zone.zone_type === 'COMMERCIAL' ? 'bg-purple-100 text-purple-700' :
-                                            zone.zone_type === 'INDUSTRIAL' ? 'bg-orange-100 text-orange-700' :
-                                            'bg-teal-100 text-teal-700'
-                                        }`}>
+                                        <span className={`px-2 py-1 rounded text-xs font-medium ${zone.zone_type === 'RESIDENTIAL' ? 'bg-blue-100 text-blue-700' :
+                                                zone.zone_type === 'COMMERCIAL' ? 'bg-purple-100 text-purple-700' :
+                                                    zone.zone_type === 'INDUSTRIAL' ? 'bg-orange-100 text-orange-700' :
+                                                        'bg-teal-100 text-teal-700'
+                                            }`}>
                                             {zone.zone_type}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-3 text-gray-600">{zone.zone_class}</td>
                                     <td className="px-4 py-3 text-gray-600">
-                                        {zone.rate_impost_min}{zone.rate_impost_max ? ` - ${zone.rate_impost_max}` : ''}
+                                        {zone.rate_impost_min}
                                     </td>
-                                    <td className="px-4 py-3 text-gray-600">
-                                        {Number(zone.minimum_rate_min).toLocaleString()}{zone.minimum_rate_max ? ` - ${Number(zone.minimum_rate_max).toLocaleString()}` : ''}
-                                    </td>
-                                    <td className="px-4 py-3 text-gray-500 text-sm max-w-xs truncate" title={zone.affected_areas || ''}>
-                                        {zone.affected_areas || '-'}
-                                    </td>
+                                    <td className="px-4 py-3 text-right font-bold text-gray-900">{formatFee(zone.cat_a_fee || zone.minimum_rate_min)}</td>
+                                    <td className="px-4 py-3 text-right text-gray-600">{formatFee(zone.cat_b_fee)}</td>
+                                    <td className="px-4 py-3 text-right text-gray-600">{formatFee(zone.cat_c_fee)}</td>
+                                    <td className="px-4 py-3 text-right text-gray-600">{formatFee(zone.cat_d_fee)}</td>
                                     {canConfigure && (
                                         <td className="px-4 py-3 text-right">
                                             <div className="flex justify-end space-x-2">
@@ -503,10 +504,11 @@ function PropertyZoneForm({ zone, onSubmit, onCancel }: {
         zone_name: zone?.zone_name || '',
         zone_type: zone?.zone_type || 'RESIDENTIAL',
         zone_class: zone?.zone_class || 1,
-        rate_impost_min: zone?.rate_impost_min || '',
-        rate_impost_max: zone?.rate_impost_max || '',
-        minimum_rate_min: zone?.minimum_rate_min || '',
-        minimum_rate_max: zone?.minimum_rate_max || '',
+        rate_impost_min: zone?.rate_impost_min || '0.0000',
+        cat_a_fee: zone?.cat_a_fee || zone?.minimum_rate_min || '',
+        cat_b_fee: zone?.cat_b_fee || '',
+        cat_c_fee: zone?.cat_c_fee || '',
+        cat_d_fee: zone?.cat_d_fee || '',
         affected_areas: zone?.affected_areas || '',
         sort_order: zone?.sort_order || 0,
     });
@@ -520,10 +522,13 @@ function PropertyZoneForm({ zone, onSubmit, onCancel }: {
         onSubmit({
             ...formData,
             rate_impost_min: parseFloat(String(formData.rate_impost_min)),
-            rate_impost_max: formData.rate_impost_max ? parseFloat(String(formData.rate_impost_max)) : null,
-            minimum_rate_min: parseFloat(String(formData.minimum_rate_min)),
-            minimum_rate_max: formData.minimum_rate_max ? parseFloat(String(formData.minimum_rate_max)) : null,
-            zone_class: parseInt(String(formData.zone_class)),
+            cat_a_fee: parseFloat(String(formData.cat_a_fee)),
+            cat_b_fee: formData.cat_b_fee ? parseFloat(String(formData.cat_b_fee)) : null,
+            cat_c_fee: formData.cat_c_fee ? parseFloat(String(formData.cat_c_fee)) : null,
+            cat_d_fee: formData.cat_d_fee ? parseFloat(String(formData.cat_d_fee)) : null,
+            // Keep backward compatibility for now
+            minimum_rate_min: parseFloat(String(formData.cat_a_fee)),
+            zone_class: parseInt(String(formData.zone_class || 1)),
             sort_order: parseInt(String(formData.sort_order)),
         });
     };
@@ -551,22 +556,26 @@ function PropertyZoneForm({ zone, onSubmit, onCancel }: {
                     <input type="number" className="input-field" value={formData.sort_order} onChange={e => handleChange('sort_order', e.target.value)} />
                 </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-4">
                 <div>
-                    <label className="label">Rate Impost Min *</label>
+                    <label className="label">Rate Impost *</label>
                     <input type="number" step="0.000001" className="input-field" value={formData.rate_impost_min} onChange={e => handleChange('rate_impost_min', e.target.value)} required placeholder="0.0023" />
                 </div>
                 <div>
-                    <label className="label">Rate Impost Max</label>
-                    <input type="number" step="0.000001" className="input-field" value={formData.rate_impost_max} onChange={e => handleChange('rate_impost_max', e.target.value)} placeholder="0.0030" />
+                    <label className="label">CAT A Fee (Min) *</label>
+                    <input type="number" step="0.01" className="input-field" value={formData.cat_a_fee} onChange={e => handleChange('cat_a_fee', e.target.value)} required placeholder="300.00" />
                 </div>
                 <div>
-                    <label className="label">Minimum Rate Min (GHc) *</label>
-                    <input type="number" step="0.01" className="input-field" value={formData.minimum_rate_min} onChange={e => handleChange('minimum_rate_min', e.target.value)} required placeholder="1500.00" />
+                    <label className="label">CAT B Fee</label>
+                    <input type="number" step="0.01" className="input-field" value={formData.cat_b_fee} onChange={e => handleChange('cat_b_fee', e.target.value)} placeholder="200.00" />
                 </div>
                 <div>
-                    <label className="label">Minimum Rate Max (GHc)</label>
-                    <input type="number" step="0.01" className="input-field" value={formData.minimum_rate_max} onChange={e => handleChange('minimum_rate_max', e.target.value)} placeholder="2000.00" />
+                    <label className="label">CAT C Fee</label>
+                    <input type="number" step="0.01" className="input-field" value={formData.cat_c_fee} onChange={e => handleChange('cat_c_fee', e.target.value)} placeholder="100.00" />
+                </div>
+                <div>
+                    <label className="label">CAT D Fee</label>
+                    <input type="number" step="0.01" className="input-field" value={formData.cat_d_fee} onChange={e => handleChange('cat_d_fee', e.target.value)} placeholder="50.00" />
                 </div>
             </div>
             <div className="mt-4">
@@ -684,7 +693,7 @@ function BusinessLicensesTab({ scheduleId, canConfigure, showMessage }: {
     if (loading) return <div className="flex justify-center py-8"><Loader2 className="w-8 h-8 animate-spin text-municipal-red" /></div>;
 
     const formatFee = (fee: any) => {
-        if (fee === null || fee === undefined) return '-';
+        if (fee === null || fee === undefined || fee === '') return '-';
         return Number(fee).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
@@ -714,6 +723,7 @@ function BusinessLicensesTab({ scheduleId, canConfigure, showMessage }: {
 
             {showForm && (
                 <BusinessFeeItemForm
+                    key={editingItem?.id || 'new'}
                     item={editingItem}
                     parentItems={parentItems}
                     onSubmit={handleSaveItem}
