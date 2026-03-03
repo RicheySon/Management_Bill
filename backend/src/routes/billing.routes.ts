@@ -50,6 +50,47 @@ router.post('/generate', authenticateToken, authorize(['generate_bill']), async 
 });
 
 /**
+ * POST /api/bills/preview
+ * Calculate bill amounts without saving
+ */
+router.post('/preview', authenticateToken, async (req: AuthRequest, res: Response) => {
+    try {
+        const schema = Joi.object({
+            bill_type: Joi.string().valid('PROPERTY_RATE', 'BOP').required(),
+            target_id: Joi.string().uuid().required(),
+            customer_id: Joi.string().uuid().required(),
+            bill_year: Joi.number().integer().min(2000).max(2100).optional(),
+        });
+
+        const { error, value } = schema.validate(req.body);
+        if (error) return res.status(400).json({ success: false, error: error.details[0].message });
+
+        const { bill_type, target_id, bill_year } = value;
+        const year = bill_year || new Date().getFullYear();
+
+        let calculation;
+        if (bill_type === 'PROPERTY_RATE') {
+            const { calculatePropertyBill } = require('../services/billing.service');
+            calculation = await calculatePropertyBill(target_id, year);
+        } else {
+            const { calculateBusinessBill } = require('../services/billing.service');
+            calculation = await calculateBusinessBill(target_id, year);
+        }
+
+        res.json({
+            success: true,
+            data: calculation,
+        });
+    } catch (error: any) {
+        console.error('Error previewing bill:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to calculate preview',
+        });
+    }
+});
+
+/**
  * GET /api/bills/:id
  * Get bill details with customer info
  */

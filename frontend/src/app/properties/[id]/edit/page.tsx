@@ -141,9 +141,10 @@ export default function EditPropertyPage() {
             )}
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 pb-20">
+                {/* SECTION: Property Information */}
                 <div className="card">
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 mb-6 text-center">
-                        <h2 className="text-municipal-teal font-bold text-lg">Property Details</h2>
+                        <h2 className="text-municipal-teal font-bold text-lg">Property Information</h2>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -161,10 +162,32 @@ export default function EditPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">Property Class</label>
-                            <select {...register('classification_id')} className="input-field">
+                            <label className="label">
+                                Property Class <span className="text-municipal-red">*</span>
+                            </label>
+                            <select
+                                {...register('classification_id', { required: 'Please select property class' })}
+                                className="input-field"
+                            >
+                                <option value="">Select option</option>
                                 {classifications.map((c: any) => (
                                     <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                            </select>
+                            {errors.classification_id && (
+                                <p className="text-red-500 text-sm mt-1">{errors.classification_id.message}</p>
+                            )}
+                        </div>
+
+                        {/* Rating Zone (from configured fee schedule) */}
+                        <div>
+                            <label className="label">Rating Zone (Fee Schedule)</label>
+                            <select {...register('property_rate_zone_id')} className="input-field">
+                                <option value="">Select rating zone (optional)</option>
+                                {rateZones.map((zone: any) => (
+                                    <option key={zone.id} value={zone.id}>
+                                        {zone.zone_name} ({zone.zone_type}) - Min: GHS {Number(zone.minimum_rate_min).toLocaleString()}
+                                    </option>
                                 ))}
                             </select>
                         </div>
@@ -172,6 +195,7 @@ export default function EditPropertyPage() {
                         <div>
                             <label className="label">Building Type</label>
                             <select {...register('building_type')} className="input-field">
+                                <option value="">Select option</option>
                                 <option value="Bungalow">Bungalow</option>
                                 <option value="Story Building">Story Building</option>
                                 <option value="Flat/Apartment">Flat/Apartment</option>
@@ -184,76 +208,289 @@ export default function EditPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">Rating Zone</label>
-                            <select {...register('property_rate_zone_id')} className="input-field">
-                                <option value="">Select rating zone</option>
-                                {rateZones.map((z: any) => (
-                                    <option key={z.id} value={z.id}>{z.zone_name}</option>
-                                ))}
+                            <label className="label">No of Storeys</label>
+                            <select {...register('no_of_storeys')} className="input-field">
+                                <option value="">Select option</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5+</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="label">Ownership of Property</label>
+                            <select {...register('ownership')} className="input-field">
+                                <option value="">Select option</option>
+                                <option value="Owner Occupied">Owner Occupied</option>
+                                <option value="Rented">Rented</option>
+                                <option value="Family Property">Family Property</option>
+                                <option value="Government">Government</option>
+                                <option value="Leased">Leased</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="label">Building Permit Status</label>
+                            <select {...register('building_permit_status')} className="input-field">
+                                <option value="">Select option</option>
+                                <option value="Approved">Approved</option>
+                                <option value="Pending">Pending</option>
+                                <option value="None">None</option>
+                                <option value="Expired">Expired</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="label">Account Number</label>
+                            <input
+                                type="text"
+                                {...register('account_number')}
+                                className="input-field"
+                                placeholder="Account no"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">Parcel Number</label>
+                            <input
+                                type="text"
+                                {...register('parcel_number')}
+                                className="input-field"
+                                placeholder="Parcel no"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">House Number</label>
+                            <input
+                                type="text"
+                                {...register('house_number')}
+                                className="input-field"
+                                placeholder="House no"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">Source of Water</label>
+                            <select {...register('source_of_water')} className="input-field">
+                                <option value="">Select option</option>
+                                <option value="Pipe-borne">Pipe-borne</option>
+                                <option value="Borehole">Borehole</option>
+                                <option value="Well">Well</option>
+                                <option value="Tanker">Tanker</option>
+                                <option value="Sachet/Bottled">Sachet/Bottled</option>
+                                <option value="River/Stream">River/Stream</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="label">Sanitation Facility Available</label>
+                            <select {...register('sanitation_facility')} className="input-field">
+                                <option value="">Select option</option>
+                                <option value="WC">WC (Water Closet)</option>
+                                <option value="KVIP">KVIP</option>
+                                <option value="Pit Latrine">Pit Latrine</option>
+                                <option value="Public Toilet">Public Toilet</option>
+                                <option value="None">None</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="label">Solid Waste Disposal Method</label>
+                            <select {...register('solid_waste_disposal')} className="input-field">
+                                <option value="">Select option</option>
+                                <option value="Collected">Collected</option>
+                                <option value="Public Container">Public Container</option>
+                                <option value="Dumped">Dumped</option>
+                                <option value="Burned">Burned</option>
+                                <option value="Buried">Buried</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="label">Liquid Waste Disposal Method</label>
+                            <select {...register('liquid_waste_disposal')} className="input-field">
+                                <option value="">Select option</option>
+                                <option value="Sewer">Sewer</option>
+                                <option value="Septic Tank">Septic Tank</option>
+                                <option value="Open Drain">Open Drain</option>
+                                <option value="Soakaway">Soakaway</option>
+                                <option value="None">None</option>
                             </select>
                         </div>
 
                         <div>
                             <label className="label">No of People</label>
-                            <input type="number" {...register('no_of_people')} className="input-field" />
+                            <input
+                                type="number"
+                                min="0"
+                                {...register('no_of_people')}
+                                className="input-field"
+                                placeholder="0"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">No of Bedrooms</label>
+                            <input
+                                type="number"
+                                min="0"
+                                {...register('no_of_bedrooms')}
+                                className="input-field"
+                                placeholder="0"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">No of Washrooms</label>
+                            <input
+                                type="number"
+                                min="0"
+                                {...register('no_of_washrooms')}
+                                className="input-field"
+                                placeholder="0"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">No of Other Rooms</label>
+                            <input
+                                type="number"
+                                min="0"
+                                {...register('no_of_other_rooms')}
+                                className="input-field"
+                                placeholder="0"
+                            />
                         </div>
 
                         <div>
                             <label className="label">Property Size (sqm)</label>
-                            <input type="number" step="0.01" {...register('property_size')} className="input-field" />
+                            <input
+                                type="number"
+                                step="0.01"
+                                {...register('property_size')}
+                                className="input-field"
+                                placeholder="0.00"
+                            />
                         </div>
                     </div>
                 </div>
 
+                {/* SECTION: Location Information */}
                 <div className="card">
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 mb-6 text-center">
-                        <h2 className="text-municipal-teal font-bold text-lg">Location Details</h2>
+                        <h2 className="text-municipal-teal font-bold text-lg">Location Information</h2>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div className="md:col-span-2">
-                            <label className="label">Physical Location</label>
-                            <input type="text" {...register('street_name')} className="input-field" placeholder="Street Name" />
+                        <div>
+                            <label className="label">GPS Address</label>
+                            <input
+                                type="text"
+                                {...register('gps_address')}
+                                className="input-field"
+                                placeholder="GPS address"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">Latitude</label>
+                            <input
+                                type="number"
+                                step="any"
+                                {...register('latitude', { valueAsNumber: true })}
+                                className="input-field"
+                                placeholder="5.6037"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">Longitude</label>
+                            <input
+                                type="number"
+                                step="any"
+                                {...register('longitude', { valueAsNumber: true })}
+                                className="input-field"
+                                placeholder="-0.1870"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">Town</label>
+                            <input
+                                type="text"
+                                {...register('town')}
+                                className="input-field"
+                                placeholder="Town"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">Street Name</label>
+                            <input
+                                type="text"
+                                {...register('street_name')}
+                                className="input-field"
+                                placeholder="Name of street"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">Landmark</label>
+                            <input
+                                type="text"
+                                {...register('landmark')}
+                                className="input-field"
+                                placeholder="Landmark"
+                            />
                         </div>
 
                         <div>
                             <label className="label">Electoral Area</label>
                             <select {...register('electoral_area_id')} className="input-field">
+                                <option value="">Electoral area</option>
                                 {electoralAreas.map((area: any) => (
-                                    <option key={area.id} value={area.id}>{area.name}</option>
+                                    <option key={area.id} value={area.id}>
+                                        {area.name}
+                                    </option>
                                 ))}
                             </select>
                         </div>
 
                         <div>
-                            <label className="label">Local Area</label>
-                            <select {...register('local_area_id')} className="input-field">
-                                <option value="">Select Local Area</option>
-                                {localAreas.map((la: any) => (
-                                    <option key={la.id} value={la.id}>{la.name}</option>
-                                ))}
+                            <label className="label">Population Density of Location</label>
+                            <select {...register('population_density')} className="input-field">
+                                <option value="">Select option</option>
+                                <option value="High">High</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Low">Low</option>
                             </select>
-                        </div>
-
-                        <div>
-                            <label className="label">GPS Address</label>
-                            <input type="text" {...register('gps_address')} className="input-field" />
-                        </div>
-
-                        <div>
-                            <label className="label">Landmark</label>
-                            <input type="text" {...register('landmark')} className="input-field" />
                         </div>
                     </div>
                 </div>
 
                 <div className="flex justify-end space-x-4">
+                    <Link href={`/properties/${id}`} className="btn-secondary">
+                        Cancel
+                    </Link>
                     <button
                         type="submit"
                         disabled={isSubmitting}
                         className="btn-primary flex items-center space-x-2 px-8"
                     >
-                        {isSubmitting ? 'Saving...' : <><Save className="w-4 h-4" /><span>Save Changes</span></>}
+                        {isSubmitting ? (
+                            <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                <span>Saving...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Save className="w-4 h-4" />
+                                <span>Save Changes</span>
+                            </>
+                        )}
                     </button>
                 </div>
             </form>

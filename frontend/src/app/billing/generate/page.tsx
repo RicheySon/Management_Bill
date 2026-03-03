@@ -6,7 +6,8 @@ import { useForm } from 'react-hook-form';
 import {
     fetchCustomers,
     generateBill,
-    fetchCustomer
+    fetchCustomer,
+    previewBill
 } from '@/lib/api-client';
 import { ArrowLeft, Send, Search, Building2, Briefcase, FileText } from 'lucide-react';
 import Link from 'next/link';
@@ -74,19 +75,34 @@ export default function GenerateBillPage() {
         }
     }, [watchCustomerId, setValue]);
 
-    const handlePreview = (data: GenerateBillForm) => {
-        const targetId = data.bill_type === 'PROPERTY' ? data.property_id : data.business_id;
-        const target = data.bill_type === 'PROPERTY'
-            ? selectedCustomerData.properties.find((p: any) => p.id === targetId)
-            : selectedCustomerData.businesses.find((b: any) => b.id === targetId);
+    const handlePreview = async (data: GenerateBillForm) => {
+        setError(null);
+        try {
+            const apiData = {
+                bill_type: data.bill_type === 'PROPERTY' ? 'PROPERTY_RATE' : 'BOP',
+                target_id: data.bill_type === 'PROPERTY' ? data.property_id : data.business_id,
+                customer_id: data.customer_id,
+                bill_year: parseInt(data.billing_year as any)
+            };
 
-        setPreviewData({
-            ...data,
-            customer_name: selectedCustomerData.customer.full_name,
-            target_name: data.bill_type === 'PROPERTY' ? target.property_number : target.business_name,
-            target_details: data.bill_type === 'PROPERTY' ? target.classification_name : target.category_name
-        });
-        setShowPreview(true);
+            const calculation = await previewBill(apiData);
+
+            const targetId = data.bill_type === 'PROPERTY' ? data.property_id : data.business_id;
+            const target = data.bill_type === 'PROPERTY'
+                ? selectedCustomerData.properties.find((p: any) => p.id === targetId)
+                : selectedCustomerData.businesses.find((b: any) => b.id === targetId);
+
+            setPreviewData({
+                ...data,
+                customer_name: selectedCustomerData.customer.full_name,
+                target_name: data.bill_type === 'PROPERTY' ? target.property_number : target.business_name,
+                target_details: data.bill_type === 'PROPERTY' ? target.classification_name : target.category_name,
+                calculation: calculation.data
+            });
+            setShowPreview(true);
+        } catch (err: any) {
+            setError(err.response?.data?.error || 'Failed to fetch bill calculation');
+        }
     };
 
     const onSubmit = async (data: GenerateBillForm) => {
@@ -305,9 +321,35 @@ export default function GenerateBillPage() {
                                 <div className="font-bold text-gray-900">{previewData.billing_year}</div>
                             </div>
 
-                            <div className="bg-yellow-50 border border-yellow-100 p-4 rounded-xl">
-                                <p className="text-xs text-yellow-800 leading-relaxed italic">
-                                    Note: Final amount including current year rate and any outstanding arrears will be calculated upon generation.
+                            <div className="bg-white border rounded-xl overflow-hidden">
+                                <div className="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
+                                    <span className="font-bold text-gray-700">Financial Breakdown</span>
+                                    <span className="text-xs bg-municipal-red/10 text-municipal-red px-2 py-0.5 rounded-full font-bold">GHS</span>
+                                </div>
+                                <div className="p-4 space-y-3">
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-gray-500">Current Rate:</span>
+                                        <span className="font-bold text-gray-900">{Number(previewData.calculation.current_rate).toLocaleString('en-GH', { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-gray-500">Previous Arrears:</span>
+                                        <span className="font-bold text-red-600">{Number(previewData.calculation.arrears).toLocaleString('en-GH', { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-gray-500">Rebate/Discount:</span>
+                                        <span className="font-bold text-green-600">({Number(previewData.calculation.rebate).toLocaleString('en-GH', { minimumFractionDigits: 2 })})</span>
+                                    </div>
+                                    <div className="h-px bg-gray-100 my-2"></div>
+                                    <div className="flex justify-between items-center font-bold text-lg">
+                                        <span className="text-gray-900">Total Due:</span>
+                                        <span className="text-municipal-red">GHS {Number(previewData.calculation.total_amount).toLocaleString('en-GH', { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-4 bg-municipal-teal/5 border border-municipal-teal/10 rounded-xl">
+                                <p className="text-xs text-municipal-teal font-medium leading-relaxed text-center">
+                                    Calculated using the active {previewData.billing_year} Fee Schedule rates.
                                 </p>
                             </div>
                         </div>

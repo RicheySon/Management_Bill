@@ -168,6 +168,11 @@ export const generateBill = async (data: any) => {
     return response.data;
 };
 
+export const previewBill = async (data: any) => {
+    const response = await apiClient.post('/bills/preview', data);
+    return response.data;
+};
+
 export const fetchBill = async (id: string) => {
     const response = await apiClient.get(`/bills/${id}`);
     return response.data.data;
