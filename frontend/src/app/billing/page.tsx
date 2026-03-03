@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { fetchBills, downloadBillPDF, fetchElectoralAreas, deleteBill } from '@/lib/api-client';
 import {
     FileText, Search, Filter, Printer,
-    CreditCard, Plus, CheckCircle2, AlertCircle, Clock, Trash
+    CreditCard, Plus, CheckCircle2, AlertCircle, Clock, Trash, Pencil
 } from 'lucide-react';
 import Link from 'next/link';
 
