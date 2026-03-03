@@ -216,42 +216,62 @@ export const fetchDefaulters = async (params?: any) => {
 
 // Print
 export const downloadBillPDF = async (billId: string) => {
-    const response = await apiClient.get(`/print/bill/${billId}`, {
-        responseType: 'blob',
-    });
+    try {
+        const response = await apiClient.get(`/print/bill/${billId}`, {
+            responseType: 'blob',
+        });
 
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `bill-${billId}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `bill-${billId}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+
+        // Cleanup
+        setTimeout(() => {
+            if (link.parentNode) link.remove();
+            window.URL.revokeObjectURL(url);
+        }, 100);
+    } catch (error) {
+        console.error('Download failed:', error);
+        alert('Failed to download PDF. Please try again.');
+    }
 };
 
 export const printBillPDF = async (billId: string) => {
-    const response = await apiClient.get(`/print/bill/${billId}`, {
-        responseType: 'blob',
-    });
+    try {
+        const response = await apiClient.get(`/print/bill/${billId}`, {
+            responseType: 'blob',
+        });
 
-    const blob = new Blob([response.data], { type: 'application/pdf' });
-    const url = window.URL.createObjectURL(blob);
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
 
-    // Create hidden iframe for printing
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = url;
-    document.body.appendChild(iframe);
+        // Create hidden iframe for printing
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.src = url;
+        document.body.appendChild(iframe);
 
-    iframe.onload = () => {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-        setTimeout(() => {
-            document.body.removeChild(iframe);
-            window.URL.revokeObjectURL(url);
-        }, 1000);
-    };
+        iframe.onload = () => {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            setTimeout(() => {
+                if (iframe.parentNode) document.body.removeChild(iframe);
+                window.URL.revokeObjectURL(url);
+            }, 2000);
+        };
+    } catch (error) {
+        console.error('Print failed:', error);
+        alert('Failed to initialize print. Please try again.');
+    }
 };
 
 export const downloadBulkBillsPDF = async (filters: any) => {

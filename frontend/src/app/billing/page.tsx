@@ -182,9 +182,21 @@ export default function BillingPage() {
                                                 <Printer className="w-5 h-5" />
                                             </button>
                                             <Link
-                                                href={`/customers/${bill.customer_id}/edit`}
+                                                href={
+                                                    bill.bill_type === 'PROPERTY_RATE'
+                                                        ? `/properties/${bill.property_id}/edit`
+                                                        : bill.bill_type === 'BOP'
+                                                            ? `/businesses/${bill.business_id}/edit`
+                                                            : `/customers/${bill.customer_id}/edit`
+                                                }
                                                 className="inline-flex items-center p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                                title="Edit Customer Details"
+                                                title={
+                                                    bill.bill_type === 'PROPERTY_RATE'
+                                                        ? "Edit Property Details"
+                                                        : bill.bill_type === 'BOP'
+                                                            ? "Edit Business Details"
+                                                            : "Edit Customer Details"
+                                                }
                                             >
                                                 <Pencil className="w-5 h-5" />
                                             </Link>
