@@ -11,7 +11,7 @@ import {
     fetchElectoralAreas,
     fetchActiveBusinessFeeItems,
 } from '@/lib/api-client';
-import { ArrowLeft, Save, UserPlus, UserCheck } from 'lucide-react';
+import { ArrowLeft, Save, UserPlus, UserCheck, Navigation, MapPin } from 'lucide-react';
 import Link from 'next/link';
 
 interface BusinessForm {
@@ -73,7 +73,7 @@ const BUSINESS_TYPE_MAIN_OPTIONS = [
 
 export default function NewBusinessPage() {
     const router = useRouter();
-    const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<BusinessForm>();
+    const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<BusinessForm>();
 
     const [customers, setCustomers] = useState([]);
     const [categories, setCategories] = useState([]);
@@ -85,6 +85,30 @@ export default function NewBusinessPage() {
     const [success, setSuccess] = useState(false);
     const [businessNumber, setBusinessNumber] = useState<string | null>(null);
     const [isNewOwner, setIsNewOwner] = useState(true);
+    const [isDetecting, setIsDetecting] = useState(false);
+
+    const detectLocation = () => {
+        setIsDetecting(true);
+        if (!navigator.geolocation) {
+            alert('Geolocation is not supported by your browser');
+            setIsDetecting(false);
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                setValue('latitude', parseFloat(position.coords.latitude.toFixed(6)));
+                setValue('longitude', parseFloat(position.coords.longitude.toFixed(6)));
+                setIsDetecting(false);
+            },
+            (error) => {
+                console.error('Geolocation error:', error);
+                alert(`Failed to get location: ${error.message}`);
+                setIsDetecting(false);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    };
 
     useEffect(() => {
         const loadData = async () => {
@@ -95,12 +119,13 @@ export default function NewBusinessPage() {
                     fetchElectoralAreas(),
                     fetchActiveBusinessFeeItems(new Date().getFullYear()),
                 ]);
-                setCustomers(customersData.data);
-                setCategories(categoriesData);
-                setElectoralAreas(areasData);
+                setCustomers(customersData.data || []);
+                setCategories(categoriesData || []);
+                setElectoralAreas(areasData || []);
                 setFeeItems(feeItemsData || []);
             } catch (err) {
                 console.error('Failed to load data:', err);
+                setError('Failed to load essential form data. Please refresh the page.');
             }
         };
         loadData();
@@ -543,7 +568,22 @@ export default function NewBusinessPage() {
                         </div>
 
                         <div>
-                            <label className="label">Latitude</label>
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="label mb-0">Latitude</label>
+                                <button
+                                    type="button"
+                                    onClick={detectLocation}
+                                    disabled={isDetecting}
+                                    className="text-municipal-red hover:text-red-700 text-xs font-bold flex items-center space-x-1"
+                                >
+                                    {isDetecting ? (
+                                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-municipal-red"></div>
+                                    ) : (
+                                        <Navigation className="w-3 h-3" />
+                                    )}
+                                    <span>{isDetecting ? 'Detecting...' : 'Detect'}</span>
+                                </button>
+                            </div>
                             <input
                                 type="number"
                                 step="any"

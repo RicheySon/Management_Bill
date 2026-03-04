@@ -12,7 +12,7 @@ import {
     fetchLocalAreas,
     fetchActivePropertyRateZones,
 } from '@/lib/api-client';
-import { ArrowLeft, Save, UserPlus, UserCheck } from 'lucide-react';
+import { ArrowLeft, Save, UserPlus, UserCheck, MapPin, Navigation } from 'lucide-react';
 import Link from 'next/link';
 
 interface PropertyForm {
@@ -58,7 +58,7 @@ interface PropertyForm {
 
 export default function NewPropertyPage() {
     const router = useRouter();
-    const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<PropertyForm>();
+    const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<PropertyForm>();
 
     const [customers, setCustomers] = useState([]);
     const [classifications, setClassifications] = useState([]);
@@ -70,6 +70,30 @@ export default function NewPropertyPage() {
     const [success, setSuccess] = useState(false);
     const [propertyNumber, setPropertyNumber] = useState<string | null>(null);
     const [isNewRatePayer, setIsNewRatePayer] = useState(true);
+    const [isDetecting, setIsDetecting] = useState(false);
+
+    const detectLocation = () => {
+        setIsDetecting(true);
+        if (!navigator.geolocation) {
+            alert('Geolocation is not supported by your browser');
+            setIsDetecting(false);
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                setValue('latitude', parseFloat(position.coords.latitude.toFixed(6)));
+                setValue('longitude', parseFloat(position.coords.longitude.toFixed(6)));
+                setIsDetecting(false);
+            },
+            (error) => {
+                console.error('Geolocation error:', error);
+                alert(`Failed to get location: ${error.message}`);
+                setIsDetecting(false);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    };
 
     useEffect(() => {
         const loadData = async () => {
@@ -80,12 +104,13 @@ export default function NewPropertyPage() {
                     fetchElectoralAreas(),
                     fetchActivePropertyRateZones(new Date().getFullYear()),
                 ]);
-                setCustomers(customersData.data);
-                setClassifications(classificationsData);
-                setElectoralAreas(areasData);
+                setCustomers(customersData.data || []);
+                setClassifications(classificationsData || []);
+                setElectoralAreas(areasData || []);
                 setRateZones(rateZonesData || []);
             } catch (err) {
                 console.error('Failed to load data:', err);
+                setError('Failed to load essential form data. Please refresh the page.');
             }
         };
         loadData();
@@ -623,7 +648,22 @@ export default function NewPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">Latitude</label>
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="label mb-0">Latitude</label>
+                                <button
+                                    type="button"
+                                    onClick={detectLocation}
+                                    disabled={isDetecting}
+                                    className="text-municipal-red hover:text-red-700 text-xs font-bold flex items-center space-x-1"
+                                >
+                                    {isDetecting ? (
+                                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-municipal-red"></div>
+                                    ) : (
+                                        <Navigation className="w-3 h-3" />
+                                    )}
+                                    <span>{isDetecting ? 'Detecting...' : 'Detect'}</span>
+                                </button>
+                            </div>
                             <input
                                 type="number"
                                 step="any"

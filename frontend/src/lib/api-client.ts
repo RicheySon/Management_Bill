@@ -249,7 +249,16 @@ export const printBillPDF = async (billId: string) => {
         const blob = new Blob([response.data], { type: 'application/pdf' });
         const url = window.URL.createObjectURL(blob);
 
-        // Create hidden iframe for printing
+        // Detect mobile users - direct tab/window is more reliable for mobile printing
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+        if (isMobile) {
+            window.open(url, '_blank');
+            // We can't easily revoke URL here as it's in a new tab, but most mobile browsers manage this well.
+            return;
+        }
+
+        // Create hidden iframe for desktop printing
         const iframe = document.createElement('iframe');
         iframe.style.position = 'fixed';
         iframe.style.right = '0';
