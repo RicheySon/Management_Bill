@@ -675,8 +675,8 @@ export default function NewPropertyPage() {
                                         type="button"
                                         onClick={() => setShowMap(!showMap)}
                                         className={`py-1 px-3 text-xs flex items-center space-x-1 rounded-md transition-all ${showMap
-                                                ? 'bg-municipal-red text-white hover:bg-red-700'
-                                                : 'bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100'
+                                            ? 'bg-municipal-red text-white hover:bg-red-700'
+                                            : 'bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100'
                                             }`}
                                     >
                                         {showMap ? <X className="w-3 h-3" /> : <MapIcon className="w-3 h-3" />}
@@ -689,7 +689,7 @@ export default function NewPropertyPage() {
                                 <div className="mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
                                     <p className="text-xs text-blue-600 mb-2 font-medium">Click on the map to pin the exact location.</p>
                                     <MapSelector
-                                        onLocationSelect={(lat, lng) => {
+                                        onLocationSelectAction={(lat: number, lng: number) => {
                                             setValue('latitude', parseFloat(lat.toFixed(6)));
                                             setValue('longitude', parseFloat(lng.toFixed(6)));
                                         }}
