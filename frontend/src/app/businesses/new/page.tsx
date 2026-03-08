@@ -79,7 +79,7 @@ const BUSINESS_TYPE_MAIN_OPTIONS = [
 
 export default function NewBusinessPage() {
     const router = useRouter();
-    const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<BusinessForm>();
+    const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<BusinessForm>();
 
     const [customers, setCustomers] = useState([]);
     const [categories, setCategories] = useState([]);
