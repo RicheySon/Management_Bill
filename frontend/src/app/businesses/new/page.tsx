@@ -11,8 +11,14 @@ import {
     fetchElectoralAreas,
     fetchActiveBusinessFeeItems,
 } from '@/lib/api-client';
-import { ArrowLeft, Save, UserPlus, UserCheck, Navigation, MapPin } from 'lucide-react';
+import { ArrowLeft, Save, UserPlus, UserCheck, Navigation, MapPin, Map as MapIcon, X } from 'lucide-react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+
+const MapSelector = dynamic(() => import('@/components/MapSelector'), {
+    ssr: false,
+    loading: () => <div className="h-[400px] w-full bg-gray-100 animate-pulse rounded-lg flex items-center justify-center text-gray-500">Loading Map...</div>
+});
 
 interface BusinessForm {
     // Business Owner fields
@@ -86,6 +92,7 @@ export default function NewBusinessPage() {
     const [businessNumber, setBusinessNumber] = useState<string | null>(null);
     const [isNewOwner, setIsNewOwner] = useState(true);
     const [isDetecting, setIsDetecting] = useState(false);
+    const [showMap, setShowMap] = useState(false);
 
     const detectLocation = () => {
         setIsDetecting(true);
@@ -567,41 +574,73 @@ export default function NewBusinessPage() {
                             />
                         </div>
 
-                        <div>
-                            <div className="flex justify-between items-center mb-1">
-                                <label className="label mb-0">Latitude</label>
-                                <button
-                                    type="button"
-                                    onClick={detectLocation}
-                                    disabled={isDetecting}
-                                    className="text-municipal-red hover:text-red-700 text-xs font-bold flex items-center space-x-1"
-                                >
-                                    {isDetecting ? (
-                                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-municipal-red"></div>
-                                    ) : (
-                                        <Navigation className="w-3 h-3" />
-                                    )}
-                                    <span>{isDetecting ? 'Detecting...' : 'Detect'}</span>
-                                </button>
+                        <div className="md:col-span-2">
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="label mb-0">Location Coordinates</label>
+                                <div className="flex space-x-2">
+                                    <button
+                                        type="button"
+                                        onClick={detectLocation}
+                                        disabled={isDetecting}
+                                        className="btn-secondary py-1 px-3 text-xs flex items-center space-x-1"
+                                    >
+                                        {isDetecting ? (
+                                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-municipal-red"></div>
+                                        ) : (
+                                            <Navigation className="w-3 h-3" />
+                                        )}
+                                        <span>{isDetecting ? 'Detecting...' : 'Detect GPS'}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowMap(!showMap)}
+                                        className={`py-1 px-3 text-xs flex items-center space-x-1 rounded-md transition-all ${showMap
+                                            ? 'bg-municipal-red text-white hover:bg-red-700'
+                                            : 'bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100'
+                                            }`}
+                                    >
+                                        {showMap ? <X className="w-3 h-3" /> : <MapIcon className="w-3 h-3" />}
+                                        <span>{showMap ? 'Close Map' : 'Select on Map'}</span>
+                                    </button>
+                                </div>
                             </div>
-                            <input
-                                type="number"
-                                step="any"
-                                {...register('latitude', { valueAsNumber: true })}
-                                className="input-field"
-                                placeholder="5.6037"
-                            />
-                        </div>
 
-                        <div>
-                            <label className="label">Longitude</label>
-                            <input
-                                type="number"
-                                step="any"
-                                {...register('longitude', { valueAsNumber: true })}
-                                className="input-field"
-                                placeholder="-0.1870"
-                            />
+                            {showMap && (
+                                <div className="mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <p className="text-xs text-blue-600 mb-2 font-medium">Click on the map to pin the exact location.</p>
+                                    <MapSelector
+                                        onLocationSelectAction={(lat, lng) => {
+                                            setValue('latitude', parseFloat(lat.toFixed(6)));
+                                            setValue('longitude', parseFloat(lng.toFixed(6)));
+                                        }}
+                                        initialLat={watch('latitude')}
+                                        initialLng={watch('longitude')}
+                                    />
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wider font-bold italic">Latitude</label>
+                                    <input
+                                        type="number"
+                                        step="any"
+                                        {...register('latitude', { valueAsNumber: true })}
+                                        className="input-field"
+                                        placeholder="5.6037"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wider font-bold italic">Longitude</label>
+                                    <input
+                                        type="number"
+                                        step="any"
+                                        {...register('longitude', { valueAsNumber: true })}
+                                        className="input-field"
+                                        placeholder="-0.1870"
+                                    />
+                                </div>
+                            </div>
                         </div>
 
                         <div>
