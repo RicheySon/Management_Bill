@@ -1,15 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import {
     fetchCustomers,
     generateBill,
     fetchCustomer,
-    previewBill
+    previewBill,
+    fetchProperty,
+    fetchBusiness,
 } from '@/lib/api-client';
-import { ArrowLeft, Send, Search, Building2, Briefcase, FileText } from 'lucide-react';
+import { ArrowLeft, Send, Search, Building2, Briefcase, FileText, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 
 interface GenerateBillForm {
@@ -20,11 +22,18 @@ interface GenerateBillForm {
     billing_year: number;
 }
 
-export default function GenerateBillPage() {
+function GenerateBillContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+
+    // Read pre-fill params from URL
+    const presetPropertyId = searchParams.get('property_id');
+    const presetBusinessId = searchParams.get('business_id');
+    const isPreset = !!(presetPropertyId || presetBusinessId);
+
     const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<GenerateBillForm>({
         defaultValues: {
-            bill_type: 'PROPERTY',
+            bill_type: presetPropertyId ? 'PROPERTY' : presetBusinessId ? 'BOP' : 'PROPERTY',
             billing_year: new Date().getFullYear(),
         }
     });
@@ -34,6 +43,7 @@ export default function GenerateBillPage() {
     const [loadingCustomer, setLoadingCustomer] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
+    const [presetLoaded, setPresetLoaded] = useState(false);
 
     const [showPreview, setShowPreview] = useState(false);
     const [previewData, setPreviewData] = useState<any>(null);
@@ -41,6 +51,7 @@ export default function GenerateBillPage() {
     const watchBillType = watch('bill_type');
     const watchCustomerId = watch('customer_id');
 
+    // 1. Load customers
     useEffect(() => {
         const loadCustomers = async () => {
             try {
@@ -53,27 +64,70 @@ export default function GenerateBillPage() {
         loadCustomers();
     }, []);
 
+    // 2. Auto-load preset property/business and set customer/selection
     useEffect(() => {
-        if (watchCustomerId) {
-            const loadCustomerDetails = async () => {
-                setLoadingCustomer(true);
-                try {
-                    const data = await fetchCustomer(watchCustomerId);
-                    setSelectedCustomerData(data);
-                    // Reset selection
-                    setValue('property_id', '');
-                    setValue('business_id', '');
-                } catch (err) {
-                    console.error('Failed to load customer details');
-                } finally {
+        if (!isPreset || presetLoaded) return;
+
+        const autoLoad = async () => {
+            try {
+                if (presetPropertyId) {
+                    const data = await fetchProperty(presetPropertyId);
+                    const p = data.property;
+                    const customerId = p.customer_id;
+
+                    setValue('bill_type', 'PROPERTY');
+                    setValue('customer_id', customerId);
+                    setValue('property_id', presetPropertyId);
+
+                    // Load customer data to populate the selector panel
+                    setLoadingCustomer(true);
+                    const cData = await fetchCustomer(customerId);
+                    setSelectedCustomerData(cData);
+                    // Re-select the property after customer data loads
+                    setValue('property_id', presetPropertyId);
+                    setLoadingCustomer(false);
+                } else if (presetBusinessId) {
+                    const data = await fetchBusiness(presetBusinessId);
+                    const b = data.business;
+                    const customerId = b.customer_id;
+
+                    setValue('bill_type', 'BOP');
+                    setValue('customer_id', customerId);
+                    setValue('business_id', presetBusinessId);
+
+                    setLoadingCustomer(true);
+                    const cData = await fetchCustomer(customerId);
+                    setSelectedCustomerData(cData);
+                    setValue('business_id', presetBusinessId);
                     setLoadingCustomer(false);
                 }
-            };
-            loadCustomerDetails();
-        } else {
-            setSelectedCustomerData(null);
-        }
-    }, [watchCustomerId, setValue]);
+                setPresetLoaded(true);
+            } catch (err) {
+                console.error('Failed to auto-load preset:', err);
+                setPresetLoaded(true);
+            }
+        };
+        autoLoad();
+    }, [isPreset, presetPropertyId, presetBusinessId, setValue, presetLoaded]);
+
+    // 3. Load customer data when manually changed (only when NOT preset-loading)
+    useEffect(() => {
+        if (!watchCustomerId || isPreset) return;
+        const loadCustomerDetails = async () => {
+            setLoadingCustomer(true);
+            try {
+                const data = await fetchCustomer(watchCustomerId);
+                setSelectedCustomerData(data);
+                setValue('property_id', '');
+                setValue('business_id', '');
+            } catch (err) {
+                console.error('Failed to load customer details');
+            } finally {
+                setLoadingCustomer(false);
+            }
+        };
+        loadCustomerDetails();
+    }, [watchCustomerId, setValue, isPreset]);
 
     const handlePreview = async (data: GenerateBillForm) => {
         setError(null);
@@ -139,6 +193,19 @@ export default function GenerateBillPage() {
                 </Link>
             </div>
 
+            {/* Pre-filled banner */}
+            {isPreset && presetLoaded && (
+                <div className="bg-teal-50 border border-teal-200 text-teal-800 px-5 py-3 rounded-lg mb-4 flex items-center space-x-3">
+                    <CheckCircle className="w-5 h-5 text-teal-600 flex-shrink-0" />
+                    <div>
+                        <p className="font-semibold text-sm">
+                            {presetPropertyId ? 'Property' : 'Business'} auto-selected
+                        </p>
+                        <p className="text-xs opacity-80">Review the details below and click Generate Bill Now.</p>
+                    </div>
+                </div>
+            )}
+
             {success && (
                 <div className="bg-green-50 border-2 border-green-500 text-green-800 px-6 py-4 rounded-lg mb-6">
                     <p className="font-semibold">✓ Bill generated successfully!</p>
@@ -159,15 +226,15 @@ export default function GenerateBillPage() {
                     <div>
                         <label className="label">What type of bill are you generating?</label>
                         <div className="grid grid-cols-2 gap-4">
-                            <label className={`flex items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all ${watchBillType === 'PROPERTY' ? 'border-municipal-red bg-red-50' : 'border-gray-200'}`}>
-                                <input type="radio" value="PROPERTY" {...register('bill_type')} className="hidden" />
+                            <label className={`flex items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all ${watchBillType === 'PROPERTY' ? 'border-municipal-red bg-red-50' : 'border-gray-200'} ${isPreset ? 'opacity-70 pointer-events-none' : ''}`}>
+                                <input type="radio" value="PROPERTY" {...register('bill_type')} className="hidden" disabled={isPreset} />
                                 <div className="text-center">
                                     <Building2 className={`w-8 h-8 mx-auto mb-2 ${watchBillType === 'PROPERTY' ? 'text-municipal-red' : 'text-gray-400'}`} />
                                     <span className={`font-bold ${watchBillType === 'PROPERTY' ? 'text-municipal-red' : 'text-gray-500'}`}>Property Rate</span>
                                 </div>
                             </label>
-                            <label className={`flex items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all ${watchBillType === 'BOP' ? 'border-municipal-red bg-red-50' : 'border-gray-200'}`}>
-                                <input type="radio" value="BOP" {...register('bill_type')} className="hidden" />
+                            <label className={`flex items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all ${watchBillType === 'BOP' ? 'border-municipal-red bg-red-50' : 'border-gray-200'} ${isPreset ? 'opacity-70 pointer-events-none' : ''}`}>
+                                <input type="radio" value="BOP" {...register('bill_type')} className="hidden" disabled={isPreset} />
                                 <div className="text-center">
                                     <Briefcase className={`w-8 h-8 mx-auto mb-2 ${watchBillType === 'BOP' ? 'text-municipal-red' : 'text-gray-400'}`} />
                                     <span className={`font-bold ${watchBillType === 'BOP' ? 'text-municipal-red' : 'text-gray-500'}`}>BOP Permit</span>
@@ -178,26 +245,49 @@ export default function GenerateBillPage() {
 
                     <hr className="my-4" />
 
-                    {/* Customer Selection */}
-                    <div>
-                        <label className="label">Select Customer</label>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <select
-                                {...register('customer_id', { required: 'Please select a customer' })}
-                                className="input-field pl-10"
-                            >
-                                <option value="">-- Choose Customer --</option>
-                                {customers.map(c => (
-                                    <option key={c.id} value={c.id}>{c.full_name} ({c.phone_number})</option>
-                                ))}
-                            </select>
+                    {/* Customer Selection — hidden/pre-filled when preset */}
+                    {!isPreset && (
+                        <div>
+                            <label className="label">Select Customer</label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <select
+                                    {...register('customer_id', { required: 'Please select a customer' })}
+                                    className="input-field pl-10"
+                                >
+                                    <option value="">-- Choose Customer --</option>
+                                    {customers.map(c => (
+                                        <option key={c.id} value={c.id}>{c.full_name} ({c.phone_number})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            {errors.customer_id && <p className="text-red-500 text-sm mt-1">{errors.customer_id.message}</p>}
                         </div>
-                        {errors.customer_id && <p className="text-red-500 text-sm mt-1">{errors.customer_id.message}</p>}
-                    </div>
+                    )}
 
-                    {/* Conditional Asset Selection */}
-                    {selectedCustomerData && (
+                    {/* Show selected customer info when preset */}
+                    {isPreset && selectedCustomerData?.customer && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex items-center space-x-3">
+                            <div className="w-9 h-9 bg-municipal-red/10 text-municipal-red rounded-full flex items-center justify-center font-bold text-sm">
+                                {selectedCustomerData.customer.full_name?.[0]}
+                            </div>
+                            <div>
+                                <p className="font-bold text-gray-900 text-sm">{selectedCustomerData.customer.full_name}</p>
+                                <p className="text-xs text-gray-500">{selectedCustomerData.customer.phone_number}</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Loading spinner */}
+                    {loadingCustomer && (
+                        <div className="flex items-center space-x-2 text-gray-500 text-sm py-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-municipal-red"></div>
+                            <span>Loading details...</span>
+                        </div>
+                    )}
+
+                    {/* Asset Selection */}
+                    {selectedCustomerData && !loadingCustomer && (
                         <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                             {watchBillType === 'PROPERTY' ? (
                                 <div>
@@ -205,12 +295,15 @@ export default function GenerateBillPage() {
                                     {selectedCustomerData.properties?.length > 0 ? (
                                         <div className="grid gap-3">
                                             {selectedCustomerData.properties.map((p: any) => (
-                                                <label key={p.id} className={`flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 ${watch('property_id') === p.id ? 'border-municipal-red bg-red-50 ring-1 ring-municipal-red' : ''}`}>
+                                                <label key={p.id} className={`flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-all ${watch('property_id') === p.id ? 'border-municipal-red bg-red-50 ring-1 ring-municipal-red' : ''}`}>
                                                     <input type="radio" value={p.id} {...register('property_id', { required: watchBillType === 'PROPERTY' ? 'Please select a property' : false })} className="mr-3" />
-                                                    <div>
+                                                    <div className="flex-1">
                                                         <p className="font-bold text-sm">{p.property_number}</p>
-                                                        <p className="text-xs text-gray-500">{p.classification_name} • {p.physical_location}</p>
+                                                        <p className="text-xs text-gray-500">{p.classification_name} • {p.physical_location || p.street_name || 'No address'}</p>
                                                     </div>
+                                                    {watch('property_id') === p.id && (
+                                                        <CheckCircle className="w-4 h-4 text-municipal-red ml-2 flex-shrink-0" />
+                                                    )}
                                                 </label>
                                             ))}
                                         </div>
@@ -227,12 +320,15 @@ export default function GenerateBillPage() {
                                     {selectedCustomerData.businesses?.length > 0 ? (
                                         <div className="grid gap-3">
                                             {selectedCustomerData.businesses.map((b: any) => (
-                                                <label key={b.id} className={`flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 ${watch('business_id') === b.id ? 'border-municipal-red bg-red-50 ring-1 ring-municipal-red' : ''}`}>
+                                                <label key={b.id} className={`flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-all ${watch('business_id') === b.id ? 'border-municipal-red bg-red-50 ring-1 ring-municipal-red' : ''}`}>
                                                     <input type="radio" value={b.id} {...register('business_id', { required: watchBillType === 'BOP' ? 'Please select a business' : false })} className="mr-3" />
-                                                    <div>
+                                                    <div className="flex-1">
                                                         <p className="font-bold text-sm">{b.business_name}</p>
                                                         <p className="text-xs text-gray-500">{b.business_number} • {b.category_name}</p>
                                                     </div>
+                                                    {watch('business_id') === b.id && (
+                                                        <CheckCircle className="w-4 h-4 text-municipal-red ml-2 flex-shrink-0" />
+                                                    )}
                                                 </label>
                                             ))}
                                         </div>
@@ -371,12 +467,20 @@ export default function GenerateBillPage() {
                                 ) : (
                                     <Send className="w-4 h-4" />
                                 )}
-                                <span>Confirm & Generate</span>
+                                <span>Confirm &amp; Generate</span>
                             </button>
                         </div>
                     </div>
                 </div>
             )}
         </div>
+    );
+}
+
+export default function GenerateBillPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center h-96"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-municipal-red"></div></div>}>
+            <GenerateBillContent />
+        </Suspense>
     );
 }

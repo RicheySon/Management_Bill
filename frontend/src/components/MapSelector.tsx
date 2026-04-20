@@ -13,6 +13,38 @@ const icon = L.icon({
     iconAnchor: [12, 41],
 });
 
+type TileLayerOption = {
+    name: string;
+    url: string;
+    attribution: string;
+    maxZoom?: number;
+};
+
+const TILE_LAYERS: TileLayerOption[] = [
+    {
+        name: 'Street',
+        url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    },
+    {
+        name: 'Satellite',
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN, and the GIS User Community',
+        maxZoom: 19,
+    },
+    {
+        name: 'Terrain',
+        url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+        attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
+        maxZoom: 17,
+    },
+    {
+        name: 'Dark',
+        url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    },
+];
+
 interface MapSelectorProps {
     onLocationSelectAction: (lat: number, lng: number) => void;
     initialLat?: number;
@@ -54,11 +86,31 @@ export default function MapSelector({ onLocationSelectAction, initialLat, initia
     const [position, setPosition] = useState<[number, number] | null>(
         initialLat && initialLng ? [initialLat, initialLng] : null
     );
+    const [activeLayer, setActiveLayer] = useState(0);
 
     const center = position || defaultCenter;
+    const layer = TILE_LAYERS[activeLayer];
 
     return (
         <div className="h-[400px] w-full rounded-lg overflow-hidden border border-gray-300 relative z-0">
+            {/* Layer Switcher */}
+            <div className="absolute top-2 right-2 z-[1000] flex gap-1 flex-wrap justify-end">
+                {TILE_LAYERS.map((tl, i) => (
+                    <button
+                        key={tl.name}
+                        type="button"
+                        onClick={() => setActiveLayer(i)}
+                        className={`px-2 py-1 text-[11px] font-bold rounded shadow-md transition-all border ${
+                            activeLayer === i
+                                ? 'bg-municipal-red text-white border-red-700'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        }`}
+                    >
+                        {tl.name}
+                    </button>
+                ))}
+            </div>
+
             <MapContainer
                 center={center}
                 zoom={13}
@@ -66,8 +118,10 @@ export default function MapSelector({ onLocationSelectAction, initialLat, initia
                 className="h-full w-full"
             >
                 <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    key={layer.url}
+                    attribution={layer.attribution}
+                    url={layer.url}
+                    maxZoom={layer.maxZoom ?? 19}
                 />
                 <LocationMarker
                     position={position}
