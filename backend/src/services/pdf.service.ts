@@ -249,9 +249,9 @@ export const generateBillPDF = async (billId: string): Promise<typeof PDFDocumen
     doc.text(item.description, 53, currentY + 5, { width: 80 });
     doc.text(item.current_rate, 140, currentY + 10);
     doc.text(item.area || '0.00', 205, currentY + 10);
-    doc.text(bill.arrears.toFixed(2), 255, currentY + 10);
-    doc.text(bill.rebate.toFixed(2), 320, currentY + 10);
-    doc.text(bill.total_amount.toFixed(2), 380, currentY + 10);
+    doc.text(parseFloat(bill.arrears || 0).toFixed(2), 255, currentY + 10);
+    doc.text(parseFloat(bill.rebate || 0).toFixed(2), 320, currentY + 10);
+    doc.text(parseFloat(bill.total_amount || 0).toFixed(2), 380, currentY + 10);
 
     currentY += 30;
 
@@ -261,7 +261,7 @@ export const generateBillPDF = async (billId: string): Promise<typeof PDFDocumen
 
     doc.fontSize(9).font('Helvetica-Bold');
     doc.text('Amount Paid ▸', 380, currentY + 7);
-    doc.text(bill.amount_paid.toFixed(2), 480, currentY + 7);
+    doc.text(parseFloat(bill.amount_paid || 0).toFixed(2), 480, currentY + 7);
 
     currentY += 20;
 
@@ -270,7 +270,7 @@ export const generateBillPDF = async (billId: string): Promise<typeof PDFDocumen
 
     doc.text('Amount Due ▸', 380, currentY + 7);
     doc.fillColor('#FF0000');
-    doc.text(bill.amount_due.toFixed(2), 480, currentY + 7);
+    doc.text(parseFloat(bill.amount_due || 0).toFixed(2), 480, currentY + 7);
 
     // Footer
     doc.fillColor('#000000')
