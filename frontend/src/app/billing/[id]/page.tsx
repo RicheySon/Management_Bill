@@ -14,7 +14,9 @@ import Link from 'next/link';
 export default function BillDetailPage() {
     const { id } = useParams();
     const router = useRouter();
+    // bill holds the full bill row; payments holds the payment history
     const [bill, setBill] = useState<any>(null);
+    const [payments, setPayments] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [paymentAmount, setPaymentAmount] = useState('');
@@ -25,8 +27,13 @@ export default function BillDetailPage() {
     const loadBill = async () => {
         try {
             const data = await fetchBill(id as string);
-            setBill(data);
-            setPaymentAmount((parseFloat(data.total_amount) - parseFloat(data.amount_paid)).toString());
+            // API returns { bill: {...}, payments: [...] }
+            const billRow = data.bill ?? data;
+            const paymentRows = data.payments ?? [];
+            setBill(billRow);
+            setPayments(paymentRows);
+            const outstanding = parseFloat(billRow.total_amount) - parseFloat(billRow.amount_paid);
+            setPaymentAmount(Math.max(0, outstanding).toFixed(2));
         } catch (err: any) {
             setError(err.response?.data?.error || 'Failed to load bill details');
         } finally {
@@ -93,14 +100,14 @@ export default function BillDetailPage() {
                 {/* Bill Info Card */}
                 <div className="lg:col-span-2 space-y-6">
                     <div className="card overflow-hidden">
-                        <div className={`px-6 py-4 flex justify-between items-center ${bill.status === 'PAID' ? 'bg-green-600' : 'bg-municipal-red'} text-white`}>
+                        <div className={`px-6 py-4 flex justify-between items-center ${bill.payment_status === 'PAID' ? 'bg-green-600' : 'bg-municipal-red'} text-white`}>
                             <div>
                                 <h2 className="text-2xl font-bold">{bill.bill_number}</h2>
-                                <p className="text-sm opacity-90">{bill.bill_type} Invoice - {bill.billing_year}</p>
+                                <p className="text-sm opacity-90">{bill.bill_type} Invoice - {bill.bill_period_year}</p>
                             </div>
                             <div className="text-right">
                                 <span className="text-xs uppercase tracking-wider opacity-75">Status</span>
-                                <p className="text-lg font-bold">{bill.status}</p>
+                                <p className="text-lg font-bold">{bill.payment_status}</p>
                             </div>
                         </div>
 
@@ -115,13 +122,13 @@ export default function BillDetailPage() {
                                     </div>
                                 </div>
                                 <div className="flex items-start space-x-3">
-                                    {bill.bill_type === 'PROPERTY' ? <Building2 className="w-5 h-5 text-gray-400 mt-1" /> : <Briefcase className="w-5 h-5 text-gray-400 mt-1" />}
+                                    {bill.bill_type === 'PROPERTY_RATE' ? <Building2 className="w-5 h-5 text-gray-400 mt-1" /> : <Briefcase className="w-5 h-5 text-gray-400 mt-1" />}
                                     <div>
                                         <p className="font-bold text-gray-900">
-                                            {bill.bill_type === 'PROPERTY' ? bill.property_number : bill.business_name}
+                                            {bill.bill_type === 'PROPERTY_RATE' ? bill.property_number : bill.business_name}
                                         </p>
                                         <p className="text-sm text-gray-500">
-                                            {bill.bill_type === 'PROPERTY' ? bill.classification_name : bill.business_number}
+                                            {bill.bill_type === 'PROPERTY_RATE' ? bill.classification_name : bill.business_number}
                                         </p>
                                     </div>
                                 </div>
@@ -131,11 +138,11 @@ export default function BillDetailPage() {
                                 <h3 className="font-bold text-gray-400 text-xs uppercase tracking-widest">Invoice Details</h3>
                                 <div className="flex items-center space-x-3 text-sm">
                                     <Calendar className="w-5 h-5 text-gray-400" />
-                                    <span className="text-gray-600">Issued On: {new Date(bill.issue_date).toLocaleDateString()}</span>
+                                    <span className="text-gray-600">Issued On: {bill.issue_date ? new Date(bill.issue_date).toLocaleDateString() : 'N/A'}</span>
                                 </div>
                                 <div className="flex items-center space-x-3 text-sm">
                                     <History className="w-5 h-5 text-gray-400" />
-                                    <span className="text-gray-600">Billing Year: {bill.billing_year}</span>
+                                    <span className="text-gray-600">Billing Year: {bill.bill_period_year}</span>
                                 </div>
                             </div>
                         </div>
@@ -156,15 +163,15 @@ export default function BillDetailPage() {
                                 </div>
                                 <div className="flex justify-between text-lg font-bold pt-2 text-gray-900">
                                     <span>Total Bill Amount</span>
-                                    <span>GHS {parseFloat(bill.total_amount).toFixed(2)}</span>
+                                    <span>GHS {parseFloat(bill.total_amount || 0).toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between text-sm font-semibold text-green-600">
                                     <span>Total Paid to Date</span>
-                                    <span>GHS {parseFloat(bill.amount_paid).toFixed(2)}</span>
+                                    <span>GHS {parseFloat(bill.amount_paid || 0).toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between text-xl font-black text-red-600 mt-2 p-3 bg-red-50 rounded-lg border border-red-100">
                                     <span>Outstanding Balance</span>
-                                    <span>GHS {balance.toFixed(2)}</span>
+                                    <span>GHS {Math.max(0, balance).toFixed(2)}</span>
                                 </div>
                             </div>
                         </div>
@@ -176,9 +183,9 @@ export default function BillDetailPage() {
                             <History className="w-5 h-5 text-municipal-red" />
                             <span>Payment History</span>
                         </h3>
-                        {bill.payments && bill.payments.length > 0 ? (
+                        {payments && payments.length > 0 ? (
                             <div className="space-y-3">
-                                {bill.payments.map((p: any) => (
+                                {payments.map((p: any) => (
                                     <div key={p.id} className="flex justify-between items-center p-3 border rounded-lg bg-white">
                                         <div>
                                             <p className="font-bold text-gray-900">{p.receipt_number}</p>

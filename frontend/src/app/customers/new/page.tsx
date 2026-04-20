@@ -4,8 +4,18 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { createCustomer, fetchElectoralAreas, fetchLocalAreas } from '@/lib/api-client';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Navigation, Map as MapIcon, X } from 'lucide-react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+
+const MapSelector = dynamic(() => import('@/components/MapSelector'), {
+    ssr: false,
+    loading: () => (
+        <div className="h-[400px] w-full bg-gray-100 animate-pulse rounded-lg flex items-center justify-center text-gray-500">
+            Loading Map...
+        </div>
+    ),
+});
 
 interface CustomerForm {
     full_name: string;
@@ -18,30 +28,52 @@ interface CustomerForm {
     landmark?: string;
     electoral_area_id?: number;
     local_area_id?: number;
+    gender?: string;
+    marital_status?: string;
+    next_of_kin_name?: string;
+    next_of_kin_contact?: string;
+    ghana_card_no?: string;
 }
 
 export default function NewCustomerPage() {
     const router = useRouter();
-    const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<CustomerForm>();
+    const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<CustomerForm>();
 
     const [electoralAreas, setElectoralAreas] = useState<any[]>([]);
     const [localAreas, setLocalAreas] = useState<any[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
+    const [isDetecting, setIsDetecting] = useState(false);
+    const [showMap, setShowMap] = useState(false);
 
     const selectedElectoralArea = watch('electoral_area_id');
+
+    const detectLocation = () => {
+        setIsDetecting(true);
+        if (!navigator.geolocation) {
+            alert('Geolocation is not supported by your browser');
+            setIsDetecting(false);
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                setValue('latitude', parseFloat(position.coords.latitude.toFixed(6)));
+                setValue('longitude', parseFloat(position.coords.longitude.toFixed(6)));
+                setIsDetecting(false);
+            },
+            (err) => {
+                alert(`Failed to get location: ${err.message}`);
+                setIsDetecting(false);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    };
 
     useEffect(() => {
         const loadLookups = async () => {
             try {
-                console.log('Fetching electoral areas...');
                 const areas = await fetchElectoralAreas();
-                console.log('Received electoral areas:', areas);
-                if (Array.isArray(areas)) {
-                    setElectoralAreas(areas);
-                } else {
-                    console.error('Electoral areas is not an array:', areas);
-                }
+                if (Array.isArray(areas)) setElectoralAreas(areas);
             } catch (err) {
                 console.error('Failed to load electoral areas:', err);
                 setError('Failed to connect to backend service');
@@ -52,21 +84,9 @@ export default function NewCustomerPage() {
 
     useEffect(() => {
         if (selectedElectoralArea) {
-            const loadLocalAreas = async () => {
-                try {
-                    console.log(`Fetching local areas for ID: ${selectedElectoralArea}`);
-                    const areas = await fetchLocalAreas(Number(selectedElectoralArea));
-                    console.log('Received local areas:', areas);
-                    if (Array.isArray(areas)) {
-                        setLocalAreas(areas);
-                    } else {
-                        setLocalAreas([]);
-                    }
-                } catch (err) {
-                    console.error('Failed to load local areas:', err);
-                }
-            };
-            loadLocalAreas();
+            fetchLocalAreas(Number(selectedElectoralArea))
+                .then(areas => setLocalAreas(Array.isArray(areas) ? areas : []))
+                .catch(() => setLocalAreas([]));
         } else {
             setLocalAreas([]);
         }
@@ -77,7 +97,6 @@ export default function NewCustomerPage() {
         try {
             const result = await createCustomer(data);
             setSuccess(true);
-
             setTimeout(() => {
                 router.push(`/customers/${result.data.id}`);
             }, 1500);
@@ -105,7 +124,6 @@ export default function NewCustomerPage() {
                     <p className="text-sm">Redirecting...</p>
                 </div>
             )}
-
             {error && (
                 <div className="bg-red-50 border-2 border-municipal-red text-red-800 px-6 py-4 rounded-lg mb-6">
                     <p className="font-semibold">✗ Error</p>
@@ -113,143 +131,236 @@ export default function NewCustomerPage() {
                 </div>
             )}
 
-            <form onSubmit={handleSubmit(onSubmit)} className="card space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Full Name */}
-                    <div className="md:col-span-2">
-                        <label className="label">
-                            Full Name <span className="text-municipal-red">*</span>
-                        </label>
-                        <input
-                            type="text"
-                            {...register('full_name', { required: 'Full name is required' })}
-                            className="input-field"
-                            placeholder="Enter full name"
-                        />
-                        {errors.full_name && (
-                            <p className="text-red-500 text-sm mt-1">{errors.full_name.message}</p>
-                        )}
-                    </div>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
 
-                    {/* Phone Number */}
-                    <div>
-                        <label className="label">
-                            Phone Number <span className="text-municipal-red">*</span>
-                        </label>
-                        <input
-                            type="tel"
-                            {...register('phone_number', { required: 'Phone number is required' })}
-                            className="input-field"
-                            placeholder="0245678901"
-                        />
-                        {errors.phone_number && (
-                            <p className="text-red-500 text-sm mt-1">{errors.phone_number.message}</p>
-                        )}
+                {/* Personal Information */}
+                <div className="card">
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 mb-6 text-center">
+                        <h2 className="text-municipal-teal font-bold text-lg">Personal Information</h2>
                     </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="md:col-span-2">
+                            <label className="label">Full Name <span className="text-municipal-red">*</span></label>
+                            <input
+                                type="text"
+                                {...register('full_name', { required: 'Full name is required' })}
+                                className="input-field"
+                                placeholder="Enter full name"
+                            />
+                            {errors.full_name && <p className="text-red-500 text-sm mt-1">{errors.full_name.message}</p>}
+                        </div>
 
-                    {/* Email */}
-                    <div>
-                        <label className="label">Email (Optional)</label>
-                        <input
-                            type="email"
-                            {...register('email')}
-                            className="input-field"
-                            placeholder="customer@email.com"
-                        />
-                    </div>
+                        <div>
+                            <label className="label">Phone Number <span className="text-municipal-red">*</span></label>
+                            <div className="flex">
+                                <span className="inline-flex items-center px-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg text-sm text-gray-600">+233</span>
+                                <input
+                                    type="tel"
+                                    {...register('phone_number', { required: 'Phone number is required' })}
+                                    className="input-field rounded-l-none"
+                                    placeholder="245678901"
+                                />
+                            </div>
+                            {errors.phone_number && <p className="text-red-500 text-sm mt-1">{errors.phone_number.message}</p>}
+                        </div>
 
-                    {/* GPS Address */}
-                    <div>
-                        <label className="label">GPS Address</label>
-                        <input
-                            type="text"
-                            {...register('gps_address')}
-                            className="input-field"
-                            placeholder="GG-845-8731"
-                        />
-                    </div>
+                        <div>
+                            <label className="label">Email (Optional)</label>
+                            <input
+                                type="email"
+                                {...register('email')}
+                                className="input-field"
+                                placeholder="customer@email.com"
+                            />
+                        </div>
 
-                    {/* Latitude */}
-                    <div>
-                        <label className="label">Latitude</label>
-                        <input
-                            type="number"
-                            step="any"
-                            {...register('latitude', { valueAsNumber: true })}
-                            className="input-field"
-                            placeholder="5.6037"
-                        />
-                    </div>
+                        <div>
+                            <label className="label">Gender</label>
+                            <select {...register('gender')} className="input-field">
+                                <option value="">Select Gender</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                            </select>
+                        </div>
 
-                    {/* Longitude */}
-                    <div>
-                        <label className="label">Longitude</label>
-                        <input
-                            type="number"
-                            step="any"
-                            {...register('longitude', { valueAsNumber: true })}
-                            className="input-field"
-                            placeholder="-0.1870"
-                        />
-                    </div>
+                        <div>
+                            <label className="label">Marital Status</label>
+                            <select {...register('marital_status')} className="input-field">
+                                <option value="">Select Marital Status</option>
+                                <option value="Single">Single</option>
+                                <option value="Married">Married</option>
+                                <option value="Divorced">Divorced</option>
+                                <option value="Widowed">Widowed</option>
+                            </select>
+                        </div>
 
-                    {/* Electoral Area */}
-                    <div>
-                        <label className="label">Electoral Area</label>
-                        <select {...register('electoral_area_id')} className="input-field">
-                            <option value="">Select Electoral Area</option>
-                            {electoralAreas.map((area: any) => (
-                                <option key={area.id} value={area.id}>
-                                    {area.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                        <div>
+                            <label className="label">Ghana Card No.</label>
+                            <input
+                                type="text"
+                                {...register('ghana_card_no')}
+                                className="input-field"
+                                placeholder="GHA-XXXXXXXXX-X"
+                            />
+                        </div>
 
-                    {/* Local Area */}
-                    <div>
-                        <label className="label">Local Area / Community</label>
-                        <select {...register('local_area_id')} className="input-field" disabled={!selectedElectoralArea}>
-                            <option value="">Select Local Area</option>
-                            {localAreas.map((area: any) => (
-                                <option key={area.id} value={area.id}>
-                                    {area.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                        <div>
+                            <label className="label">Next of Kin Name</label>
+                            <input
+                                type="text"
+                                {...register('next_of_kin_name')}
+                                className="input-field"
+                                placeholder="Full name"
+                            />
+                        </div>
 
-                    {/* Physical Location */}
-                    <div className="md:col-span-2">
-                        <label className="label">Physical Location / Street Name</label>
-                        <input
-                            type="text"
-                            {...register('physical_location')}
-                            className="input-field"
-                            placeholder="NII AYI KUSHIE ST"
-                        />
-                    </div>
-
-                    {/* Landmark */}
-                    <div className="md:col-span-2">
-                        <label className="label">Landmark</label>
-                        <input
-                            type="text"
-                            {...register('landmark')}
-                            className="input-field"
-                            placeholder="Near GOIL filling Station"
-                        />
+                        <div>
+                            <label className="label">Next of Kin Contact</label>
+                            <div className="flex">
+                                <span className="inline-flex items-center px-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg text-sm text-gray-600">+233</span>
+                                <input
+                                    type="tel"
+                                    {...register('next_of_kin_contact')}
+                                    className="input-field rounded-l-none"
+                                    placeholder="245678901"
+                                />
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div className="flex justify-end space-x-4 pt-4 border-t">
-                    <Link href="/customers" className="btn-secondary">
-                        Cancel
-                    </Link>
+                {/* Location Information */}
+                <div className="card">
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 mb-6 text-center">
+                        <h2 className="text-municipal-teal font-bold text-lg">Location Information</h2>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="label font-mono tracking-tighter">GPS ADDRESS</label>
+                            <input
+                                type="text"
+                                {...register('gps_address')}
+                                className="input-field font-mono"
+                                placeholder="GG-845-8731"
+                            />
+                        </div>
+
+                        {/* Coordinates Row */}
+                        <div className="md:col-span-2">
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="label mb-0">Location Coordinates</label>
+                                <div className="flex space-x-2">
+                                    <button
+                                        type="button"
+                                        onClick={detectLocation}
+                                        disabled={isDetecting}
+                                        className="btn-secondary py-1 px-3 text-xs flex items-center space-x-1"
+                                    >
+                                        {isDetecting
+                                            ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-municipal-red" />
+                                            : <Navigation className="w-3 h-3" />
+                                        }
+                                        <span>{isDetecting ? 'Detecting...' : 'Detect GPS'}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowMap(!showMap)}
+                                        className={`py-1 px-3 text-xs flex items-center space-x-1 rounded-md transition-all ${showMap
+                                            ? 'bg-municipal-red text-white hover:bg-red-700'
+                                            : 'bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100'}`}
+                                    >
+                                        {showMap ? <X className="w-3 h-3" /> : <MapIcon className="w-3 h-3" />}
+                                        <span>{showMap ? 'Close Map' : 'Select on Map'}</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {showMap && (
+                                <div className="mb-4">
+                                    <p className="text-xs text-blue-600 mb-2 font-medium">Click on the map to pin the exact location.</p>
+                                    <MapSelector
+                                        onLocationSelectAction={(lat: number, lng: number) => {
+                                            setValue('latitude', parseFloat(lat.toFixed(6)));
+                                            setValue('longitude', parseFloat(lng.toFixed(6)));
+                                        }}
+                                        initialLat={watch('latitude')}
+                                        initialLng={watch('longitude')}
+                                    />
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wider font-bold italic">Latitude</label>
+                                    <input
+                                        type="number"
+                                        step="any"
+                                        {...register('latitude', { valueAsNumber: true })}
+                                        className="input-field"
+                                        placeholder="5.6037"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wider font-bold italic">Longitude</label>
+                                    <input
+                                        type="number"
+                                        step="any"
+                                        {...register('longitude', { valueAsNumber: true })}
+                                        className="input-field"
+                                        placeholder="-0.1870"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="label">Electoral Area</label>
+                            <select {...register('electoral_area_id')} className="input-field">
+                                <option value="">Select Electoral Area</option>
+                                {electoralAreas.map((area: any) => (
+                                    <option key={area.id} value={area.id}>{area.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="label">Local Area / Community</label>
+                            <select {...register('local_area_id')} className="input-field" disabled={!selectedElectoralArea}>
+                                <option value="">Select Local Area</option>
+                                {localAreas.map((area: any) => (
+                                    <option key={area.id} value={area.id}>{area.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="md:col-span-2">
+                            <label className="label">Physical Location / Street Name</label>
+                            <input
+                                type="text"
+                                {...register('physical_location')}
+                                className="input-field"
+                                placeholder="NII AYI KUSHIE ST"
+                            />
+                        </div>
+
+                        <div className="md:col-span-2">
+                            <label className="label">Landmark</label>
+                            <input
+                                type="text"
+                                {...register('landmark')}
+                                className="input-field"
+                                placeholder="Near GOIL filling Station"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex justify-end space-x-4 pt-2">
+                    <Link href="/customers" className="btn-secondary">Cancel</Link>
                     <button
                         type="submit"
                         disabled={isSubmitting}
-                        className="btn-primary flex items-center space-x-2"
+                        className="btn-primary flex items-center space-x-2 px-8"
                     >
                         {isSubmitting ? (
                             <>
