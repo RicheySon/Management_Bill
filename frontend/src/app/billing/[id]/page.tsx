@@ -54,8 +54,7 @@ export default function BillDetailPage() {
                 amount: parseFloat(paymentAmount),
                 payment_method: paymentMethod,
                 customer_id: bill.customer_id,
-                notes: `Manual payment for ${bill.bill_number}`
-            } as any);
+            });
             setSuccess(true);
             await loadBill();
             setTimeout(() => setSuccess(false), 3000);
