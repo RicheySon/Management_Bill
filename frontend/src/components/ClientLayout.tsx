@@ -1,17 +1,19 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 import Link from 'next/link';
 import {
     Home, Users, Building2, FileText,
     DollarSign, BarChart3, Printer, LogOut, Loader2, Shield,
-    Briefcase, ClipboardList, Settings
+    Briefcase, ClipboardList, Settings, Menu
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
     const { user, logout, isLoading, hasPermission } = useAuth();
     const pathname = usePathname();
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     if (isLoading) {
         return (
@@ -32,8 +34,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     if (isRevenueCollector) {
         return (
             <div className="flex min-h-screen bg-gray-50">
+                {/* Mobile Overlay */}
+                {isSidebarOpen && <div className="fixed inset-0 bg-black/50 z-20 md:hidden" onClick={() => setIsSidebarOpen(false)} />}
+
                 {/* Revenue Collector Sidebar - Teal Theme */}
-                <aside className="w-64 bg-white border-r shadow-sm flex flex-col fixed h-full z-10">
+                <aside className={`w-64 bg-white border-r shadow-sm flex flex-col fixed h-full z-30 transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
                     <div className="p-6 flex justify-center">
                         <div className="w-36 h-36 rounded-full overflow-hidden border-2 border-gray-100">
                             <img src="/logo.jpg" alt="GA North Logo" className="w-full h-full object-cover" />
@@ -44,11 +49,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
                     <nav className="flex-1 overflow-y-auto py-6 px-4">
                         <ul className="space-y-4">
-                            <CollectorNavLink href="/" icon={<Home className="w-6 h-6" />} label="Home" />
-                            <CollectorNavLink href="/customers" icon={<Users className="w-6 h-6" />} label="Rate Payers" />
-                            <CollectorNavLink href="/properties" icon={<Building2 className="w-6 h-6" />} label="Property Rates" />
-                            <CollectorNavLink href="/businesses" icon={<Briefcase className="w-6 h-6" />} label="Business Owners" />
-                            <CollectorNavLink href="/businesses#permits" icon={<ClipboardList className="w-6 h-6" />} label="Business Operation Permits" />
+                            <CollectorNavLink href="/" icon={<Home className="w-6 h-6" />} label="Home" onClick={() => setIsSidebarOpen(false)} />
+                            <CollectorNavLink href="/customers" icon={<Users className="w-6 h-6" />} label="Rate Payers" onClick={() => setIsSidebarOpen(false)} />
+                            <CollectorNavLink href="/properties" icon={<Building2 className="w-6 h-6" />} label="Property Rates" onClick={() => setIsSidebarOpen(false)} />
+                            <CollectorNavLink href="/businesses" icon={<Briefcase className="w-6 h-6" />} label="Business Owners" onClick={() => setIsSidebarOpen(false)} />
+                            <CollectorNavLink href="/businesses#permits" icon={<ClipboardList className="w-6 h-6" />} label="Business Operation Permits" onClick={() => setIsSidebarOpen(false)} />
                         </ul>
                     </nav>
 
@@ -69,10 +74,14 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                 </aside>
 
                 {/* Main Content Area */}
-                <div className="flex-1 ml-64 flex flex-col">
-                    <header className="bg-white border-b h-16 flex items-center px-8 justify-between sticky top-0 z-10">
+                <div className="flex-1 ml-0 md:ml-64 flex flex-col transition-all duration-300">
+                    <header className="bg-white border-b h-16 flex items-center px-4 md:px-8 justify-between sticky top-0 z-10">
                         <div className="flex items-center text-gray-400">
-                            <span className="text-sm font-medium">Municipal Revenue Management System</span>
+                            <button className="md:hidden mr-4 p-1 hover:bg-gray-100 rounded-md" onClick={() => setIsSidebarOpen(true)}>
+                                <Menu className="w-6 h-6 text-gray-600" />
+                            </button>
+                            <span className="text-sm font-medium hidden sm:inline-block">Municipal Revenue Management System</span>
+                            <span className="text-sm font-medium sm:hidden">MRMS</span>
                         </div>
                         <div className="flex items-center space-x-4">
                             <div className="text-right">
@@ -99,8 +108,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
     return (
         <div className="flex min-h-screen bg-gray-50">
+            {/* Mobile Overlay */}
+            {isSidebarOpen && <div className="fixed inset-0 bg-black/50 z-20 md:hidden" onClick={() => setIsSidebarOpen(false)} />}
+
             {/* Sidebar */}
-            <aside className="w-64 bg-white border-r shadow-sm flex flex-col fixed h-full z-10">
+            <aside className={`w-64 bg-white border-r shadow-sm flex flex-col fixed h-full z-30 transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
                 <div className="p-6 border-b bg-municipal-red">
                     <div className="flex items-center space-x-3 text-white">
                         <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center overflow-hidden border-2 border-white shadow-sm">
@@ -115,30 +127,30 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
                 <nav className="flex-1 overflow-y-auto py-6 px-4">
                     <ul className="space-y-2">
-                        <NavLink href="/" icon={<Home className="w-5 h-5" />} label="Dashboard" />
+                        <NavLink href="/" icon={<Home className="w-5 h-5" />} label="Dashboard" onClick={() => setIsSidebarOpen(false)} />
 
                         {hasPermission('view_customer') &&
-                            <NavLink href="/customers" icon={<Users className="w-5 h-5" />} label="Customers" />
+                            <NavLink href="/customers" icon={<Users className="w-5 h-5" />} label="Customers" onClick={() => setIsSidebarOpen(false)} />
                         }
 
                         {(hasPermission('register_property') || hasPermission('edit_property')) &&
-                            <NavLink href="/properties" icon={<Building2 className="w-5 h-5" />} label="Properties" />
+                            <NavLink href="/properties" icon={<Building2 className="w-5 h-5" />} label="Properties" onClick={() => setIsSidebarOpen(false)} />
                         }
 
                         {(hasPermission('register_business') || hasPermission('edit_business')) &&
-                            <NavLink href="/businesses" icon={<FileText className="w-5 h-5" />} label="Businesses" />
+                            <NavLink href="/businesses" icon={<FileText className="w-5 h-5" />} label="Businesses" onClick={() => setIsSidebarOpen(false)} />
                         }
 
                         {hasPermission('generate_bill') &&
-                            <NavLink href="/billing" icon={<DollarSign className="w-5 h-5" />} label="Billing" />
+                            <NavLink href="/billing" icon={<DollarSign className="w-5 h-5" />} label="Billing" onClick={() => setIsSidebarOpen(false)} />
                         }
 
                         {hasPermission('view_reports') &&
-                            <NavLink href="/reports" icon={<BarChart3 className="w-5 h-5" />} label="Reports" />
+                            <NavLink href="/reports" icon={<BarChart3 className="w-5 h-5" />} label="Reports" onClick={() => setIsSidebarOpen(false)} />
                         }
 
                         {hasPermission('bulk_print') &&
-                            <NavLink href="/print" icon={<Printer className="w-5 h-5" />} label="Bulk Printing" />
+                            <NavLink href="/print" icon={<Printer className="w-5 h-5" />} label="Bulk Printing" onClick={() => setIsSidebarOpen(false)} />
                         }
 
                         {/* Admin Links */}
@@ -149,15 +161,15 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                         )}
 
                         {hasPermission('manage_users') &&
-                            <NavLink href="/admin/users" icon={<Shield className="w-5 h-5" />} label="User Management" />
+                            <NavLink href="/admin/users" icon={<Shield className="w-5 h-5" />} label="User Management" onClick={() => setIsSidebarOpen(false)} />
                         }
 
                         {hasPermission('configure_rates') &&
-                            <NavLink href="/admin/configuration" icon={<Settings className="w-5 h-5" />} label="Fee Configuration" />
+                            <NavLink href="/admin/configuration" icon={<Settings className="w-5 h-5" />} label="Fee Configuration" onClick={() => setIsSidebarOpen(false)} />
                         }
 
                         {hasPermission('view_audit_logs') &&
-                            <NavLink href="/admin/audit" icon={<FileText className="w-5 h-5" />} label="Audit Logs" />
+                            <NavLink href="/admin/audit" icon={<FileText className="w-5 h-5" />} label="Audit Logs" onClick={() => setIsSidebarOpen(false)} />
                         }
                     </ul>
                 </nav>
@@ -177,11 +189,15 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             </aside>
 
             {/* Main Content Area */}
-            <div className="flex-1 ml-64 flex flex-col">
+            <div className="flex-1 ml-0 md:ml-64 flex flex-col transition-all duration-300">
                 {/* Header */}
-                <header className="bg-white border-b h-16 flex items-center px-8 justify-between sticky top-0 z-10">
+                <header className="bg-white border-b h-16 flex items-center px-4 md:px-8 justify-between sticky top-0 z-10">
                     <div className="flex items-center text-gray-400">
-                        <span className="text-sm font-medium">Municipal Revenue Management System</span>
+                        <button className="md:hidden mr-4 p-1 hover:bg-gray-100 rounded-md" onClick={() => setIsSidebarOpen(true)}>
+                            <Menu className="w-6 h-6 text-gray-600" />
+                        </button>
+                        <span className="text-sm font-medium hidden sm:inline-block">Municipal Revenue Management System</span>
+                        <span className="text-sm font-medium sm:hidden">MRMS</span>
                     </div>
                     <div className="flex items-center space-x-4">
                         <div className="text-right">
@@ -206,7 +222,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     );
 }
 
-function NavLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
+function NavLink({ href, icon, label, onClick }: { href: string; icon: React.ReactNode; label: string; onClick?: () => void }) {
     const pathname = usePathname();
     const isActive = pathname === href || pathname.startsWith(`${href}/`);
 
@@ -214,6 +230,7 @@ function NavLink({ href, icon, label }: { href: string; icon: React.ReactNode; l
         <li>
             <Link
                 href={href}
+                onClick={onClick}
                 className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all group ${isActive
                     ? 'bg-red-50 text-municipal-red font-medium shadow-sm'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-municipal-red'
@@ -228,11 +245,12 @@ function NavLink({ href, icon, label }: { href: string; icon: React.ReactNode; l
     );
 }
 
-function CollectorNavLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
+function CollectorNavLink({ href, icon, label, onClick }: { href: string; icon: React.ReactNode; label: string; onClick?: () => void }) {
     return (
         <li>
             <Link
                 href={href}
+                onClick={onClick}
                 className="flex items-center space-x-4 px-4 py-3 rounded-lg text-municipal-teal hover:bg-teal-50 transition-all group"
             >
                 <div className="text-municipal-teal">
