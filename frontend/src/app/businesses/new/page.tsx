@@ -7,11 +7,12 @@ import {
     createBusiness,
     createCustomer,
     fetchCustomers,
+    fetchCustomer,
     fetchBusinessCategories,
     fetchElectoralAreas,
     fetchActiveBusinessFeeItems,
 } from '@/lib/api-client';
-import { ArrowLeft, Save, UserPlus, UserCheck, Navigation, MapPin, Map as MapIcon, X } from 'lucide-react';
+import { ArrowLeft, Save, UserPlus, UserCheck, Navigation, MapPin, Map as MapIcon, X, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
@@ -93,6 +94,31 @@ export default function NewBusinessPage() {
     const [isNewOwner, setIsNewOwner] = useState(true);
     const [isDetecting, setIsDetecting] = useState(false);
     const [showMap, setShowMap] = useState(false);
+    const [selectedCustomerProfile, setSelectedCustomerProfile] = useState<any>(null);
+    const [loadingProfile, setLoadingProfile] = useState(false);
+
+    const watchedCustomerId = watch('customer_id');
+
+    // Auto-fetch customer profile when existing owner is selected
+    useEffect(() => {
+        if (!isNewOwner && watchedCustomerId) {
+            const doFetch = async () => {
+                setLoadingProfile(true);
+                setSelectedCustomerProfile(null);
+                try {
+                    const data = await fetchCustomer(watchedCustomerId);
+                    setSelectedCustomerProfile(data.customer);
+                } catch (err) {
+                    console.error('Failed to fetch customer profile', err);
+                } finally {
+                    setLoadingProfile(false);
+                }
+            };
+            doFetch();
+        } else if (isNewOwner) {
+            setSelectedCustomerProfile(null);
+        }
+    }, [watchedCustomerId, isNewOwner]);
 
     const detectLocation = () => {
         setIsDetecting(true);
@@ -342,21 +368,75 @@ export default function NewBusinessPage() {
                             </div>
                         </div>
                     ) : (
-                        <div>
-                            <label className="label">
-                                Select Existing Business Owner <span className="text-municipal-red">*</span>
-                            </label>
-                            <select
-                                {...register('customer_id')}
-                                className="input-field"
-                            >
-                                <option value="">-- Select Business Owner --</option>
-                                {customers.map((customer: any) => (
-                                    <option key={customer.id} value={customer.id}>
-                                        {customer.full_name} ({customer.phone_number})
-                                    </option>
-                                ))}
-                            </select>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="label">
+                                    Select Existing Business Owner <span className="text-municipal-red">*</span>
+                                </label>
+                                <select
+                                    {...register('customer_id', { required: !isNewOwner ? 'Please select a business owner' : false })}
+                                    className="input-field"
+                                >
+                                    <option value="">-- Select Business Owner --</option>
+                                    {customers.map((customer: any) => (
+                                        <option key={customer.id} value={customer.id}>
+                                            {customer.full_name} ({customer.phone_number})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Loading spinner */}
+                            {loadingProfile && (
+                                <div className="flex items-center space-x-2 text-gray-500 text-sm py-2">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-municipal-red"></div>
+                                    <span>Loading owner details...</span>
+                                </div>
+                            )}
+
+                            {/* Auto-filled profile card */}
+                            {selectedCustomerProfile && !loadingProfile && (
+                                <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="bg-teal-50 border border-teal-200 rounded-xl p-4">
+                                        <div className="flex items-center space-x-2 mb-3">
+                                            <CheckCircle className="w-4 h-4 text-teal-600" />
+                                            <span className="text-teal-800 font-semibold text-sm">Business Owner Details Auto-Loaded</span>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <div className="md:col-span-2 flex items-center space-x-3 bg-white rounded-lg p-3 border border-teal-100">
+                                                <div className="w-10 h-10 bg-municipal-red/10 text-municipal-red rounded-full flex items-center justify-center font-bold text-lg">
+                                                    {selectedCustomerProfile.full_name?.[0]}
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold text-gray-900">{selectedCustomerProfile.full_name}</p>
+                                                    <p className="text-xs text-gray-500">{selectedCustomerProfile.gender || '—'} • {selectedCustomerProfile.marital_status || '—'}</p>
+                                                </div>
+                                            </div>
+                                            <div className="bg-white rounded-lg p-3 border border-teal-100">
+                                                <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Phone</p>
+                                                <p className="text-sm font-semibold text-gray-800">{selectedCustomerProfile.phone_number || '—'}</p>
+                                            </div>
+                                            <div className="bg-white rounded-lg p-3 border border-teal-100">
+                                                <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Email</p>
+                                                <p className="text-sm font-semibold text-gray-800">{selectedCustomerProfile.email || '—'}</p>
+                                            </div>
+                                            {selectedCustomerProfile.ghana_card_no && (
+                                                <div className="bg-white rounded-lg p-3 border border-teal-100">
+                                                    <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Ghana Card</p>
+                                                    <p className="text-sm font-semibold font-mono text-gray-800">{selectedCustomerProfile.ghana_card_no}</p>
+                                                </div>
+                                            )}
+                                            {selectedCustomerProfile.address && (
+                                                <div className="bg-white rounded-lg p-3 border border-teal-100">
+                                                    <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Address</p>
+                                                    <p className="text-sm font-semibold text-gray-800">{selectedCustomerProfile.address}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <p className="text-[11px] text-teal-600 mt-3 italic">✓ This owner's profile will be linked to the business you're registering.</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
