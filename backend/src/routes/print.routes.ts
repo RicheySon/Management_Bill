@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import Joi from 'joi';
 import { authenticateToken, authorize } from '../middlewares/auth.middleware';
-import { generateBillPDF } from '../services/pdf.service';
+import { generateBillPDF, generateBulkBillsPDF } from '../services/pdf.service';
 import pool from '../config/database';
 
 const router = Router();
@@ -131,16 +131,8 @@ router.post('/bills/bulk', authorize(['bulk_print']), async (req: Request, res: 
             });
         }
 
-        // Generate individual PDFs and concatenate
-        // For simplicity, we'll send one PDF per page
-        const doc = await generateBillPDF(billIdsToGenerate[0]);
-
-        for (let i = 1; i < billIdsToGenerate.length; i++) {
-            doc.addPage();
-            // In production, use a proper PDF merging library like pdf-lib
-            // For now we just add a page to keep it consistent with the existing logic
-            await generateBillPDF(billIdsToGenerate[i]);
-        }
+        // Generate bulk PDF using the service
+        const doc = await generateBulkBillsPDF(billIdsToGenerate);
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=bulk-bills-${Date.now()}.pdf`);

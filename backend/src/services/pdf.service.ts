@@ -77,16 +77,11 @@ const fetchBillData = async (billId: string): Promise<BillData> => {
 };
 
 /**
- * Generate GA North Municipal Bill PDF
+ * Draw a single bill onto the provided PDF document
  */
-export const generateBillPDF = async (billId: string): Promise<typeof PDFDocument> => {
+const drawBill = async (doc: typeof PDFDocument, billId: string): Promise<void> => {
     const data = await fetchBillData(billId);
     const { bill, customer, property, business, electoral_area, landmark } = data;
-
-    const doc = new PDFDocument({
-        size: 'A5',
-        margins: { top: 20, bottom: 20, left: 25, right: 25 },
-    });
 
     const pageWidth = doc.page.width;
     const pageHeight = doc.page.height;
@@ -330,6 +325,18 @@ export const generateBillPDF = async (billId: string): Promise<typeof PDFDocumen
     points.forEach((point, i) => {
         doc.text(point, margin + 40, currentY + 10 + (i * 8));
     });
+};
+
+/**
+ * Generate GA North Municipal Bill PDF
+ */
+export const generateBillPDF = async (billId: string): Promise<typeof PDFDocument> => {
+    const doc = new PDFDocument({
+        size: 'A5',
+        margins: { top: 20, bottom: 20, left: 25, right: 25 },
+    });
+
+    await drawBill(doc, billId);
 
     return doc;
 };
@@ -349,9 +356,7 @@ export const generateBulkBillsPDF = async (billIds: string[]): Promise<typeof PD
         }
 
         // Generate each bill on a new page
-        await generateBillPDF(billIds[i]);
-        // Note: In production, you'd merge PDFs properly
-        // This is a simplified version
+        await drawBill(doc, billIds[i]);
     }
 
     return doc;
