@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import pool from '../config/database';
 import { format } from 'date-fns';
+import path from 'path';
 
 /**
  * PDF Generation Service
@@ -83,203 +84,250 @@ export const generateBillPDF = async (billId: string): Promise<typeof PDFDocumen
     const { bill, customer, property, business, electoral_area, landmark } = data;
 
     const doc = new PDFDocument({
-        size: 'A4',
-        margins: { top: 30, bottom: 30, left: 40, right: 40 },
+        size: 'A5',
+        margins: { top: 20, bottom: 20, left: 25, right: 25 },
     });
+
+    const pageWidth = doc.page.width;
+    const pageHeight = doc.page.height;
+    const margin = 20;
+
+    // Assets Path
+    const assetsPath = path.join(__dirname, '../../assets');
+    const gaLogoPath = path.join(assetsPath, 'ga_north_logo.jpg');
+    const coatOfArmsPath = path.join(assetsPath, 'coat_of_arms.png');
+
+    // Draw Black Border
+    doc.rect(margin, margin, pageWidth - (margin * 2), pageHeight - (margin * 2))
+        .lineWidth(1)
+        .strokeColor('#000000')
+        .stroke();
+
+    // Watermark
+    try {
+        doc.save();
+        doc.opacity(0.1);
+        const watermarkWidth = 350;
+        doc.image(gaLogoPath, (pageWidth - watermarkWidth) / 2, (pageHeight - watermarkWidth) / 2, {
+            width: watermarkWidth,
+        });
+        doc.restore();
+    } catch (e) {
+        console.warn('Could not add watermark:', e);
+    }
 
     const isBOP = bill.bill_type === 'BOP';
     const billDetails = typeof bill.bill_details === 'string'
         ? JSON.parse(bill.bill_details)
         : bill.bill_details;
 
-    // Header
-    doc.fontSize(18)
-        .font('Helvetica-Bold')
-        .text('GA NORTH MUNICIPAL', 50, 50, { align: 'center' });
+    // Header Logos
+    try {
+        doc.image(gaLogoPath, margin + 10, margin + 10, { width: 45 });
+        doc.image(coatOfArmsPath, pageWidth - margin - 55, margin + 10, { width: 45 });
+    } catch (e) {
+        console.warn('Could not add header logos:', e);
+    }
 
-    doc.fontSize(10)
-        .font('Helvetica')
-        .text('Revenue Management System', { align: 'center' });
+    // Header Text
+    doc.fillColor('#000000')
+        .fontSize(14)
+        .font('Helvetica-Bold')
+        .text('GA NORTH MUNICIPAL ASSEMBLY', margin, margin + 25, { align: 'center' });
+
+    doc.moveDown(1.5);
 
     // Bill Type Header Box
-    doc.rect(50, 100, 150, 30)
-        .fillAndStroke('#000080', '#000080');
+    let currentY = doc.y;
+    doc.rect(margin + 40, currentY, 110, 20)
+        .fill('#000000');
 
     doc.fillColor('#FFFFFF')
-        .fontSize(12)
+        .fontSize(10)
         .font('Helvetica-Bold')
-        .text(isBOP ? 'BOP BILL' : 'PROPERTY BILL', 55, 110);
+        .text(isBOP ? 'BOP BILL' : 'PROPERTY BILL', margin + 45, currentY + 5, { width: 100, align: 'center' });
 
     // Printed On Date
     doc.fillColor('#000000')
-        .fontSize(9)
-        .font('Helvetica')
-        .text(`Printed On: ${format(new Date(), 'dd/MM/yyyy')}`, 450, 110, { align: 'right' });
+        .fontSize(8)
+        .font('Helvetica-Bold')
+        .text(`Printed On ${format(new Date(), "do' / 'MMMM / yyyy").toUpperCase()}`,
+            pageWidth - margin - 180, currentY + 5, { width: 170, align: 'right' });
+
+    currentY += 25;
 
     // Bill To Box
-    let currentY = 150;
-    doc.rect(50, currentY, 495, 25)
+    doc.rect(margin + 10, currentY, pageWidth - (margin * 2) - 20, 20)
+        .strokeColor('#000000')
+        .lineWidth(0.5)
         .stroke();
 
-    doc.fontSize(10)
+    doc.fontSize(9)
         .font('Helvetica-Bold')
-        .text(`BILL TO: ${isBOP ? business.business_name : customer.full_name}`,
-            55, currentY + 8);
+        .text('BILL TO:', margin + 15, currentY + 6, { continued: true })
+        .font('Helvetica')
+        .text(` ${isBOP ? business.business_name : customer.full_name}`);
+
+    currentY += 25;
+
+    // Customer & Phone
+    doc.rect(margin + 10, currentY, 190, 20).stroke();
+    doc.rect(margin + 205, currentY, 160, 20).stroke();
+
+    doc.fontSize(8).font('Helvetica-Bold')
+        .text('CUSTOMER:', margin + 15, currentY + 6, { continued: true })
+        .font('Helvetica')
+        .text(` ${customer.customer_number}`);
+
+    doc.font('Helvetica-Bold')
+        .text('PHONE:', margin + 210, currentY + 6, { continued: true })
+        .font('Helvetica')
+        .text(` ${customer.phone_number}`);
+
+    currentY += 25;
+
+    // Street & Electoral Area
+    doc.rect(margin + 10, currentY, 160, 25).stroke();
+    doc.rect(margin + 175, currentY, 190, 25).stroke();
+
+    doc.fontSize(8);
+    doc.font('Helvetica-Bold').text('STREET NAME:', margin + 15, currentY + 4);
+    doc.font('Helvetica').text(business?.street_name || property?.street_name || 'N/A', margin + 15, currentY + 13);
+
+    doc.font('Helvetica-Bold').text('ELECTRAL AREA:', margin + 180, currentY + 4);
+    doc.font('Helvetica').text((electoral_area || 'N/A').toUpperCase(), margin + 180, currentY + 13);
 
     currentY += 30;
 
-    // Customer Details Section
-    // Customer Number & Phone
-    doc.rect(50, currentY, 270, 30).stroke();
-    doc.rect(320, currentY, 225, 30).stroke();
+    // Business Type & Landmark
+    doc.rect(margin + 10, currentY, 190, 25).stroke();
+    doc.rect(margin + 205, currentY, 160, 25).stroke();
 
-    doc.fontSize(8).font('Helvetica-Bold');
-    doc.text('CUSTOMER NO:', 55, currentY + 5);
-    doc.fontSize(9).font('Helvetica');
-    doc.text(customer.customer_number, 55, currentY + 15, { width: 260 });
+    doc.font('Helvetica-Bold').text('BUSINESS TYPE:', margin + 15, currentY + 4);
+    doc.font('Helvetica').text((business?.business_category || 'N/A').toUpperCase(), margin + 15, currentY + 13);
 
-    doc.fontSize(8).font('Helvetica-Bold');
-    doc.text(`PHONE: ${customer.phone_number}`, 325, currentY + 12);
+    doc.font('Helvetica-Bold').text('LANDMARK:', margin + 210, currentY + 4);
+    doc.font('Helvetica').text(landmark || 'N/A', margin + 210, currentY + 13);
 
     currentY += 30;
 
-    // Street Name & Electoral Area
-    doc.rect(50, currentY, 270, 25).stroke();
-    doc.rect(320, currentY, 225, 25).stroke();
+    // Old Account No & GPS
+    doc.rect(margin + 10, currentY, 190, 20).stroke();
+    doc.rect(margin + 205, currentY, 160, 20).stroke();
 
-    doc.fontSize(8).font('Helvetica-Bold');
-    doc.text('STREET NAME:', 55, currentY + 5);
-    doc.fontSize(9).font('Helvetica');
-    const streetName = business?.street_name || property?.street_name || 'N/A';
-    doc.text(streetName, 55, currentY + 13);
+    doc.font('Helvetica-Bold').text('OLD ACCOUNT NO:', margin + 15, currentY + 6, { continued: true })
+        .font('Helvetica').text(` ${bill.old_account_no || 'N/A'}`);
 
-    doc.fontSize(8).font('Helvetica-Bold');
-    doc.text('ELECTORAL AREA:', 325, currentY + 5);
-    doc.fontSize(9).font('Helvetica');
-    doc.text(electoral_area || 'N/A', 325, currentY + 13);
+    doc.font('Helvetica-Bold').text('GPS COORDINATE:', margin + 210, currentY + 6, { continued: true })
+        .font('Helvetica').text(` ${business?.gps_address || property?.gps_address || 'N/A'}`);
 
     currentY += 25;
 
-    // Business Type/Category & Landmark
-    if (isBOP) {
-        doc.rect(50, currentY, 270, 25).stroke();
-        doc.rect(320, currentY, 225, 25).stroke();
+    // Bill No & Period
+    doc.rect(margin + 10, currentY, 225, 20).stroke();
+    doc.rect(margin + 240, currentY, 125, 20).stroke();
 
-        doc.fontSize(8).font('Helvetica-Bold');
-        doc.text('BUSINESS TYPE:', 55, currentY + 5);
-        doc.fontSize(9).font('Helvetica');
-        doc.text(business.business_category, 55, currentY + 13);
+    doc.font('Helvetica-Bold').text('BILL NO:', margin + 15, currentY + 6, { continued: true })
+        .font('Helvetica').text(` ${bill.bill_number}`);
 
-        doc.fontSize(8).font('Helvetica-Bold');
-        doc.text('LANDMARK:', 325, currentY + 5);
-        doc.fontSize(9).font('Helvetica');
-        doc.text(landmark || 'N/A', 325, currentY + 13);
+    doc.font('Helvetica-Bold').text('BILL PERIOD:', margin + 245, currentY + 6, { continued: true })
+        .font('Helvetica').text(` ${bill.bill_period_year}`);
 
-        currentY += 25;
-
-        // Business Activity (Category Name from your image)
-        doc.rect(50, currentY, 495, 25).stroke();
-        doc.fontSize(9).font('Helvetica-Bold');
-        doc.text(business.business_category.toUpperCase(), 55, currentY + 10);
-
-        currentY += 25;
-    }
-
-    // GPS Coordinate
-    const gpsAddress = business?.gps_address || property?.gps_address || 'N/A';
-    doc.rect(50, currentY, 495, 20).stroke();
-    doc.fontSize(8).font('Helvetica-Bold');
-    doc.text(`GPS COORDINATE: ${gpsAddress}`, 55, currentY + 7);
-
-    currentY += 25;
-
-    // Bill Number & Period
-    doc.rect(50, currentY, 270, 20).stroke();
-    doc.rect(320, currentY, 225, 20).stroke();
-
-    doc.fontSize(8).font('Helvetica-Bold');
-    doc.text('BILL NO:', 55, currentY + 7);
-
-    doc.fontSize(8).font('Helvetica-Bold');
-    doc.text('BILL PERIOD:', 325, currentY + 7);
-    doc.fontSize(9).font('Helvetica');
-    doc.text(bill.bill_period_year.toString(), 390, currentY + 7);
-
-    currentY += 25;
+    currentY += 30;
 
     // Charges Table
+    const col1 = 120;
+    const col2 = 60;
+    const col3 = 55;
+    const col4 = 55;
+    const col5 = 65;
+
     // Table Header
-    doc.rect(50, currentY, 85, 40).stroke(); // Bill Type
-    doc.rect(135, currentY, 65, 20).stroke(); // Current Rate(GH)
-    doc.rect(200, currentY, 50, 20).stroke(); // Area(GH)
-    doc.rect(250, currentY, 65, 20).stroke(); // Arrears(GHS)
-    doc.rect(315, currentY, 60, 20).stroke(); // Rebate(GHS)
-    doc.rect(375, currentY, 170, 20).stroke(); // Total(GHS)
+    doc.rect(margin + 10, currentY, col1, 20).stroke();
+    doc.rect(margin + 10 + col1, currentY, col2, 20).stroke();
+    doc.rect(margin + 10 + col1 + col2, currentY, col3, 20).stroke();
+    doc.rect(margin + 10 + col1 + col2 + col3, currentY, col4, 20).stroke();
+    doc.rect(margin + 10 + col1 + col2 + col3 + col4, currentY, col5, 20).stroke();
 
     doc.fontSize(7).font('Helvetica-Bold');
-    doc.text('BILL TYPE', 55, currentY + 3, { width: 75, align: 'center' });
-    doc.text('CURRENT\nRATE(GH)', 137, currentY + 2, { width: 60, align: 'center' });
-    doc.text('AREA\n(GH)', 203, currentY + 2, { width: 45, align: 'center' });
-    doc.text('ARREARS\n(GHS)', 253, currentY + 2, { width: 60, align: 'center' });
-    doc.text('REBAT\n(GHS)', 318, currentY + 2, { width: 55, align: 'center' });
-    doc.text('TOTAL\n(GHS)', 385, currentY + 2, { width: 150, align: 'center' });
-
-    currentY += 20;
-
-    // Sub-headers
-    doc.rect(135, currentY, 65, 20).stroke();
-    doc.rect(200, currentY, 50, 20).stroke();
-
-    doc.fontSize(7).font('Helvetica');
-    doc.text('C.RATE', 140, currentY + 7);
-    doc.text('CR', 205, currentY + 7);
+    doc.text('BILL TYPE', margin + 10, currentY + 7, { width: col1, align: 'center' });
+    doc.text('CURRENT\nRATE(GHS)', margin + 10 + col1, currentY + 2, { width: col2, align: 'center' });
+    doc.text('AREARS\n(GHS)', margin + 10 + col1 + col2, currentY + 2, { width: col3, align: 'center' });
+    doc.text('REBATE\n(GHS)', margin + 10 + col1 + col2 + col3, currentY + 2, { width: col4, align: 'center' });
+    doc.text('TOTAL\n(GHS)', margin + 10 + col1 + col2 + col3 + col4, currentY + 7, { width: col5, align: 'center' });
 
     currentY += 20;
 
     // Bill Item Row
-    const item = billDetails.items[0];
-    doc.rect(50, currentY, 85, 25).stroke();
-    doc.rect(135, currentY, 65, 25).stroke();
-    doc.rect(200, currentY, 50, 25).stroke();
-    doc.rect(250, currentY, 65, 25).stroke();
-    doc.rect(315, currentY, 60, 25).stroke();
-    doc.rect(375, currentY, 170, 25).stroke();
+    const item = billDetails.items[0] || { description: 'Basic Rate Charge', current_rate: 0 };
+    doc.rect(margin + 10, currentY, col1, 60).stroke();
+    doc.rect(margin + 10 + col1, currentY, col2, 60).stroke();
+    doc.rect(margin + 10 + col1 + col2, currentY, col3, 60).stroke();
+    doc.rect(margin + 10 + col1 + col2 + col3, currentY, col4, 60).stroke();
+    doc.rect(margin + 10 + col1 + col2 + col3 + col4, currentY, col5, 60).stroke();
 
-    doc.fontSize(8).font('Helvetica');
-    doc.text(item.description, 53, currentY + 5, { width: 80 });
-    doc.text(item.current_rate, 140, currentY + 10);
-    doc.text(item.area || '0.00', 205, currentY + 10);
-    doc.text(parseFloat(bill.arrears || 0).toFixed(2), 255, currentY + 10);
-    doc.text(parseFloat(bill.rebate || 0).toFixed(2), 320, currentY + 10);
-    doc.text(parseFloat(bill.total_amount || 0).toFixed(2), 380, currentY + 10);
+    doc.fontSize(9).font('Helvetica');
+    doc.text(item.description, margin + 15, currentY + 20, { width: col1 - 10, align: 'center' });
+    doc.text(parseFloat(item.current_rate).toFixed(2), margin + 10 + col1, currentY + 20, { width: col2, align: 'center' });
+    doc.text(parseFloat(bill.arrears || 0).toFixed(2), margin + 10 + col1 + col2, currentY + 20, { width: col3, align: 'center' });
+    doc.text(parseFloat(bill.rebate || 0).toFixed(2), margin + 10 + col1 + col2 + col3, currentY + 20, { width: col4, align: 'center' });
+    doc.text(parseFloat(bill.total_amount || 0).toFixed(2), margin + 10 + col1 + col2 + col3 + col4, currentY + 20, { width: col5, align: 'center' });
+
+    // Sum row inside the current rate column?
+    doc.text(parseFloat(item.current_rate).toFixed(2), margin + 10 + col1, currentY + 45, { width: col2, align: 'center' });
+
+    currentY += 70;
+
+    // Amount Paid & Due
+    const labelX = margin + 180;
+    const valueX = margin + 260;
+    const rowWidth = 100;
+
+    doc.rect(valueX, currentY, rowWidth, 20).stroke();
+    doc.fontSize(10).font('Helvetica-Bold');
+    doc.text('Amount Paid : GHS', labelX, currentY + 5, { width: valueX - labelX - 5, align: 'right' });
+    doc.font('Helvetica').text(parseFloat(bill.amount_paid || 0).toFixed(2), valueX, currentY + 5, { width: rowWidth, align: 'center' });
+
+    currentY += 25;
+
+    doc.rect(valueX, currentY, rowWidth, 20).stroke();
+    doc.font('Helvetica-Bold');
+    doc.text('Amount Due : GHS', labelX, currentY + 5, { width: valueX - labelX - 5, align: 'right' });
+    doc.text(parseFloat(bill.amount_due || 0).toFixed(2), valueX, currentY + 5, { width: rowWidth, align: 'center' });
 
     currentY += 30;
 
-    // Amount Paid & Due
-    doc.rect(375, currentY, 100, 20).stroke();
-    doc.rect(475, currentY, 70, 20).stroke();
+    // Please Note Footer
+    doc.fontSize(7).font('Helvetica-Bold').text('PLEASE NOTE', margin + 10, currentY);
+    doc.fontSize(6).font('Helvetica');
+    const notes = [
+        'Do not make any payment without this bill.',
+        'It is an offence to deface the property number given by the G.N.M.A.',
+        'It is an offence to change ownership of the property without informing the G.N.M.A Authorities.',
+        'All dishonored cheque(s) shall attract a penalty of 100% of the face value of the cheque and defaulters will be liable for prosecution.',
+        'Legal action shall be taken against defaulters after Bill Payment Date specified on the bill elapsed. Defaulters shall pay 50% penalty of the amount owed the Assembly.',
+        'Payments should be made to the Ga North Municipal Assembly Authorized Revenue Collector(s) or at the Municipal Revenue Office.',
+        'Obtain General Counteroil receipt (GCR) for all payment to the Assembly at all time.'
+    ];
 
-    doc.fontSize(9).font('Helvetica-Bold');
-    doc.text('Amount Paid ▸', 380, currentY + 7);
-    doc.text(parseFloat(bill.amount_paid || 0).toFixed(2), 480, currentY + 7);
+    notes.forEach((note, i) => {
+        doc.text(`•  ${note}`, margin + 50, currentY + (i * 8), { width: pageWidth - margin - 60 });
+    });
 
-    currentY += 20;
+    currentY += 60;
 
-    doc.rect(375, currentY, 100, 20).stroke();
-    doc.rect(475, currentY, 70, 20).stroke();
+    // Payment Points
+    doc.fontSize(7).font('Helvetica-Bold').text('NB:-  Payments Points', margin + 10, currentY);
+    const points = [
+        '*Revenue Collection Point',
+        '*Municipal Assembly Collection Point (Walk-in Service)',
+        '*Direct Payment / Bank Transfer Zenit Bank #6011811493',
+        '*Office Line - 0302-908-086'
+    ];
 
-    doc.text('Amount Due ▸', 380, currentY + 7);
-    doc.fillColor('#FF0000');
-    doc.text(parseFloat(bill.amount_due || 0).toFixed(2), 480, currentY + 7);
-
-    // Footer
-    doc.fillColor('#000000')
-        .fontSize(7)
-        .font('Helvetica')
-        .text('Please write the customer number on all payment slips', 50, 700, { align: 'center' });
-
-    doc.text(`Generated by Municipal Revenue Management System - ${format(new Date(), 'dd/MM/yyyy HH:mm')}`,
-        50, 715, { align: 'center' });
+    points.forEach((point, i) => {
+        doc.text(point, margin + 40, currentY + 10 + (i * 8));
+    });
 
     return doc;
 };
@@ -289,8 +337,8 @@ export const generateBillPDF = async (billId: string): Promise<typeof PDFDocumen
  */
 export const generateBulkBillsPDF = async (billIds: string[]): Promise<typeof PDFDocument> => {
     const doc = new PDFDocument({
-        size: 'A4',
-        margins: { top: 30, bottom: 30, left: 40, right: 40 },
+        size: 'A5',
+        margins: { top: 20, bottom: 20, left: 25, right: 25 },
     });
 
     for (let i = 0; i < billIds.length; i++) {

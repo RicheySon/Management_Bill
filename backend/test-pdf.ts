@@ -10,8 +10,15 @@ async function testPDF() {
         }
         console.log(`Generating PDF for bill ${result.rows[0].id}`);
         const doc = await generateBillPDF(result.rows[0].id);
-        console.log('PDF Generation Successful!');
-        process.exit(0);
+        const fs = require('fs');
+        const writeStream = fs.createWriteStream('test-bill.pdf');
+        doc.pipe(writeStream);
+        doc.end();
+        console.log('PDF Generation Successful! Saved to test-bill.pdf');
+
+        writeStream.on('finish', () => {
+            process.exit(0);
+        });
     } catch (e) {
         console.error('PDF Generation Failed:', e);
         process.exit(1);
