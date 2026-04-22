@@ -8,6 +8,7 @@ import {
     createCustomer,
     fetchCustomers,
     fetchCustomer,
+    fetchBusinessCategories,
     fetchElectoralAreas,
     fetchActiveBusinessFeeItems,
     reverseGeocode,

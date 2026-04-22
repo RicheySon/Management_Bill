@@ -8,6 +8,8 @@ import {
     updateProperty,
     updateCustomer,
     fetchPropertyClassifications,
+    fetchElectoralAreas,
+    fetchLocalAreas,
     fetchActivePropertyRateZones,
     reverseGeocode,
 } from '@/lib/api-client';

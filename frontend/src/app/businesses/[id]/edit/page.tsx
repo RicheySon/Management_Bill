@@ -8,6 +8,8 @@ import {
     updateBusiness,
     updateCustomer,
     fetchBusinessCategories,
+    fetchElectoralAreas,
+    fetchLocalAreas,
     fetchActiveBusinessFeeItems,
     reverseGeocode,
 } from '@/lib/api-client';
