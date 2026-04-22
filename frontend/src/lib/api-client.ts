@@ -435,6 +435,20 @@ export const commitFeeScheduleImport = async (scheduleId: number, data: any) => 
 };
 
 // Active Fee Schedule Lookups (for forms)
+export const reverseGeocode = async (lat: number, lon: number) => {
+    try {
+        const response = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`, {
+            headers: {
+                'Accept-Language': 'en-US,en;q=0.9',
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Reverse geocoding failed:', error);
+        return null;
+    }
+};
+
 export const fetchActivePropertyRateZones = async (year?: number) => {
     const response = await apiClient.get('/fee-config/active/property-zones', { params: { year } });
     return response.data.data;

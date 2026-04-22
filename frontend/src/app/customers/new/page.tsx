@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { createCustomer, fetchElectoralAreas, fetchLocalAreas } from '@/lib/api-client';
+import { createCustomer, fetchElectoralAreas, fetchLocalAreas, reverseGeocode } from '@/lib/api-client';
 import { ArrowLeft, Save, Navigation, Map as MapIcon, X } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -56,16 +56,37 @@ export default function NewCustomerPage() {
             return;
         }
         navigator.geolocation.getCurrentPosition(
-            (position) => {
-                setValue('latitude', parseFloat(position.coords.latitude.toFixed(6)));
-                setValue('longitude', parseFloat(position.coords.longitude.toFixed(6)));
+            async (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                setValue('latitude', parseFloat(lat.toFixed(6)));
+                setValue('longitude', parseFloat(lng.toFixed(6)));
+                
+                // Attempt reverse geocoding
+                try {
+                    const geoData = await reverseGeocode(lat, lng);
+                    if (geoData && geoData.address) {
+                        const addr = geoData.address;
+                        const town = addr.city || addr.town || addr.village || addr.suburb || '';
+                        const street = addr.road || addr.street || '';
+                        const suburb = addr.neighbourhood || addr.suburb || '';
+                        
+                        // Populate physical location
+                        const physical = [street, suburb, town].filter(Boolean).join(', ');
+                        if (physical) setValue('physical_location', physical);
+                        if (suburb) setValue('landmark', suburb);
+                    }
+                } catch (err) {
+                    console.error('Auto-address failed:', err);
+                }
+
                 setIsDetecting(false);
             },
             (err) => {
                 alert(`Failed to get location: ${err.message}`);
                 setIsDetecting(false);
             },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
     };
 
@@ -279,9 +300,23 @@ export default function NewCustomerPage() {
                                 <div className="mb-4">
                                     <p className="text-xs text-blue-600 mb-2 font-medium">Click on the map to pin the exact location.</p>
                                     <MapSelector
-                                        onLocationSelectAction={(lat: number, lng: number) => {
+                                        onLocationSelectAction={async (lat: number, lng: number) => {
                                             setValue('latitude', parseFloat(lat.toFixed(6)));
                                             setValue('longitude', parseFloat(lng.toFixed(6)));
+                                            
+                                            // Attempt reverse geocoding
+                                            try {
+                                                const geoData = await reverseGeocode(lat, lng);
+                                                if (geoData && geoData.address) {
+                                                    const addr = geoData.address;
+                                                    const town = addr.city || addr.town || addr.village || addr.suburb || '';
+                                                    const street = addr.road || addr.street || '';
+                                                    const physical = [street, town].filter(Boolean).join(', ');
+                                                    if (physical) setValue('physical_location', physical);
+                                                }
+                                            } catch (err) {
+                                                console.error('Auto-address from map failed:', err);
+                                            }
                                         }}
                                         initialLat={watch('latitude')}
                                         initialLng={watch('longitude')}
