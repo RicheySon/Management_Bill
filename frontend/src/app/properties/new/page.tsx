@@ -14,7 +14,7 @@ import {
     fetchActivePropertyRateZones,
     reverseGeocode,
 } from '@/lib/api-client';
-import { ArrowLeft, Save, UserPlus, UserCheck, MapPin, Navigation, Map as MapIcon, X, Phone, Mail, User, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Save, UserPlus, UserCheck, MapPin, Navigation, Map as MapIcon, X, Phone, Mail, User, CheckCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 

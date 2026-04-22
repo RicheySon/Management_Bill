@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { createCustomer, fetchElectoralAreas, fetchLocalAreas, reverseGeocode } from '@/lib/api-client';
-import { ArrowLeft, Save, Navigation, Map as MapIcon, X } from 'lucide-react';
+import { ArrowLeft, Save, Navigation, Map as MapIcon, X, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 

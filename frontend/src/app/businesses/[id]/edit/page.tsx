@@ -13,7 +13,7 @@ import {
     fetchActiveBusinessFeeItems,
     reverseGeocode,
 } from '@/lib/api-client';
-import { ArrowLeft, Save, Navigation, Map as MapIcon, X } from 'lucide-react';
+import { ArrowLeft, Save, Navigation, Map as MapIcon, X, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
