@@ -183,8 +183,27 @@ export const fetchBills = async (params?: any) => {
     return response.data;
 };
 
+const mapFilters = (frontendFilters: any) => {
+    const mapped: any = {};
+    if (frontendFilters.billing_year) mapped.year = parseInt(frontendFilters.billing_year);
+    if (frontendFilters.electoral_area_id) mapped.electoral_area_id = parseInt(frontendFilters.electoral_area_id);
+    if (frontendFilters.status) mapped.payment_status = frontendFilters.status;
+    if (frontendFilters.property_classification_id) mapped.classification_id = parseInt(frontendFilters.property_classification_id);
+    if (frontendFilters.business_category_id) mapped.category_id = parseInt(frontendFilters.business_category_id);
+    
+    if (frontendFilters.bill_type === 'PROPERTY') {
+        mapped.bill_type = 'PROPERTY_RATE';
+    } else if (frontendFilters.bill_type === 'BOP') {
+        mapped.bill_type = 'BOP';
+    }
+    return mapped;
+};
+
 export const sendBulkSMS = async (data: any) => {
-    const response = await apiClient.post('/bills/bulk-sms', data);
+    const response = await apiClient.post('/bills/bulk-sms', {
+        ...data,
+        filters: mapFilters(data.filters)
+    });
     return response.data;
 };
 
@@ -283,8 +302,10 @@ export const printBillPDF = async (billId: string) => {
     }
 };
 
-export const downloadBulkBillsPDF = async (filters: any) => {
-    const response = await apiClient.post('/print/bills/bulk', filters, {
+export const downloadBulkBillsPDF = async (frontendFilters: any) => {
+    const response = await apiClient.post('/print/bills/bulk', { 
+        filters: mapFilters(frontendFilters) 
+    }, {
         responseType: 'blob',
     });
 
