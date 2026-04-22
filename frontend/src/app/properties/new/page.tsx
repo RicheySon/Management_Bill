@@ -80,6 +80,7 @@ export default function NewPropertyPage() {
     const [isNewRatePayer, setIsNewRatePayer] = useState(true);
     const [isDetecting, setIsDetecting] = useState(false);
     const [showMap, setShowMap] = useState(false);
+    const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
     const [selectedCustomerProfile, setSelectedCustomerProfile] = useState<any>(null);
     const [loadingProfile, setLoadingProfile] = useState(false);
 
@@ -118,8 +119,15 @@ export default function NewPropertyPage() {
             async (position) => {
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
+                const acc = position.coords.accuracy;
+                
                 setValue('latitude', parseFloat(lat.toFixed(6)));
                 setValue('longitude', parseFloat(lng.toFixed(6)));
+                setLocationAccuracy(acc);
+                
+                if (acc > 100) {
+                    console.warn(`Low GPS accuracy: ${acc} meters`);
+                }
                 
                 // Attempt reverse geocoding
                 try {
@@ -806,6 +814,7 @@ export default function NewPropertyPage() {
                                         onLocationSelectAction={async (lat: number, lng: number) => {
                                             setValue('latitude', parseFloat(lat.toFixed(6)));
                                             setValue('longitude', parseFloat(lng.toFixed(6)));
+                                            setLocationAccuracy(null); // Manual selection clears accuracy warning
                                             
                                             // Attempt reverse geocoding
                                             try {
@@ -815,8 +824,8 @@ export default function NewPropertyPage() {
                                                     const town = addr.city || addr.town || addr.village || addr.suburb || '';
                                                     const street = addr.road || addr.street || '';
                                                     
-                                                    if (town) setValue('town', town);
-                                                    if (street) setValue('street_name', street);
+                                                    const physical = [street, town].filter(Boolean).join(', ');
+                                                    if (physical) setValue('street_name', physical);
                                                 }
                                             } catch (err) {
                                                 console.error('Auto-address from map failed:', err);
@@ -824,7 +833,14 @@ export default function NewPropertyPage() {
                                         }}
                                         initialLat={watch('latitude')}
                                         initialLng={watch('longitude')}
+                                        accuracy={locationAccuracy || undefined}
                                     />
+                                    {locationAccuracy && locationAccuracy > 100 && (
+                                        <div className="mt-2 text-xs bg-yellow-50 text-yellow-700 p-2 rounded border border-yellow-200 flex items-center">
+                                            <AlertCircle className="w-3 h-3 mr-1" />
+                                            Low GPS precision ({Math.round(locationAccuracy)}m). Please adjust the pin on the map if needed.
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

@@ -45,10 +45,13 @@ const TILE_LAYERS: TileLayerOption[] = [
     },
 ];
 
+const SEARCH_API = 'https://nominatim.openstreetmap.org/search?format=json&q=';
+
 interface MapSelectorProps {
     onLocationSelectAction: (lat: number, lng: number) => void;
     initialLat?: number;
     initialLng?: number;
+    accuracy?: number;
 }
 
 function LocationMarker({ position, setPosition, onLocationSelectAction }: {
@@ -73,26 +76,75 @@ function LocationMarker({ position, setPosition, onLocationSelectAction }: {
 }
 
 // Helper to update map view when initial coordinates change
-function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
+function ChangeView({ center, zoom, accuracy }: { center: [number, number], zoom: number, accuracy?: number }) {
     const map = useMap();
     useEffect(() => {
         map.setView(center, zoom);
-    }, [center, zoom, map]);
+        if (accuracy && accuracy < 2000) {
+            // If accuracy is good, zoom in more
+            map.setZoom(17);
+        }
+    }, [center, zoom, accuracy, map]);
     return null;
 }
 
-export default function MapSelector({ onLocationSelectAction, initialLat, initialLng }: MapSelectorProps) {
+export default function MapSelector({ onLocationSelectAction, initialLat, initialLng, accuracy }: MapSelectorProps) {
     const defaultCenter: [number, number] = [5.6037, -0.1870]; // Accra
     const [position, setPosition] = useState<[number, number] | null>(
         initialLat && initialLng ? [initialLat, initialLng] : null
     );
     const [activeLayer, setActiveLayer] = useState(0);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isSearching, setIsSearching] = useState(false);
 
     const center = position || defaultCenter;
     const layer = TILE_LAYERS[activeLayer];
 
+    const handleSearch = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!searchQuery.trim()) return;
+
+        setIsSearching(true);
+        try {
+            const response = await fetch(`${SEARCH_API}${encodeURIComponent(searchQuery + ' Ga North Municipal Assembly, Ghana')}`);
+            const data = await response.json();
+            if (data && data.length > 0) {
+                const { lat, lon } = data[0];
+                const newPos: [number, number] = [parseFloat(lat), parseFloat(lon)];
+                setPosition(newPos);
+                onLocationSelectAction(newPos[0], newPos[1]);
+            } else {
+                alert('Place not found. Try adding more details.');
+            }
+        } catch (err) {
+            console.error('Search failed:', err);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
     return (
         <div className="h-[400px] w-full rounded-lg overflow-hidden border border-gray-300 relative z-0">
+            {/* Search Bar */}
+            <div className="absolute top-2 left-2 z-[1000] w-64">
+                <form onSubmit={handleSearch} className="flex shadow-md">
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search community or area..."
+                        className="flex-1 px-3 py-2 text-sm rounded-l border-r-0 border-gray-300 focus:ring-0 focus:border-municipal-teal"
+                    />
+                    <button
+                        type="submit"
+                        disabled={isSearching}
+                        className="bg-municipal-teal text-white px-3 py-2 rounded-r hover:bg-teal-700 disabled:opacity-50"
+                    >
+                        {isSearching ? '...' : 'Go'}
+                    </button>
+                </form>
+            </div>
+
             {/* Layer Switcher */}
             <div className="absolute top-2 right-2 z-[1000] flex gap-1 flex-wrap justify-end">
                 {TILE_LAYERS.map((tl, i) => (
@@ -128,9 +180,13 @@ export default function MapSelector({ onLocationSelectAction, initialLat, initia
                     setPosition={setPosition}
                     onLocationSelectAction={onLocationSelectAction}
                 />
-                {initialLat && initialLng && !position && (
-                    <ChangeView center={[initialLat, initialLng]} zoom={15} />
-                )}
+                {(initialLat && initialLng && !position) || (position) ? (
+                    <ChangeView 
+                        center={position || [initialLat!, initialLng!]} 
+                        zoom={position ? 18 : 15} 
+                        accuracy={accuracy}
+                    />
+                ) : null}
             </MapContainer>
         </div>
     );

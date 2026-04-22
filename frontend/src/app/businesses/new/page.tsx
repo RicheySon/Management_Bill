@@ -92,9 +92,11 @@ export default function NewBusinessPage() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const [businessNumber, setBusinessNumber] = useState<string | null>(null);
+    const [customerId, setCustomerId] = useState<string | null>(null);
     const [isNewOwner, setIsNewOwner] = useState(true);
     const [isDetecting, setIsDetecting] = useState(false);
     const [showMap, setShowMap] = useState(false);
+    const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
     const [selectedCustomerProfile, setSelectedCustomerProfile] = useState<any>(null);
     const [loadingProfile, setLoadingProfile] = useState(false);
 
@@ -133,8 +135,11 @@ export default function NewBusinessPage() {
             async (position) => {
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
+                const acc = position.coords.accuracy;
+                
                 setValue('latitude', parseFloat(lat.toFixed(6)));
                 setValue('longitude', parseFloat(lng.toFixed(6)));
+                setLocationAccuracy(acc);
                 
                 // Attempt reverse geocoding
                 try {
@@ -713,6 +718,7 @@ export default function NewBusinessPage() {
                                         onLocationSelectAction={async (lat: number, lng: number) => {
                                             setValue('latitude', parseFloat(lat.toFixed(6)));
                                             setValue('longitude', parseFloat(lng.toFixed(6)));
+                                            setLocationAccuracy(null);
                                             
                                             // Attempt reverse geocoding
                                             try {
@@ -731,7 +737,14 @@ export default function NewBusinessPage() {
                                         }}
                                         initialLat={watch('latitude')}
                                         initialLng={watch('longitude')}
+                                        accuracy={locationAccuracy || undefined}
                                     />
+                                    {locationAccuracy && locationAccuracy > 100 && (
+                                        <div className="mt-2 text-xs bg-yellow-50 text-yellow-700 p-2 rounded border border-yellow-200 flex items-center">
+                                            <AlertCircle className="w-3 h-3 mr-1" />
+                                            Low GPS precision ({Math.round(locationAccuracy)}m). Please adjust the pin on the map if needed.
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

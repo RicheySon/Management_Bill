@@ -13,7 +13,7 @@ import {
     fetchActivePropertyRateZones,
     reverseGeocode,
 } from '@/lib/api-client';
-import { ArrowLeft, Save, Navigation, Map as MapIcon, X } from 'lucide-react';
+import { ArrowLeft, Save, Navigation, Map as MapIcon, X, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
@@ -80,6 +80,7 @@ export default function EditPropertyPage() {
     const [selectedRateZoneId, setSelectedRateZoneId] = useState<string>('');
     const [isDetecting, setIsDetecting] = useState(false);
     const [showMap, setShowMap] = useState(false);
+    const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
 
     const selectedElectoralArea = watch('electoral_area_id');
 
@@ -95,8 +96,10 @@ export default function EditPropertyPage() {
             async (position) => {
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
+                const acc = position.coords.accuracy;
                 setValue('latitude', parseFloat(lat.toFixed(6)));
                 setValue('longitude', parseFloat(lng.toFixed(6)));
+                setLocationAccuracy(acc);
                 
                 // Attempt reverse geocoding
                 try {
@@ -564,6 +567,7 @@ export default function EditPropertyPage() {
                                         onLocationSelectAction={async (lat: number, lng: number) => {
                                             setValue('latitude', parseFloat(lat.toFixed(6)));
                                             setValue('longitude', parseFloat(lng.toFixed(6)));
+                                            setLocationAccuracy(null);
                                             
                                             // Attempt reverse geocoding
                                             try {
@@ -582,7 +586,14 @@ export default function EditPropertyPage() {
                                         }}
                                         initialLat={watch('latitude')}
                                         initialLng={watch('longitude')}
+                                        accuracy={locationAccuracy || undefined}
                                     />
+                                    {locationAccuracy && locationAccuracy > 100 && (
+                                        <div className="mt-2 text-xs bg-yellow-50 text-yellow-700 p-2 rounded border border-yellow-200 flex items-center">
+                                            <AlertCircle className="w-3 h-3 mr-1" />
+                                            Low GPS precision ({Math.round(locationAccuracy)}m). Please adjust the pin on the map.
+                                        </div>
+                                    )}
                                 </div>
                             )}
                             <div className="grid grid-cols-2 gap-4">
