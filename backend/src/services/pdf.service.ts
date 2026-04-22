@@ -310,17 +310,19 @@ export const generateBillPDF = async (billId: string): Promise<typeof PDFDocumen
         'Obtain General Counteroil receipt (GCR) for all payment to the Assembly at all time.'
     ];
 
-    notes.forEach((note, i) => {
-        doc.text(`•  ${note}`, margin + 50, currentY + (i * 8), { width: pageWidth - margin - 60 });
+    currentY += 5;
+    notes.forEach((note) => {
+        doc.text(`•  ${note}`, margin + 50, currentY, { width: pageWidth - margin - 60 });
+        currentY = doc.y + 2; // Move currentY to the next line with a small gap
     });
 
-    currentY += 60;
+    currentY += 5;
 
     // Payment Points
     doc.fontSize(7).font('Helvetica-Bold').text('NB:-  Payments Points', margin + 10, currentY);
     const points = [
         '*Revenue Collection Point',
-        '*Municipal Assembly Collection Point (Walk-in Service)',
+        '*Municipal Assembly Collection Point  (Walk-in Service)',
         '*Direct Payment / Bank Transfer Zenit Bank #6011811493',
         '*Office Line - 0302-908-086'
     ];
