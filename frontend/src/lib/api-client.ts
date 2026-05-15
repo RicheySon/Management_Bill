@@ -190,7 +190,7 @@ const mapFilters = (frontendFilters: any) => {
     if (frontendFilters.status) mapped.payment_status = frontendFilters.status;
     if (frontendFilters.property_classification_id) mapped.classification_id = parseInt(frontendFilters.property_classification_id);
     if (frontendFilters.business_category_id) mapped.category_id = parseInt(frontendFilters.business_category_id);
-    
+
     if (frontendFilters.bill_type === 'PROPERTY') {
         mapped.bill_type = 'PROPERTY_RATE';
     } else if (frontendFilters.bill_type === 'BOP') {
@@ -303,8 +303,8 @@ export const printBillPDF = async (billId: string) => {
 };
 
 export const downloadBulkBillsPDF = async (frontendFilters: any) => {
-    const response = await apiClient.post('/print/bills/bulk', { 
-        filters: mapFilters(frontendFilters) 
+    const response = await apiClient.post('/print/bills/bulk', {
+        filters: mapFilters(frontendFilters)
     }, {
         responseType: 'blob',
     });
@@ -457,4 +457,40 @@ export const fetchActivePropertyRateZones = async (year?: number) => {
 export const fetchActiveBusinessFeeItems = async (year?: number) => {
     const response = await apiClient.get('/fee-config/active/business-items', { params: { year } });
     return response.data.data;
+};
+
+// Data Management
+export const exportData = async (type: 'customers' | 'properties' | 'businesses') => {
+    try {
+        const response = await apiClient.get(`/data/export/${type}`, {
+            responseType: 'arraybuffer'
+        });
+        const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `${type}_export_${new Date().toISOString().split('T')[0]}.xlsx`);
+        document.body.appendChild(link);
+        link.click();
+        link.parentNode?.removeChild(link);
+        return true;
+    } catch (error) {
+        console.error(`Export ${type} error:`, error);
+        throw error;
+    }
+};
+
+export const importData = async (type: 'customers' | 'properties' | 'businesses', file: File) => {
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await apiClient.post(`/data/import/${type}`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        return response.data;
+    } catch (error: any) {
+        console.error(`Import ${type} error:`, error);
+        throw error.response?.data || error;
+    }
 };

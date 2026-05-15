@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
     Home, Users, Building2, FileText,
     DollarSign, BarChart3, Printer, LogOut, Loader2, Shield,
-    Briefcase, ClipboardList, Settings, Menu
+    Briefcase, ClipboardList, Settings, Menu, Database
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
@@ -170,6 +170,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
                         {hasPermission('view_audit_logs') &&
                             <NavLink href="/admin/audit" icon={<FileText className="w-5 h-5" />} label="Audit Logs" onClick={() => setIsSidebarOpen(false)} />
+                        }
+
+                        {hasPermission('manage_users') &&
+                            <NavLink href="/admin/data-management" icon={<Database className="w-5 h-5" />} label="Data Management" onClick={() => setIsSidebarOpen(false)} />
                         }
                     </ul>
                 </nav>

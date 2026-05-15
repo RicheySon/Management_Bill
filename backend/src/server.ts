@@ -17,6 +17,7 @@ import usersRoutes from './routes/users.routes';
 import auditRoutes from './routes/audit.routes';
 import authRoutes from './routes/auth.routes';
 import feeConfigRoutes from './routes/fee-config.routes';
+import dataRoutes from './routes/data.routes';
 
 // Load environment variables
 dotenv.config();
@@ -55,6 +56,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/fee-config', feeConfigRoutes);
+app.use('/api/data', dataRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
