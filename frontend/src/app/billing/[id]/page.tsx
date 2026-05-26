@@ -190,7 +190,7 @@ export default function BillDetailPage() {
                                     <div key={p.id} className="flex justify-between items-center p-3 border rounded-lg bg-white">
                                         <div>
                                             <p className="font-bold text-gray-900">{p.receipt_number}</p>
-                                            <p className="text-xs text-gray-500">{new Date(p.payment_date).toLocaleString()} • {p.payment_method}</p>
+                                            <p className="text-xs text-gray-500">GCR: {p.gcr_number || 'N/A'} • {new Date(p.payment_date).toLocaleString()} • {p.payment_method}</p>
                                         </div>
                                         <div className="text-right">
                                             <p className="font-bold text-green-600">GHS {parseFloat(p.amount).toFixed(2)}</p>
