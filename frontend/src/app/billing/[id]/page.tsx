@@ -21,6 +21,7 @@ export default function BillDetailPage() {
     const [error, setError] = useState<string | null>(null);
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('CASH');
+    const [gcrNumber, setGcrNumber] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
 
@@ -53,6 +54,7 @@ export default function BillDetailPage() {
             await recordPayment(id as string, {
                 amount: parseFloat(paymentAmount),
                 payment_method: paymentMethod,
+                gcr_number: gcrNumber,
                 customer_id: bill.customer_id,
             });
             setSuccess(true);
@@ -258,10 +260,25 @@ export default function BillDetailPage() {
                                 </select>
                             </div>
 
+                            <div>
+                                <label className="label">General Counterfoil Receipt (GCR) Number</label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder="Enter GCR number"
+                                        value={gcrNumber}
+                                        onChange={(e) => setGcrNumber(e.target.value)}
+                                        disabled={balance <= 0}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
                             <button
                                 type="submit"
                                 className="w-full btn-primary py-3 flex items-center justify-center space-x-2 disabled:bg-gray-300 disabled:shadow-none"
-                                disabled={isSubmitting || balance <= 0 || !paymentAmount}
+                                disabled={isSubmitting || balance <= 0 || !paymentAmount || !gcrNumber.trim()}
                             >
                                 {isSubmitting ? (
                                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>

@@ -335,6 +335,7 @@ router.post('/:id/payment', authenticateToken, authorize(['record_payment']), as
             customer_id: Joi.string().uuid().required(),
             amount: Joi.number().positive().required(),
             payment_method: Joi.string().required(),
+            gcr_number: Joi.string().required(),
             payment_reference: Joi.string().optional().allow(''),
         });
 
@@ -347,13 +348,14 @@ router.post('/:id/payment', authenticateToken, authorize(['record_payment']), as
             });
         }
 
-        const { customer_id, amount, payment_method, payment_reference } = value;
+        const { customer_id, amount, payment_method, gcr_number, payment_reference } = value;
 
         const payment = await recordPayment(
             id,
             customer_id,
             amount,
             payment_method,
+            gcr_number,
             payment_reference
         );
 

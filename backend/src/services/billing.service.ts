@@ -337,6 +337,7 @@ export const recordPayment = async (
     customerId: string,
     amount: number,
     paymentMethod: string,
+    gcrNumber: string,
     paymentReference?: string
 ): Promise<any> => {
     const client = await pool.connect();
@@ -381,11 +382,11 @@ export const recordPayment = async (
         // Insert payment
         const paymentResult = await client.query(
             `INSERT INTO payments (
-        receipt_number, bill_id, customer_id, amount,
+        receipt_number, gcr_number, bill_id, customer_id, amount,
         payment_method, payment_reference
-      ) VALUES ($1, $2, $3, $4, $5, $6)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *`,
-            [receiptNumber, billId, customerId, amount, paymentMethod, paymentReference || null]
+            [receiptNumber, gcrNumber, billId, customerId, amount, paymentMethod, paymentReference || null]
         );
 
         // Update bill

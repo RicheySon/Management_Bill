@@ -392,6 +392,7 @@ CREATE INDEX idx_bills_period ON bills(bill_period_year);
 CREATE TABLE payments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     receipt_number VARCHAR(30) NOT NULL UNIQUE,
+    gcr_number VARCHAR(50) NOT NULL,
     bill_id UUID NOT NULL REFERENCES bills(id),
     customer_id UUID NOT NULL REFERENCES customers(id),
     amount DECIMAL(10, 2) NOT NULL,

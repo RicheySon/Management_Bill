@@ -207,7 +207,7 @@ export const sendBulkSMS = async (data: any) => {
     return response.data;
 };
 
-export const recordPayment = async (billId: string, data: { amount: number; payment_method: string; customer_id: string; payment_reference?: string }) => {
+export const recordPayment = async (billId: string, data: { amount: number; payment_method: string; gcr_number: string; customer_id: string; payment_reference?: string }) => {
     const response = await apiClient.post(`/bills/${billId}/payment`, data);
     return response.data;
 };
