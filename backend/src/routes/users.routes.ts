@@ -51,7 +51,8 @@ router.post('/', authenticateToken, authorize(['manage_users']), async (req: Aut
         full_name: Joi.string().required(),
         email: Joi.string().email().required(),
         password: Joi.string().min(6).required(),
-        role_id: Joi.number().integer().required()
+        role_id: Joi.number().integer().required(),
+        electoral_areas: Joi.array().items(Joi.number().integer()).optional()
     });
 
     const { error, value } = schema.validate(req.body);
@@ -88,6 +89,16 @@ router.post('/', authenticateToken, authorize(['manage_users']), async (req: Aut
             `INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)`,
             [newUser.id, value.role_id]
         );
+
+        // Assign electoral areas if provided
+        if (value.electoral_areas && value.electoral_areas.length > 0) {
+            for (const areaId of value.electoral_areas) {
+                await client.query(
+                    `INSERT INTO user_electoral_areas (user_id, electoral_area_id) VALUES ($1, $2)`,
+                    [newUser.id, areaId]
+                );
+            }
+        }
 
         await logAction(
             req.user!.id,

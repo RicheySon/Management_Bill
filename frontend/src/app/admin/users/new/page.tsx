@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { createCustomer, createUser, fetchRoles } from '@/lib/api-client'; // Note: createCustomer imported by mistake? Fixing below.
+import { createUser, fetchRoles, fetchElectoralAreas } from '@/lib/api-client';
 import {
     ArrowLeft, Save, User, Mail, Lock, Shield,
     AlertCircle, CheckCircle2
@@ -20,22 +20,28 @@ export default function NewUserPage() {
         password: '',
         role_id: ''
     });
+    const [electoralAreas, setElectoralAreas] = useState<any[]>([]);
+    const [selectedAreas, setSelectedAreas] = useState<number[]>([]);
 
     useEffect(() => {
-        const loadRoles = async () => {
+        const loadInitialData = async () => {
             try {
-                const data = await fetchRoles();
-                setRoles(data);
+                const [rolesData, areasData] = await Promise.all([
+                    fetchRoles(),
+                    fetchElectoralAreas()
+                ]);
+                setRoles(rolesData);
+                setElectoralAreas(areasData);
                 // Set default role if available
-                if (data.length > 0) {
-                    setFormData(prev => ({ ...prev, role_id: data[0].id }));
+                if (rolesData.length > 0) {
+                    setFormData(prev => ({ ...prev, role_id: rolesData[0].id }));
                 }
             } catch (err) {
-                console.error('Failed to load roles:', err);
-                setError('Failed to load available roles');
+                console.error('Failed to load initial data:', err);
+                setError('Failed to load available roles or electoral areas');
             }
         };
-        loadRoles();
+        loadInitialData();
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -49,13 +55,28 @@ export default function NewUserPage() {
         setError(null);
 
         try {
-            await createUser(formData);
+            const payload = {
+                ...formData,
+                electoral_areas: selectedAreas
+            };
+            await createUser(payload);
             router.push('/admin/users');
         } catch (err: any) {
             setError(err.response?.data?.error || 'Failed to create user');
             setLoading(false);
         }
     };
+
+    const handleAreaToggle = (areaId: number) => {
+        setSelectedAreas(prev => 
+            prev.includes(areaId) 
+                ? prev.filter(id => id !== areaId)
+                : [...prev, areaId]
+        );
+    };
+
+    const selectedRole = roles.find(r => r.id === Number(formData.role_id));
+    const isRevenueCollector = selectedRole?.name === 'Revenue Collector';
 
     return (
         <div className="max-w-2xl mx-auto space-y-6">
@@ -157,6 +178,29 @@ export default function NewUserPage() {
                                     </select>
                                 </div>
                             </div>
+                            
+                            {isRevenueCollector && (
+                                <div className="mt-6 border-t pt-4">
+                                    <h4 className="text-sm font-semibold text-gray-800 mb-3">Assign Electoral Areas</h4>
+                                    <p className="text-xs text-gray-500 mb-4">Select one or more electoral areas for this revenue collector.</p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto p-2 border rounded-md bg-gray-50">
+                                        {electoralAreas.map((area) => (
+                                            <label key={area.id} className="flex items-center space-x-3 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedAreas.includes(area.id)}
+                                                    onChange={() => handleAreaToggle(area.id)}
+                                                    className="w-4 h-4 text-municipal-red border-gray-300 rounded focus:ring-municipal-red"
+                                                />
+                                                <span className="text-sm text-gray-700">{area.name} ({area.code})</span>
+                                            </label>
+                                        ))}
+                                        {electoralAreas.length === 0 && (
+                                            <p className="text-sm text-gray-500 italic col-span-2">No electoral areas available.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 

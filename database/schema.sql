@@ -110,6 +110,13 @@ CREATE TABLE user_roles (
     PRIMARY KEY (user_id, role_id)
 );
 
+-- User-Electoral Areas Join Table
+CREATE TABLE user_electoral_areas (
+    user_id UUID REFERENCES system_users(id) ON DELETE CASCADE,
+    electoral_area_id INTEGER REFERENCES electoral_areas(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, electoral_area_id)
+);
+
 -- Audit Logs Table
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
