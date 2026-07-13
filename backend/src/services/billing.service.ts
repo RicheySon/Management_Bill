@@ -12,6 +12,7 @@ interface BillCalculation {
     total_amount: number;
     amount_due: number;
     bill_details: any;
+    prior_bill_ids?: string[];
 }
 
 /**
@@ -95,17 +96,20 @@ export const calculatePropertyBill = async (
         rateDescription = `Legacy Rate: ${baseRate}`;
     }
 
-    // Check for arrears (previous unpaid bills)
+    // Check for arrears (previous unpaid bills not already rolled into another bill)
     const arrearsResult = await pool.query(
-        `SELECT COALESCE(SUM(amount_due), 0) as total_arrears
+        `SELECT COALESCE(SUM(amount_due), 0) as total_arrears,
+                COALESCE(array_agg(id) FILTER (WHERE id IS NOT NULL), '{}') as prior_bill_ids
      FROM bills
      WHERE property_id = $1
        AND bill_period_year < $2
-       AND payment_status != 'PAID'`,
+       AND payment_status != 'PAID'
+       AND rolled_into_bill_id IS NULL`,
         [propertyId, billYear]
     );
 
     const arrears = parseFloat(arrearsResult.rows[0].total_arrears);
+    const priorBillIds: string[] = arrearsResult.rows[0].prior_bill_ids || [];
     const rebate = 0;
     const total_amount = current_rate + arrears - rebate;
     const amount_due = total_amount;
@@ -132,6 +136,7 @@ export const calculatePropertyBill = async (
         total_amount,
         amount_due,
         bill_details,
+        prior_bill_ids: priorBillIds,
     };
 };
 
@@ -203,17 +208,20 @@ export const calculateBusinessBill = async (
         feeDescription = `Legacy: ${business.category_name}`;
     }
 
-    // Check for arrears
+    // Check for arrears (exclude bills already rolled into a newer bill)
     const arrearsResult = await pool.query(
-        `SELECT COALESCE(SUM(amount_due), 0) as total_arrears
+        `SELECT COALESCE(SUM(amount_due), 0) as total_arrears,
+                COALESCE(array_agg(id) FILTER (WHERE id IS NOT NULL), '{}') as prior_bill_ids
      FROM bills
      WHERE business_id = $1
        AND bill_period_year < $2
-       AND payment_status != 'PAID'`,
+       AND payment_status != 'PAID'
+       AND rolled_into_bill_id IS NULL`,
         [businessId, billYear]
     );
 
     const arrears = parseFloat(arrearsResult.rows[0].total_arrears);
+    const priorBillIds: string[] = arrearsResult.rows[0].prior_bill_ids || [];
     const rebate = 0;
     const total_amount = current_rate + arrears - rebate;
     const amount_due = total_amount;
@@ -240,6 +248,7 @@ export const calculateBusinessBill = async (
         total_amount,
         amount_due,
         bill_details,
+        prior_bill_ids: priorBillIds,
     };
 };
 
@@ -326,7 +335,19 @@ export const generateBill = async (
         ]
     );
 
-    return result.rows[0];
+    const newBill = result.rows[0];
+
+    // Mark prior unpaid bills as rolled into this bill (prevents double-counting arrears)
+    const priorIds = (calculation.prior_bill_ids || []).filter(Boolean);
+    if (priorIds.length > 0) {
+        await pool.query(
+            `UPDATE bills SET rolled_into_bill_id = $1, updated_at = NOW()
+             WHERE id = ANY($2::uuid[]) AND rolled_into_bill_id IS NULL`,
+            [newBill.id, priorIds]
+        );
+    }
+
+    return newBill;
 };
 
 /**

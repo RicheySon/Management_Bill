@@ -22,3 +22,16 @@ Thumbs.db
 
 # Claude
 .claude/
+
+# Local scratch / diagnostics
+tmp/
+backend/tmp-*
+backend/db-check.js
+backend/test-pdf.ts
+backend/seed-local-areas.js
+
+# Reference bill / fee assets (not deploy artifacts)
+*.xlsx
+*.docx
+Book1.xlsx
+screenshot/

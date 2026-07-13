@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import pool from '../config/database';
-import { authenticateToken, authorize, AuthRequest } from '../middlewares/auth.middleware';
+import { authenticateToken, authorize, AuthRequest, getCollectorAreaFilter } from '../middlewares/auth.middleware';
 import Joi from 'joi';
 
 const router = Router();
@@ -270,6 +270,11 @@ router.get('/', async (req: AuthRequest, res: Response) => {
             queryParams.push(electoral_area_id);
             paramIndex++;
         }
+
+        const areaFilter = getCollectorAreaFilter(req, 'b.electoral_area_id', paramIndex);
+        query += areaFilter.clause;
+        queryParams.push(...areaFilter.params);
+        paramIndex = areaFilter.nextIndex;
 
         if (customer_id) {
             query += ` AND b.customer_id = $${paramIndex}`;

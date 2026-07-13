@@ -1,6 +1,6 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import pool from '../config/database';
-import { authenticateToken, authorize, AuthRequest } from '../middlewares/auth.middleware';
+import { authenticateToken, authorize, AuthRequest, getCollectorAreaFilter } from '../middlewares/auth.middleware';
 import Joi from 'joi';
 
 const router = Router();
@@ -222,6 +222,11 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
             queryParams.push(local_area_id);
             paramIndex++;
         }
+
+        const areaFilter = getCollectorAreaFilter(req, 'c.electoral_area_id', paramIndex);
+        query += areaFilter.clause;
+        queryParams.push(...areaFilter.params);
+        paramIndex = areaFilter.nextIndex;
 
         query += ` GROUP BY c.id, ea.name, la.name ORDER BY c.full_name`;
 

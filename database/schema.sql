@@ -128,8 +128,15 @@ CREATE TABLE audit_logs (
     new_values JSONB,
     ip_address VARCHAR(45),
     user_agent TEXT,
+    mac_address VARCHAR(64), -- browsers cannot supply MAC; typically 'unavailable'
+    device_fingerprint VARCHAR(128),
+    session_id UUID,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX idx_audit_logs_action ON audit_logs(action);
+CREATE INDEX idx_audit_logs_created ON audit_logs(created_at DESC);
+CREATE INDEX idx_audit_logs_user ON audit_logs(user_id);
 
 -- Insert Default Roles
 INSERT INTO roles (name, description) VALUES
@@ -161,7 +168,8 @@ INSERT INTO permissions (code, description) VALUES
 ('record_payment', 'Recieve and record payments'),
 ('void_payment', 'Void payment receipts'),
 ('view_reports', 'Access financial and revenue reports'),
-('view_logs', 'View system audit logs');
+('view_logs', 'View system audit logs'),
+('approve_amount_changes', 'Approve or reject pending amount changes on bills and fee rates');
 
 -- Map Permissions to Super Admin (All)
 INSERT INTO role_permissions (role_id, permission_id)
@@ -296,6 +304,7 @@ CREATE TABLE properties (
     local_area_id INTEGER REFERENCES local_areas(id),
     population_density VARCHAR(50),
     property_size DECIMAL(10, 2), -- in square meters
+    property_rate_zone_id INTEGER, -- FK added after property_rate_zones exists
     year_registered INTEGER NOT NULL,
     status VARCHAR(20) DEFAULT 'ACTIVE', -- ACTIVE, INACTIVE, DEMOLISHED
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -306,6 +315,7 @@ CREATE INDEX idx_properties_number ON properties(property_number);
 CREATE INDEX idx_properties_customer ON properties(customer_id);
 CREATE INDEX idx_properties_classification ON properties(classification_id);
 CREATE INDEX idx_properties_electoral_area ON properties(electoral_area_id);
+CREATE INDEX idx_properties_rate_zone ON properties(property_rate_zone_id);
 
 -- Businesses / Business Operating Permits (BOP)
 CREATE TABLE businesses (
@@ -334,6 +344,7 @@ CREATE TABLE businesses (
     landmark TEXT,
     electoral_area_id INTEGER REFERENCES electoral_areas(id),
     local_area_id INTEGER REFERENCES local_areas(id),
+    fee_item_id INTEGER, -- FK added after business_fee_items exists
     year_registered INTEGER NOT NULL,
     status VARCHAR(20) DEFAULT 'ACTIVE', -- ACTIVE, INACTIVE, CLOSED
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -341,6 +352,7 @@ CREATE TABLE businesses (
 );
 
 CREATE INDEX idx_businesses_number ON businesses(business_number);
+CREATE INDEX idx_businesses_fee_item ON businesses(fee_item_id);
 CREATE INDEX idx_businesses_customer ON businesses(customer_id);
 CREATE INDEX idx_businesses_category ON businesses(category_id);
 CREATE INDEX idx_businesses_property ON businesses(property_id);
@@ -371,6 +383,9 @@ CREATE TABLE bills (
     
     -- Bill details (for printing)
     bill_details JSONB, -- Store itemized charges
+
+    -- When arrears are rolled into a newer bill, prior bills point here
+    rolled_into_bill_id UUID REFERENCES bills(id) ON DELETE SET NULL,
     
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -382,6 +397,7 @@ CREATE TABLE bills (
 );
 
 CREATE INDEX idx_bills_number ON bills(bill_number);
+CREATE INDEX idx_bills_rolled_into ON bills(rolled_into_bill_id);
 CREATE INDEX idx_bills_customer ON bills(customer_id);
 CREATE INDEX idx_bills_property ON bills(property_id);
 CREATE INDEX idx_bills_business ON bills(business_id);
@@ -620,6 +636,41 @@ FOR EACH ROW EXECUTE FUNCTION trg_update_timestamp();
 
 CREATE TRIGGER update_business_fee_items_timestamp
 BEFORE UPDATE ON business_fee_items
+FOR EACH ROW EXECUTE FUNCTION trg_update_timestamp();
+
+-- Link properties/businesses to fee config (columns declared earlier without FK)
+ALTER TABLE properties
+    ADD CONSTRAINT fk_properties_rate_zone
+    FOREIGN KEY (property_rate_zone_id) REFERENCES property_rate_zones(id) ON DELETE SET NULL;
+
+ALTER TABLE businesses
+    ADD CONSTRAINT fk_businesses_fee_item
+    FOREIGN KEY (fee_item_id) REFERENCES business_fee_items(id) ON DELETE SET NULL;
+
+-- Amount change requests (bills + fee rates require Super Admin approval)
+CREATE TABLE amount_change_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    entity_type VARCHAR(50) NOT NULL CHECK (entity_type IN ('BILL', 'PROPERTY_RATE_ZONE', 'BUSINESS_FEE_ITEM')),
+    entity_id VARCHAR(50) NOT NULL,
+    field_changes JSONB,
+    old_values JSONB NOT NULL,
+    new_values JSONB NOT NULL,
+    reason TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
+    requested_by UUID NOT NULL REFERENCES system_users(id),
+    reviewed_by UUID REFERENCES system_users(id),
+    reviewed_at TIMESTAMP,
+    review_note TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_acr_status ON amount_change_requests(status);
+CREATE INDEX idx_acr_entity ON amount_change_requests(entity_type, entity_id);
+CREATE INDEX idx_acr_requested_by ON amount_change_requests(requested_by);
+
+CREATE TRIGGER update_amount_change_requests_timestamp
+BEFORE UPDATE ON amount_change_requests
 FOR EACH ROW EXECUTE FUNCTION trg_update_timestamp();
 
 -- =====================================================

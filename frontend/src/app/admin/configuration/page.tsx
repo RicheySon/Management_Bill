@@ -161,6 +161,9 @@ export default function FeeConfigurationPage() {
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">Fee Configuration</h1>
                             <p className="text-sm text-gray-500">Configure fee schedules for property rates and business licenses</p>
+                            <p className="text-xs text-amber-700 mt-1">
+                                Rate / fee amount edits are submitted for Super Admin approval before they take effect.
+                            </p>
                         </div>
                     </div>
                 </div>

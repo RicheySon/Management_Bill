@@ -2,25 +2,26 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../config/database';
+import { JWT_SECRET, loadUserElectoralAreas } from '../middlewares/auth.middleware';
+import { getAuditContext, logAction } from '../services/audit.service';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'ganorth-municipal-secret-key-2026';
 
 // Login Endpoint
 router.post('/login', async (req, res) => {
-    const { email, password } = req.body;
+    const { email, password, mac_address, device_fingerprint } = req.body;
+    const auditCtx = getAuditContext(req, { mac_address, device_fingerprint });
 
     if (!email || !password) {
         return res.status(400).json({ success: false, error: 'Email and password are required' });
     }
 
     try {
-        // Fetch user with roles and permissions
         const userQuery = `
             SELECT 
                 u.id, u.full_name, u.email, u.password_hash, u.status,
-                array_agg(DISTINCT r.name) as roles,
-                array_agg(DISTINCT p.code) as permissions
+                array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) as roles,
+                array_agg(DISTINCT p.code) FILTER (WHERE p.code IS NOT NULL) as permissions
             FROM system_users u
             LEFT JOIN user_roles ur ON u.id = ur.user_id
             LEFT JOIN roles r ON ur.role_id = r.id
@@ -34,28 +35,43 @@ router.post('/login', async (req, res) => {
         const user = result.rows[0];
 
         if (!user || user.status !== 'ACTIVE') {
+            await logAction(null, 'USER_LOGIN_FAILED', 'system_users', email, null, { email, reason: 'invalid_or_inactive' }, auditCtx);
             return res.status(401).json({ success: false, error: 'Invalid credentials or account inactive' });
         }
 
-        // Verify password
         const isValid = await bcrypt.compare(password, user.password_hash);
         if (!isValid) {
+            await logAction(user.id, 'USER_LOGIN_FAILED', 'system_users', user.id, null, { email, reason: 'bad_password' }, auditCtx);
             return res.status(401).json({ success: false, error: 'Invalid credentials' });
         }
 
-        // Generate JWT
+        const electoralAreaIds = await loadUserElectoralAreas(user.id);
+        const roles = (user.roles || []).filter(Boolean);
+        const permissions = (user.permissions || []).filter(Boolean);
+
         const token = jwt.sign(
             {
                 id: user.id,
                 email: user.email,
-                permissions: user.permissions
+                permissions,
+                roles,
+                electoral_area_ids: electoralAreaIds,
             },
             JWT_SECRET,
             { expiresIn: '8h' }
         );
 
-        // Update last login
         await pool.query('UPDATE system_users SET last_login = NOW() WHERE id = $1', [user.id]);
+
+        await logAction(
+            user.id,
+            'USER_LOGIN',
+            'system_users',
+            user.id,
+            null,
+            { email: user.email, roles },
+            auditCtx
+        );
 
         res.json({
             success: true,
@@ -64,11 +80,11 @@ router.post('/login', async (req, res) => {
                 id: user.id,
                 full_name: user.full_name,
                 email: user.email,
-                roles: user.roles,
-                permissions: user.permissions
-            }
+                roles,
+                permissions,
+                electoral_area_ids: electoralAreaIds,
+            },
         });
-
     } catch (err) {
         console.error('Login error:', err);
         res.status(500).json({ success: false, error: 'Server error during login' });
@@ -87,7 +103,6 @@ router.get('/validate', async (req, res) => {
     try {
         const decoded = jwt.verify(token, JWT_SECRET) as any;
 
-        // Check if user still exists and is active
         const result = await pool.query(
             'SELECT id, status FROM system_users WHERE id = $1',
             [decoded.id]
@@ -101,6 +116,26 @@ router.get('/validate', async (req, res) => {
     } catch (err) {
         res.status(401).json({ success: false, error: 'Invalid or expired token' });
     }
+});
+
+// Logout (client-initiated audit trail)
+router.post('/logout', async (req, res) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    const auditCtx = getAuditContext(req);
+
+    let userId: string | null = null;
+    if (token) {
+        try {
+            const decoded = jwt.verify(token, JWT_SECRET) as any;
+            userId = decoded.id;
+        } catch {
+            // ignore expired token on logout
+        }
+    }
+
+    await logAction(userId, 'USER_LOGOUT', 'system_users', userId || undefined, null, null, auditCtx);
+    res.json({ success: true, message: 'Logged out' });
 });
 
 export default router;

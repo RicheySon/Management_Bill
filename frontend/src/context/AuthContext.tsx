@@ -10,6 +10,7 @@ interface User {
     email: string;
     roles: string[];
     permissions: string[];
+    electoral_area_ids?: number[];
 }
 
 interface AuthContextType {
@@ -25,6 +26,21 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
+const getDeviceFingerprint = () => {
+    if (typeof window === 'undefined') return undefined;
+    try {
+        const key = 'device_fingerprint';
+        let fp = localStorage.getItem(key);
+        if (!fp) {
+            fp = `web-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
+            localStorage.setItem(key, fp);
+        }
+        return fp;
+    } catch {
+        return undefined;
+    }
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [token, setToken] = useState<string | null>(null);
@@ -39,17 +55,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             if (storedToken && storedUser) {
                 try {
-                    // Validate token with timeout
                     await axios.get(`${API_BASE_URL}/auth/validate`, {
                         headers: { Authorization: `Bearer ${storedToken}` },
-                        timeout: 5000 // 5 second timeout
+                        timeout: 5000,
                     });
                     setToken(storedToken);
                     setUser(JSON.parse(storedUser));
+                    document.cookie = `auth_token=${storedToken}; path=/; SameSite=Lax`;
                 } catch (error) {
-                    // Token is invalid or server unreachable, clear storage
                     localStorage.removeItem('auth_token');
                     localStorage.removeItem('auth_user');
+                    document.cookie = 'auth_token=; path=/; max-age=0';
                 }
             }
             setIsLoading(false);
@@ -59,34 +75,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const login = async (email: string, password: string) => {
-        try {
-            const response = await axios.post(`${API_BASE_URL}/auth/login`, { email, password });
-            const { token, user } = response.data;
+        const response = await axios.post(`${API_BASE_URL}/auth/login`, {
+            email,
+            password,
+            mac_address: 'unavailable',
+            device_fingerprint: getDeviceFingerprint(),
+        });
+        const { token: newToken, user: newUser } = response.data;
 
-            setToken(token);
-            setUser(user);
-            localStorage.setItem('auth_token', token);
-            localStorage.setItem('auth_user', JSON.stringify(user));
+        setToken(newToken);
+        setUser(newUser);
+        localStorage.setItem('auth_token', newToken);
+        localStorage.setItem('auth_user', JSON.stringify(newUser));
+        document.cookie = `auth_token=${newToken}; path=/; SameSite=Lax`;
 
-            router.push('/');
-        } catch (error) {
-            throw error;
-        }
+        router.push('/');
     };
 
-    const logout = () => {
+    const logout = async () => {
+        try {
+            if (token) {
+                await axios.post(
+                    `${API_BASE_URL}/auth/logout`,
+                    { mac_address: 'unavailable', device_fingerprint: getDeviceFingerprint() },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+            }
+        } catch {
+            // ignore logout audit failures
+        }
         setToken(null);
         setUser(null);
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_user');
+        document.cookie = 'auth_token=; path=/; max-age=0';
         router.push('/login');
     };
 
     const hasPermission = (permission: string) => {
-        return user?.permissions.includes(permission) || false;
+        return user?.permissions?.includes(permission) || false;
     };
 
-    // Protect routes
     useEffect(() => {
         if (!isLoading && !token && pathname !== '/login') {
             router.push('/login');

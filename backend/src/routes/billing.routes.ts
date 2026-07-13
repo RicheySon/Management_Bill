@@ -1,8 +1,10 @@
 import { Router, Response } from 'express';
 import Joi from 'joi';
 import { generateBill, recordPayment } from '../services/billing.service';
-import { authenticateToken, authorize, AuthRequest } from '../middlewares/auth.middleware';
+import { authenticateToken, authorize, AuthRequest, getCollectorAreaFilter } from '../middlewares/auth.middleware';
 import pool from '../config/database';
+import { createAmountChangeRequest } from '../services/amount-change.service';
+import { getAuditContext, logAction } from '../services/audit.service';
 
 const router = Router();
 
@@ -35,6 +37,16 @@ router.post('/generate', authenticateToken, authorize(['generate_bill']), async 
 
         const bill = await generateBill(bill_type, target_id, customer_id, bill_year);
 
+        await logAction(
+            req.user!.id,
+            'BILL_GENERATED',
+            'bills',
+            bill.id,
+            null,
+            { bill_number: bill.bill_number, bill_type, total_amount: bill.total_amount },
+            getAuditContext(req)
+        );
+
         res.status(201).json({
             success: true,
             data: bill,
@@ -46,6 +58,56 @@ router.post('/generate', authenticateToken, authorize(['generate_bill']), async 
             success: false,
             error: error.message || 'Failed to generate bill',
         });
+    }
+});
+
+/**
+ * PUT /api/bills/:id/amounts
+ * Request amount change — never applies directly (Super Admin approval required).
+ */
+router.put('/:id/amounts', async (req: AuthRequest, res: Response) => {
+    try {
+        const perms = req.user?.permissions || [];
+        const can =
+            perms.includes('generate_bill') ||
+            perms.includes('delete_bill') ||
+            perms.includes('configure_rates') ||
+            perms.includes('approve_amount_changes');
+        if (!can) {
+            return res.status(403).json({ success: false, error: 'Permission denied' });
+        }
+
+        const schema = Joi.object({
+            current_rate: Joi.number().min(0).optional(),
+            arrears: Joi.number().min(0).optional(),
+            rebate: Joi.number().min(0).optional(),
+            total_amount: Joi.number().min(0).optional(),
+            reason: Joi.string().allow('', null).optional(),
+        }).or('current_rate', 'arrears', 'rebate', 'total_amount');
+
+        const { error, value } = schema.validate(req.body);
+        if (error) {
+            return res.status(400).json({ success: false, error: error.details[0].message });
+        }
+
+        const { reason, ...proposed } = value;
+        const request = await createAmountChangeRequest({
+            entityType: 'BILL',
+            entityId: req.params.id,
+            proposedValues: proposed,
+            reason,
+            requestedBy: req.user!.id,
+            auditCtx: getAuditContext(req),
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'Amount change submitted for Super Admin approval',
+            data: request,
+        });
+    } catch (error: any) {
+        console.error('Error requesting bill amount change:', error);
+        res.status(400).json({ success: false, error: error.message || 'Failed to request amount change' });
     }
 });
 
@@ -256,6 +318,15 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
             paramIndex++;
         }
 
+        const areaFilter = getCollectorAreaFilter(
+            req,
+            'COALESCE(p.electoral_area_id, bus.electoral_area_id, c.electoral_area_id)',
+            paramIndex
+        );
+        query += areaFilter.clause;
+        queryParams.push(...areaFilter.params);
+        paramIndex = areaFilter.nextIndex;
+
         if (search) {
             query += ` AND (b.bill_number ILIKE $${paramIndex} OR c.full_name ILIKE $${paramIndex})`;
             queryParams.push(`%${search}%`);
@@ -357,6 +428,21 @@ router.post('/:id/payment', authenticateToken, authorize(['record_payment']), as
             payment_method,
             gcr_number,
             payment_reference
+        );
+
+        await logAction(
+            req.user!.id,
+            'PAYMENT_RECORDED',
+            'payments',
+            payment.id,
+            null,
+            {
+                bill_id: id,
+                amount,
+                gcr_number,
+                receipt_number: payment.receipt_number,
+            },
+            getAuditContext(req)
         );
 
         res.status(201).json({

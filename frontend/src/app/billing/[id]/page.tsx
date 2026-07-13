@@ -2,18 +2,20 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { fetchBill, recordPayment, downloadBillPDF, printBillPDF } from '@/lib/api-client';
+import { fetchBill, recordPayment, downloadBillPDF, printBillPDF, requestBillAmountChange } from '@/lib/api-client';
+import { useAuth } from '@/context/AuthContext';
 import {
     ArrowLeft, Printer, CreditCard,
     User, Building2, Briefcase, Calendar,
     Wallet, CheckCircle2, AlertCircle, History,
-    FileDown
+    FileDown, Pencil
 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function BillDetailPage() {
     const { id } = useParams();
     const router = useRouter();
+    const { hasPermission } = useAuth();
     // bill holds the full bill row; payments holds the payment history
     const [bill, setBill] = useState<any>(null);
     const [payments, setPayments] = useState<any[]>([]);
@@ -24,6 +26,8 @@ export default function BillDetailPage() {
     const [gcrNumber, setGcrNumber] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [amountForm, setAmountForm] = useState({ current_rate: '', arrears: '', rebate: '', reason: '' });
+    const [amountMsg, setAmountMsg] = useState<string | null>(null);
 
     const loadBill = async () => {
         try {
@@ -35,6 +39,12 @@ export default function BillDetailPage() {
             setPayments(paymentRows);
             const outstanding = parseFloat(billRow.total_amount) - parseFloat(billRow.amount_paid);
             setPaymentAmount(Math.max(0, outstanding).toFixed(2));
+            setAmountForm({
+                current_rate: String(billRow.current_rate ?? ''),
+                arrears: String(billRow.arrears ?? ''),
+                rebate: String(billRow.rebate ?? ''),
+                reason: '',
+            });
         } catch (err: any) {
             setError(err.response?.data?.error || 'Failed to load bill details');
         } finally {
@@ -64,6 +74,29 @@ export default function BillDetailPage() {
             setError(err.response?.data?.error || 'Failed to record payment');
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const canRequestAmountChange =
+        hasPermission('generate_bill') ||
+        hasPermission('delete_bill') ||
+        hasPermission('configure_rates') ||
+        hasPermission('approve_amount_changes');
+
+    const handleAmountChangeRequest = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setAmountMsg(null);
+        setError(null);
+        try {
+            const res = await requestBillAmountChange(id as string, {
+                current_rate: parseFloat(amountForm.current_rate),
+                arrears: parseFloat(amountForm.arrears),
+                rebate: parseFloat(amountForm.rebate),
+                reason: amountForm.reason,
+            });
+            setAmountMsg(res.message || 'Submitted for Super Admin approval');
+        } catch (err: any) {
+            setError(err.response?.data?.error || 'Failed to submit amount change');
         }
     };
 
@@ -202,6 +235,73 @@ export default function BillDetailPage() {
                             <p className="text-gray-500 italic text-center py-4">No payments recorded yet.</p>
                         )}
                     </div>
+
+                    {canRequestAmountChange && (
+                        <div className="card">
+                            <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
+                                <Pencil className="w-5 h-5 text-municipal-red" />
+                                Request Amount Change
+                            </h3>
+                            <p className="text-sm text-gray-500 mb-4">
+                                Changes go to Super Admin for approval before they take effect.
+                            </p>
+                            {amountMsg && (
+                                <div className="bg-amber-50 text-amber-800 p-3 rounded-lg text-sm mb-4 border border-amber-200">
+                                    {amountMsg}
+                                </div>
+                            )}
+                            <form onSubmit={handleAmountChangeRequest} className="grid md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Current Rate</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        className="input-field mt-1"
+                                        value={amountForm.current_rate}
+                                        onChange={(e) => setAmountForm({ ...amountForm, current_rate: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Arrears</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        className="input-field mt-1"
+                                        value={amountForm.arrears}
+                                        onChange={(e) => setAmountForm({ ...amountForm, arrears: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Rebate</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        className="input-field mt-1"
+                                        value={amountForm.rebate}
+                                        onChange={(e) => setAmountForm({ ...amountForm, rebate: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Reason</label>
+                                    <input
+                                        type="text"
+                                        className="input-field mt-1"
+                                        value={amountForm.reason}
+                                        onChange={(e) => setAmountForm({ ...amountForm, reason: e.target.value })}
+                                        placeholder="Why is this change needed?"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <button type="submit" className="btn-secondary">
+                                        Submit for Approval
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
                 </div>
 
                 {/* Payment Form */}

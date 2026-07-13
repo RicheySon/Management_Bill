@@ -3,7 +3,7 @@ import pool from '../config/database';
 import bcrypt from 'bcryptjs';
 import Joi from 'joi';
 import { authenticateToken, authorize, AuthRequest } from '../middlewares/auth.middleware';
-import { logAction } from '../services/audit.service';
+import { getAuditContext, logAction } from '../services/audit.service';
 
 const router = Router();
 
@@ -105,7 +105,9 @@ router.post('/', authenticateToken, authorize(['manage_users']), async (req: Aut
             'USER_CREATED',
             'system_users',
             newUser.id,
-            `Created user ${newUser.email}`
+            null,
+            { email: newUser.email, full_name: newUser.full_name, role_id: value.role_id },
+            getAuditContext(req)
         );
 
         await client.query('COMMIT');
@@ -138,10 +140,12 @@ router.patch('/:id/status', authenticateToken, authorize(['manage_users']), asyn
 
         await logAction(
             req.user!.id,
-            'USER_UPDATED',
+            'USER_STATUS_CHANGED',
             'system_users',
             id,
-            `Updated user status to ${status}`
+            { status: 'previous' },
+            { status },
+            getAuditContext(req)
         );
 
         res.json({ success: true, message: 'User status updated successfully' });

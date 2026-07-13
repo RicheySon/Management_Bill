@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { fetchRevenueReport, fetchDefaulters, fetchElectoralAreas } from '@/lib/api-client';
 import { BarChart3, TrendingUp, Users, AlertTriangle, Download, Filter, Calendar } from 'lucide-react';
 import {
@@ -25,13 +25,13 @@ export default function ReportsPage() {
         setLoading(true);
         try {
             const [rev, def, areaList] = await Promise.all([
-                fetchRevenueReport(filters),
-                fetchDefaulters(filters),
+                fetchRevenueReport({ year: filters.year, period: 'month' }),
+                fetchDefaulters(filters.electoral_area_id ? { electoral_area_id: filters.electoral_area_id } : {}),
                 fetchElectoralAreas()
             ]);
-            setRevenueData(rev);
-            setDefaulters(def);
-            setAreas(areaList);
+            setRevenueData(rev || []);
+            setDefaulters(def || []);
+            setAreas(areaList || []);
         } catch (err) {
             console.error('Failed to load report data');
         } finally {
@@ -43,8 +43,50 @@ export default function ReportsPage() {
         loadData();
     }, [filters.year, filters.electoral_area_id]);
 
-    const totalRevenue = revenueData.reduce((sum, item) => sum + parseFloat(item.total_collected), 0);
-    const totalOutstanding = revenueData.reduce((sum, item) => sum + parseFloat(item.total_outstanding), 0);
+    const totalRevenue = revenueData.reduce((sum, item) => sum + parseFloat(item.total_collected || 0), 0);
+    const totalBilled = revenueData.reduce((sum, item) => sum + parseFloat(item.total_billed || 0), 0);
+    const totalOutstanding = revenueData.reduce((sum, item) => sum + parseFloat(item.total_outstanding || 0), 0);
+    const collectionRate = totalBilled > 0 ? Math.round((totalRevenue / totalBilled) * 100) : 0;
+
+    const yearOptions = useMemo(() => {
+        const current = new Date().getFullYear();
+        return [current - 2, current - 1, current, current + 1];
+    }, []);
+
+    const exportCsv = () => {
+        const rows =
+            activeTab === 'revenue'
+                ? [
+                      ['Period', 'Bill Type', 'Bill Count', 'Total Billed', 'Collected', 'Outstanding'],
+                      ...revenueData.map((r) => [
+                          r.period ? new Date(r.period).toLocaleDateString() : '',
+                          r.bill_type || '',
+                          r.bill_count || 0,
+                          r.total_billed || 0,
+                          r.total_collected || 0,
+                          r.total_outstanding || 0,
+                      ]),
+                  ]
+                : [
+                      ['Customer', 'Phone', 'Electoral Area', 'Unpaid Bills', 'Outstanding'],
+                      ...defaulters.map((d) => [
+                          d.full_name || '',
+                          d.phone_number || '',
+                          d.electoral_area || '',
+                          d.unpaid_bill_count || 0,
+                          d.total_outstanding || 0,
+                      ]),
+                  ];
+
+        const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = activeTab === 'revenue' ? `revenue-${filters.year}.csv` : `defaulters-${filters.year}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+    };
 
     return (
         <div className="space-y-6">
@@ -54,14 +96,13 @@ export default function ReportsPage() {
                     <p className="text-gray-600 mt-1">Financial performance and collection insights</p>
                 </div>
                 <div className="flex space-x-3">
-                    <button className="btn-secondary flex items-center space-x-2">
+                    <button onClick={exportCsv} className="btn-secondary flex items-center space-x-2">
                         <Download className="w-4 h-4" />
                         <span>Export CSV</span>
                     </button>
                 </div>
             </div>
 
-            {/* Filter Bar */}
             <div className="card flex flex-wrap items-center gap-4 py-4">
                 <div className="flex items-center space-x-2">
                     <Calendar className="w-4 h-4 text-gray-400" />
@@ -70,7 +111,11 @@ export default function ReportsPage() {
                         value={filters.year}
                         onChange={(e) => setFilters({ ...filters, year: parseInt(e.target.value) })}
                     >
-                        {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+                        {yearOptions.map((y) => (
+                            <option key={y} value={y}>
+                                {y}
+                            </option>
+                        ))}
                     </select>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -81,37 +126,39 @@ export default function ReportsPage() {
                         onChange={(e) => setFilters({ ...filters, electoral_area_id: e.target.value })}
                     >
                         <option value="">All Areas</option>
-                        {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        {areas.map((a) => (
+                            <option key={a.id} value={a.id}>
+                                {a.name}
+                            </option>
+                        ))}
                     </select>
                 </div>
             </div>
 
-            {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <SummaryCard
                     title="Yearly Collected"
                     value={`GHS ${totalRevenue.toLocaleString()}`}
-                    trend="+12% vs last year"
+                    trend={`Billed: GHS ${totalBilled.toLocaleString()}`}
                     icon={<TrendingUp className="text-green-600" />}
                     color="border-l-4 border-l-green-500"
                 />
                 <SummaryCard
                     title="Total Outstanding"
                     value={`GHS ${totalOutstanding.toLocaleString()}`}
-                    trend="Collection rate: 64%"
+                    trend={`Collection rate: ${collectionRate}%`}
                     icon={<AlertTriangle className="text-red-600" />}
                     color="border-l-4 border-l-red-500"
                 />
                 <SummaryCard
-                    title="Top Area"
-                    value={revenueData[0]?.area_name || 'N/A'}
-                    trend="Highest compliance"
-                    icon={<BarChart3 className="text-municipal-red" />}
+                    title="Defaulters"
+                    value={String(defaulters.length)}
+                    trend="Customers with unpaid balances"
+                    icon={<Users className="text-municipal-red" />}
                     color="border-l-4 border-l-municipal-red"
                 />
             </div>
 
-            {/* Tabs */}
             <div className="border-b flex space-x-8">
                 <button
                     onClick={() => setActiveTab('revenue')}
@@ -123,105 +170,102 @@ export default function ReportsPage() {
                     onClick={() => setActiveTab('defaulters')}
                     className={`pb-4 px-2 font-bold text-sm transition-all ${activeTab === 'defaulters' ? 'border-b-2 border-municipal-red text-municipal-red' : 'text-gray-400'}`}
                 >
-                    DEFAULTERS LIST
+                    DEFAULTERS
                 </button>
             </div>
 
             {loading ? (
-                <div className="flex justify-center py-20"><Loader2 /></div>
+                <div className="flex justify-center py-16">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-municipal-red" />
+                </div>
             ) : activeTab === 'revenue' ? (
-                <div className="space-y-6">
-                    <div className="card h-80">
-                        <h3 className="font-bold mb-4">Revenue Collection Trend (Monthly)</h3>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={revenueData}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="period_label" />
-                                <YAxis />
-                                <Tooltip />
-                                <Bar dataKey="total_collected" fill="#991B1B" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-
-                    <div className="card">
-                        <h3 className="font-bold mb-4">Detailed Revenue Breakdown</h3>
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full">
-                                <thead>
-                                    <tr className="bg-gray-50 text-left text-xs text-gray-500 font-bold uppercase">
-                                        <th className="p-4">Period</th>
-                                        <th className="p-4">Bill Type</th>
-                                        <th className="p-4 text-right">Collected</th>
-                                        <th className="p-4 text-right">Outstanding</th>
-                                        <th className="p-4 text-right">Bills Count</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y">
-                                    {revenueData.map((item, i) => (
-                                        <tr key={i} className="text-sm">
-                                            <td className="p-4 font-semibold">{item.period_label}</td>
-                                            <td className="p-4 text-gray-600">{item.bill_type}</td>
-                                            <td className="p-4 text-right font-bold text-green-600">GHS {parseFloat(item.total_collected).toFixed(2)}</td>
-                                            <td className="p-4 text-right font-bold text-red-600">GHS {parseFloat(item.total_outstanding).toFixed(2)}</td>
-                                            <td className="p-4 text-right text-gray-600">{item.bill_count}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                <div className="card p-6 h-96">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={revenueData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis
+                                dataKey="period"
+                                tickFormatter={(v) => (v ? new Date(v).toLocaleDateString(undefined, { month: 'short' }) : '')}
+                            />
+                            <YAxis />
+                            <Tooltip formatter={(value: any) => `GHS ${Number(value).toLocaleString()}`} />
+                            <Bar dataKey="total_collected" name="Collected" fill="#16a34a" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="total_outstanding" name="Outstanding" fill="#dc2626" radius={[4, 4, 0, 0]}>
+                                {revenueData.map((_, i) => (
+                                    <Cell key={i} />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
                 </div>
             ) : (
-                <div className="card">
-                    <h3 className="font-bold mb-4">Priority Defaulters (Over GHS 500)</h3>
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full">
-                            <thead>
-                                <tr className="bg-gray-50 text-left text-xs text-gray-500 font-bold uppercase">
-                                    <th className="p-4">Customer</th>
-                                    <th className="p-4">Phone</th>
-                                    <th className="p-4">Area</th>
-                                    <th className="p-4 text-right">Outstanding</th>
-                                    <th className="p-4 text-center">Action</th>
+                <div className="card overflow-hidden">
+                    <table className="w-full text-sm">
+                        <thead className="bg-gray-50 border-b">
+                            <tr>
+                                <th className="px-4 py-3 text-left">Customer</th>
+                                <th className="px-4 py-3 text-left">Phone</th>
+                                <th className="px-4 py-3 text-left">Area</th>
+                                <th className="px-4 py-3 text-right">Unpaid Bills</th>
+                                <th className="px-4 py-3 text-right">Outstanding</th>
+                                <th className="px-4 py-3 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                            {defaulters.map((d) => (
+                                <tr key={d.id}>
+                                    <td className="px-4 py-3 font-medium">{d.full_name}</td>
+                                    <td className="px-4 py-3">{d.phone_number}</td>
+                                    <td className="px-4 py-3">{d.electoral_area || '—'}</td>
+                                    <td className="px-4 py-3 text-right">{d.unpaid_bill_count}</td>
+                                    <td className="px-4 py-3 text-right font-bold text-red-600">
+                                        GHS {parseFloat(d.total_outstanding || 0).toLocaleString()}
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                        <Link href={`/customers/${d.id}`} className="text-municipal-red font-semibold text-xs">
+                                            VIEW
+                                        </Link>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {defaulters.map((item, i) => (
-                                    <tr key={i} className="text-sm">
-                                        <td className="p-4 font-bold">{item.full_name}</td>
-                                        <td className="p-4 text-gray-600">{item.phone_number}</td>
-                                        <td className="p-4 text-gray-600">{item.area_name}</td>
-                                        <td className="p-4 text-right font-black text-red-600">GHS {parseFloat(item.total_outstanding).toLocaleString()}</td>
-                                        <td className="p-4 text-center">
-                                            <Link href={`/customers/${item.id}`} className="text-municipal-red hover:underline text-xs font-bold">SEND REMINDER</Link>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                            ))}
+                            {defaulters.length === 0 && (
+                                <tr>
+                                    <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
+                                        No defaulters for this filter.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             )}
         </div>
     );
 }
 
-function SummaryCard({ title, value, trend, icon, color }: any) {
+function SummaryCard({
+    title,
+    value,
+    trend,
+    icon,
+    color,
+}: {
+    title: string;
+    value: string;
+    trend: string;
+    icon: React.ReactNode;
+    color: string;
+}) {
     return (
-        <div className={`card ${color}`}>
+        <div className={`card p-5 ${color}`}>
             <div className="flex justify-between items-start">
                 <div>
-                    <p className="text-gray-500 text-xs font-bold uppercase">{title}</p>
-                    <p className="text-2xl font-black text-gray-900 mt-1">{value}</p>
-                    <p className="text-xs text-gray-400 mt-2">{trend}</p>
+                    <p className="text-xs font-bold text-gray-500 uppercase">{title}</p>
+                    <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+                    <p className="text-xs text-gray-500 mt-2">{trend}</p>
                 </div>
                 <div className="p-2 bg-gray-50 rounded-lg">{icon}</div>
             </div>
         </div>
     );
-}
-
-function Loader2() {
-    return <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-municipal-red"></div>;
 }

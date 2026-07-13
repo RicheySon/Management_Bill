@@ -154,7 +154,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                         }
 
                         {/* Admin Links */}
-                        {(hasPermission('manage_users') || hasPermission('configure_rates') || hasPermission('view_audit_logs')) && (
+                        {(hasPermission('manage_users') || hasPermission('configure_rates') || hasPermission('view_logs') || hasPermission('approve_amount_changes')) && (
                             <div className="pt-4 pb-2">
                                 <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Administration</p>
                             </div>
@@ -164,11 +164,15 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                             <NavLink href="/admin/users" icon={<Shield className="w-5 h-5" />} label="User Management" onClick={() => setIsSidebarOpen(false)} />
                         }
 
+                        {hasPermission('approve_amount_changes') &&
+                            <NavLink href="/admin/approvals" icon={<ClipboardList className="w-5 h-5" />} label="Amount Approvals" onClick={() => setIsSidebarOpen(false)} />
+                        }
+
                         {hasPermission('configure_rates') &&
                             <NavLink href="/admin/configuration" icon={<Settings className="w-5 h-5" />} label="Fee Configuration" onClick={() => setIsSidebarOpen(false)} />
                         }
 
-                        {hasPermission('view_audit_logs') &&
+                        {hasPermission('view_logs') &&
                             <NavLink href="/admin/audit" icon={<FileText className="w-5 h-5" />} label="Audit Logs" onClick={() => setIsSidebarOpen(false)} />
                         }
 

@@ -18,12 +18,21 @@ import auditRoutes from './routes/audit.routes';
 import authRoutes from './routes/auth.routes';
 import feeConfigRoutes from './routes/fee-config.routes';
 import dataRoutes from './routes/data.routes';
+import amountChangeRoutes from './routes/amount-change.routes';
 
 // Load environment variables
 dotenv.config();
 
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+    console.error('FATAL: JWT_SECRET is required in production');
+    process.exit(1);
+}
+
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Trust proxy for correct client IP behind Vercel/Railway
+app.set('trust proxy', 1);
 
 // Middleware
 app.use(helmet()); // Security headers
@@ -57,6 +66,7 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/fee-config', feeConfigRoutes);
 app.use('/api/data', dataRoutes);
+app.use('/api/amount-changes', amountChangeRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

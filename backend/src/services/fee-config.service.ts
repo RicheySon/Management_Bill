@@ -348,7 +348,7 @@ function cleanNumber(val: any): number | undefined {
     return isNaN(num) ? undefined : num;
 }
 
-function parseRateRange(val: any): { min: number; max?: number } | null {
+export function parseRateRange(val: any): { min: number; max?: number } | null {
     if (val === null || val === undefined || val === '') return null;
     const str = String(val).replace(/,/g, '').trim();
 

@@ -1,13 +1,23 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import pool from '../config/database';
-import { authorize } from '../middlewares/auth.middleware';
+import { authenticateToken, authorize, AuthRequest } from '../middlewares/auth.middleware';
 
 const router = Router();
 
+router.use(authenticateToken);
+router.use(authorize(['view_logs']));
+
 // Get audit logs with filters
-router.get('/', authorize(['view_audit_logs']), async (req: Request, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
     try {
-        const { start_date, end_date, action_type, limit = 50 } = req.query;
+        const {
+            start_date,
+            end_date,
+            action_type,
+            user_id,
+            ip_address,
+            limit = 100,
+        } = req.query;
 
         let query = `
             SELECT a.*, u.full_name as user_name, u.email as user_email
@@ -21,6 +31,18 @@ router.get('/', authorize(['view_audit_logs']), async (req: Request, res: Respon
         if (action_type) {
             query += ` AND a.action = $${paramIndex}`;
             params.push(action_type);
+            paramIndex++;
+        }
+
+        if (user_id) {
+            query += ` AND a.user_id = $${paramIndex}`;
+            params.push(user_id);
+            paramIndex++;
+        }
+
+        if (ip_address) {
+            query += ` AND a.ip_address ILIKE $${paramIndex}`;
+            params.push(`%${ip_address}%`);
             paramIndex++;
         }
 
@@ -43,7 +65,7 @@ router.get('/', authorize(['view_audit_logs']), async (req: Request, res: Respon
 
         res.json({
             success: true,
-            data: result.rows
+            data: result.rows,
         });
     } catch (error) {
         console.error('Error fetching audit logs:', error);

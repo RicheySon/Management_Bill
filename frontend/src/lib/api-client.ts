@@ -12,31 +12,28 @@ const apiClient = axios.create({
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
     (config) => {
-        // Only run in browser environment
         if (typeof window !== 'undefined') {
             const token = localStorage.getItem('auth_token');
-            console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`, {
-                hasToken: !!token,
-                tokenPrefix: token ? `${token.substring(0, 10)}...` : 'none'
-            });
             if (token) {
                 config.headers.Authorization = `Bearer ${token}`;
-            } else {
-                console.warn('No auth token found in localStorage for request:', config.url);
             }
         }
         return config;
     },
-    (error) => {
-        console.error('Request interceptor error:', error);
-        return Promise.reject(error);
-    }
+    (error) => Promise.reject(error)
 );
 
-// Response interceptor for error handling
+// Response interceptor — force logout on expired/invalid session
 apiClient.interceptors.response.use(
     (response) => response,
     (error) => {
+        if (typeof window !== 'undefined' && error.response?.status === 401) {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_user');
+            if (!window.location.pathname.startsWith('/login')) {
+                window.location.href = '/login';
+            }
+        }
         console.error('API Error:', error.response?.data || error.message);
         return Promise.reject(error);
     }
@@ -209,6 +206,35 @@ export const sendBulkSMS = async (data: any) => {
 
 export const recordPayment = async (billId: string, data: { amount: number; payment_method: string; gcr_number: string; customer_id: string; payment_reference?: string }) => {
     const response = await apiClient.post(`/bills/${billId}/payment`, data);
+    return response.data;
+};
+
+export const requestBillAmountChange = async (
+    billId: string,
+    data: {
+        current_rate?: number;
+        arrears?: number;
+        rebate?: number;
+        total_amount?: number;
+        reason?: string;
+    }
+) => {
+    const response = await apiClient.put(`/bills/${billId}/amounts`, data);
+    return response.data;
+};
+
+export const fetchAmountChanges = async (params?: { status?: string; entity_type?: string; limit?: number }) => {
+    const response = await apiClient.get('/amount-changes', { params });
+    return response.data.data || [];
+};
+
+export const approveAmountChange = async (id: string, review_note?: string) => {
+    const response = await apiClient.post(`/amount-changes/${id}/approve`, { review_note });
+    return response.data;
+};
+
+export const rejectAmountChange = async (id: string, review_note?: string) => {
+    const response = await apiClient.post(`/amount-changes/${id}/reject`, { review_note });
     return response.data;
 };
 
