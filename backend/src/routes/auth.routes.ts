@@ -7,10 +7,32 @@ import { getAuditContext, logAction } from '../services/audit.service';
 
 const router = express.Router();
 
+// Simple in-memory login rate limit (per IP)
+const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 20;
+
+const checkLoginRateLimit = (ip: string): boolean => {
+    const now = Date.now();
+    const entry = loginAttempts.get(ip);
+    if (!entry || entry.resetAt < now) {
+        loginAttempts.set(ip, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
+        return true;
+    }
+    entry.count += 1;
+    return entry.count <= LOGIN_MAX_ATTEMPTS;
+};
+
 // Login Endpoint
 router.post('/login', async (req, res) => {
     const { email, password, mac_address, device_fingerprint } = req.body;
     const auditCtx = getAuditContext(req, { mac_address, device_fingerprint });
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+
+    if (!checkLoginRateLimit(ip)) {
+        await logAction(null, 'USER_LOGIN_FAILED', 'system_users', email || 'unknown', null, { email, reason: 'rate_limited', ip }, auditCtx);
+        return res.status(429).json({ success: false, error: 'Too many login attempts. Try again later.' });
+    }
 
     if (!email || !password) {
         return res.status(400).json({ success: false, error: 'Email and password are required' });
