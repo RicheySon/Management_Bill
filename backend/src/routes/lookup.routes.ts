@@ -1,7 +1,10 @@
 import { Router, Request, Response } from 'express';
 import pool from '../config/database';
+import { authenticateToken } from '../middlewares/auth.middleware';
 
 const router = Router();
+
+router.use(authenticateToken);
 
 /**
  * GET /api/lookups/electoral-areas

@@ -2,14 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import { fetchDashboardData } from '@/lib/api-client';
+import { useAuth } from '@/context/AuthContext';
 import { DollarSign, Users, Building2, FileText, AlertCircle } from 'lucide-react';
 
 export default function HomePage() {
+    const { user, hasPermission } = useAuth();
     const [dashboardData, setDashboardData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const canViewDashboard = hasPermission('view_reports') || hasPermission('record_payment') || hasPermission('manage_users');
 
     useEffect(() => {
         const loadDashboard = async () => {
+            if (!canViewDashboard) {
+                setLoading(false);
+                return;
+            }
             try {
                 const data = await fetchDashboardData();
                 setDashboardData(data);
@@ -21,7 +28,7 @@ export default function HomePage() {
         };
 
         loadDashboard();
-    }, []);
+    }, [canViewDashboard]);
 
     if (loading) {
         return (
@@ -29,6 +36,28 @@ export default function HomePage() {
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-municipal-red mx-auto mb-4"></div>
                     <p className="text-gray-600">Loading dashboard...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!canViewDashboard) {
+        return (
+            <div className="max-w-3xl mx-auto">
+                <div className="card p-8">
+                    <h1 className="text-3xl font-bold text-gray-900">Welcome, {user?.full_name}</h1>
+                    <p className="text-gray-600 mt-2">
+                        Role: {(user?.roles || []).join(', ') || 'Staff'}
+                    </p>
+                    <p className="text-gray-500 mt-4">
+                        Use the sidebar to register customers, properties, and businesses in your assigned area.
+                        Revenue analytics are available to officers with reporting access.
+                    </p>
+                    <div className="mt-6 grid sm:grid-cols-3 gap-3">
+                        <a href="/customers" className="btn-secondary text-center">Customers</a>
+                        <a href="/properties" className="btn-secondary text-center">Properties</a>
+                        <a href="/businesses" className="btn-secondary text-center">Businesses</a>
+                    </div>
                 </div>
             </div>
         );

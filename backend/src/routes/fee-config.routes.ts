@@ -105,6 +105,14 @@ const businessFeeItemSchema = Joi.object({
  */
 router.get('/schedules', async (req: AuthRequest, res: Response) => {
     try {
+        const perms = req.user?.permissions || [];
+        const can =
+            perms.includes('configure_rates') ||
+            perms.includes('generate_bill') ||
+            perms.includes('manage_users');
+        if (!can) {
+            return res.status(403).json({ success: false, error: 'Permission denied' });
+        }
         const year = req.query.year ? parseInt(req.query.year as string) : undefined;
         const schedules = await getFeeSchedules(year);
         res.json({ success: true, data: schedules });
@@ -119,6 +127,14 @@ router.get('/schedules', async (req: AuthRequest, res: Response) => {
  */
 router.get('/schedules/:id', async (req: AuthRequest, res: Response) => {
     try {
+        const perms = req.user?.permissions || [];
+        const can =
+            perms.includes('configure_rates') ||
+            perms.includes('generate_bill') ||
+            perms.includes('manage_users');
+        if (!can) {
+            return res.status(403).json({ success: false, error: 'Permission denied' });
+        }
         const schedule = await getFeeScheduleById(parseInt(req.params.id));
         if (!schedule) {
             return res.status(404).json({ success: false, error: 'Fee schedule not found' });

@@ -16,6 +16,10 @@
             "destination": "/backend/src/server.ts"
         },
         {
+            "source": "/health",
+            "destination": "/backend/src/server.ts"
+        },
+        {
             "source": "/(.*)",
             "destination": "/frontend/$1"
         }
