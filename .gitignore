@@ -35,3 +35,4 @@ backend/seed-local-areas.js
 *.docx
 Book1.xlsx
 screenshot/
+frontend/tsconfig.tsbuildinfo

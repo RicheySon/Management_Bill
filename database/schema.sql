@@ -169,7 +169,10 @@ INSERT INTO permissions (code, description) VALUES
 ('void_payment', 'Void payment receipts'),
 ('view_reports', 'Access financial and revenue reports'),
 ('view_logs', 'View system audit logs'),
-('approve_amount_changes', 'Approve or reject pending amount changes on bills and fee rates');
+('approve_amount_changes', 'Approve or reject pending amount changes on bills and fee rates'),
+('request_print', 'Request approval to print a bill'),
+('request_delete', 'Request approval to delete a bill'),
+('approve_privileged_actions', 'Approve or reject print/delete action requests');
 
 -- Map Permissions to Super Admin (All)
 INSERT INTO role_permissions (role_id, permission_id)
@@ -182,7 +185,8 @@ WHERE r.name = 'Admin' AND p.code IN (
     'create_customer', 'edit_customer', 'view_customer',
     'register_property', 'edit_property',
     'register_business', 'edit_business',
-    'generate_bill', 'print_bill', 'bulk_print', 'view_reports'
+    'generate_bill', 'delete_bill', 'print_bill', 'bulk_print', 'view_reports',
+    'approve_privileged_actions'
 );
 
 -- Map Permissions to Revenue Officer
@@ -191,7 +195,8 @@ SELECT r.id, p.id FROM roles r, permissions p
 WHERE r.name = 'Revenue Officer' AND p.code IN (
     'create_customer', 'view_customer',
     'register_property', 'register_business',
-    'generate_bill', 'print_bill', 'record_payment'
+    'generate_bill', 'record_payment', 'view_reports',
+    'request_print', 'request_delete'
 );
 
 -- Map Permissions to Cashier
@@ -208,11 +213,13 @@ WHERE r.name = 'Data Entry' AND p.code IN (
     'create_customer', 'view_customer', 'register_property', 'register_business'
 );
 
--- Map Permissions to Supervisor
+-- Map Permissions to Supervisor (includes Data Entry capabilities)
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p 
 WHERE r.name = 'Supervisor' AND p.code IN (
-    'view_customer', 'view_reports', 'bulk_print'
+    'create_customer', 'edit_customer', 'view_customer',
+    'register_property', 'register_business',
+    'view_reports', 'bulk_print'
 );
 
 -- Map Permissions to Auditor
@@ -228,7 +235,8 @@ SELECT r.id, p.id FROM roles r, permissions p
 WHERE r.name = 'Revenue Collector' AND p.code IN (
     'create_customer', 'view_customer',
     'register_property',
-    'register_business'
+    'register_business',
+    'request_print', 'request_delete'
 );
 
 -- Seed Initial Super Admin (Password: admin123)
@@ -416,6 +424,7 @@ CREATE TABLE payments (
     payment_reference VARCHAR(100),
     payment_date DATE NOT NULL DEFAULT CURRENT_DATE,
     notes TEXT,
+    recorded_by UUID REFERENCES system_users(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -423,6 +432,27 @@ CREATE INDEX idx_payments_receipt ON payments(receipt_number);
 CREATE INDEX idx_payments_bill ON payments(bill_id);
 CREATE INDEX idx_payments_customer ON payments(customer_id);
 CREATE INDEX idx_payments_date ON payments(payment_date);
+CREATE INDEX idx_payments_recorded_by ON payments(recorded_by);
+
+-- Privileged action requests (print / delete need admin approval for some roles)
+CREATE TABLE privileged_action_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    action_type VARCHAR(30) NOT NULL CHECK (action_type IN ('PRINT_BILL', 'DELETE_BILL')),
+    bill_id UUID NOT NULL REFERENCES bills(id) ON DELETE CASCADE,
+    reason TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING'
+        CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'COMPLETED')),
+    requested_by UUID NOT NULL REFERENCES system_users(id),
+    reviewed_by UUID REFERENCES system_users(id),
+    reviewed_at TIMESTAMP,
+    review_note TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_par_status ON privileged_action_requests(status);
+CREATE INDEX idx_par_bill ON privileged_action_requests(bill_id);
+CREATE INDEX idx_par_requested_by ON privileged_action_requests(requested_by);
 
 -- =====================================================
 -- AUTO-NUMBERING SEQUENCES
@@ -557,6 +587,11 @@ EXECUTE FUNCTION trg_update_timestamp();
 
 CREATE TRIGGER update_bills_timestamp
 BEFORE UPDATE ON bills
+FOR EACH ROW
+EXECUTE FUNCTION trg_update_timestamp();
+
+CREATE TRIGGER update_privileged_action_requests_timestamp
+BEFORE UPDATE ON privileged_action_requests
 FOR EACH ROW
 EXECUTE FUNCTION trg_update_timestamp();
 

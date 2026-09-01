@@ -359,7 +359,8 @@ export const recordPayment = async (
     amount: number,
     paymentMethod: string,
     gcrNumber: string,
-    paymentReference?: string
+    paymentReference?: string,
+    recordedBy?: string
 ): Promise<any> => {
     const client = await pool.connect();
 
@@ -373,13 +374,26 @@ export const recordPayment = async (
         );
 
         if (billResult.rows.length === 0) {
-            throw new Error('Bill not found');
+            throw new Error('Bill not found for this customer');
         }
 
         const bill = billResult.rows[0];
 
         if (bill.payment_status === 'PAID') {
             throw new Error('Bill is already fully paid');
+        }
+
+        const outstanding = parseFloat(bill.total_amount) - parseFloat(bill.amount_paid);
+        if (amount > outstanding + 0.001) {
+            throw new Error(`Payment amount exceeds outstanding balance of GHS ${outstanding.toFixed(2)}`);
+        }
+
+        // GCR format: 4–20 chars, digits with optional letters/hyphens (e.g. 012345 or GCR-012345)
+        const gcr = String(gcrNumber || '').trim().toUpperCase();
+        if (!/^[A-Z0-9][A-Z0-9\-]{3,19}$/.test(gcr)) {
+            throw new Error(
+                'Invalid GCR format. Enter the General Counterfoil Receipt serial (4–20 characters), e.g. 012345 or GCR-012345'
+            );
         }
 
         const newAmountPaid = parseFloat(bill.amount_paid) + amount;
@@ -400,14 +414,14 @@ export const recordPayment = async (
 
         const receiptNumber = receiptResult.rows[0].receipt_number;
 
-        // Insert payment
+        // Insert payment with recorder attribution
         const paymentResult = await client.query(
             `INSERT INTO payments (
         receipt_number, gcr_number, bill_id, customer_id, amount,
-        payment_method, payment_reference
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        payment_method, payment_reference, recorded_by
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *`,
-            [receiptNumber, gcrNumber, billId, customerId, amount, paymentMethod, paymentReference || null]
+            [receiptNumber, gcr, billId, customerId, amount, paymentMethod, paymentReference || null, recordedBy || null]
         );
 
         // Update bill
@@ -417,7 +431,7 @@ export const recordPayment = async (
         amount_due = $2,
         payment_status = $3
        WHERE id = $4`,
-            [newAmountPaid, newAmountDue, newStatus, billId]
+            [newAmountPaid, Math.max(newAmountDue, 0), newStatus, billId]
         );
 
         await client.query('COMMIT');

@@ -266,6 +266,13 @@ export const downloadBillPDF = async (billId: string) => {
             responseType: 'blob',
         });
 
+        // If server returned JSON error as blob
+        if (response.data?.type === 'application/json') {
+            const text = await response.data.text();
+            const parsed = JSON.parse(text);
+            throw new Error(parsed.error || 'Print failed');
+        }
+
         const blob = new Blob([response.data], { type: 'application/pdf' });
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -279,9 +286,14 @@ export const downloadBillPDF = async (billId: string) => {
             if (link.parentNode) link.remove();
             window.URL.revokeObjectURL(url);
         }, 100);
-    } catch (error) {
+    } catch (error: any) {
         console.error('Download failed:', error);
-        alert('Failed to download PDF. Please try again.');
+        const msg =
+            error?.response?.data instanceof Blob
+                ? JSON.parse(await error.response.data.text())?.error
+                : error?.response?.data?.error || error?.message || 'Failed to download PDF';
+        alert(msg);
+        throw error;
     }
 };
 
@@ -291,6 +303,12 @@ export const printBillPDF = async (billId: string) => {
             responseType: 'blob',
         });
 
+        if (response.data?.type === 'application/json') {
+            const text = await response.data.text();
+            const parsed = JSON.parse(text);
+            throw new Error(parsed.error || 'Print failed');
+        }
+
         const blob = new Blob([response.data], { type: 'application/pdf' });
         const url = window.URL.createObjectURL(blob);
 
@@ -299,7 +317,6 @@ export const printBillPDF = async (billId: string) => {
 
         if (isMobile) {
             window.open(url, '_blank');
-            // We can't easily revoke URL here as it's in a new tab, but most mobile browsers manage this well.
             return;
         }
 
@@ -322,9 +339,18 @@ export const printBillPDF = async (billId: string) => {
                 window.URL.revokeObjectURL(url);
             }, 2000);
         };
-    } catch (error) {
+    } catch (error: any) {
         console.error('Print failed:', error);
-        alert('Failed to initialize print. Please try again.');
+        let msg = error?.message || 'Failed to initialize print. Please try again.';
+        if (error?.response?.data instanceof Blob) {
+            try {
+                msg = JSON.parse(await error.response.data.text())?.error || msg;
+            } catch {
+                // ignore
+            }
+        }
+        alert(msg);
+        throw error;
     }
 };
 
@@ -369,6 +395,21 @@ export const updateUserStatus = async (id: string, status: string) => {
 export const fetchAuditLogs = async (params?: any) => {
     const response = await apiClient.get('/audit', { params });
     return response.data.data;
+};
+
+export const exportAuditLogs = async (params?: any) => {
+    const response = await apiClient.get('/audit/export', {
+        params: { ...params, limit: 5000 },
+        responseType: 'blob',
+    });
+    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
 };
 
 // =====================================================
@@ -519,4 +560,29 @@ export const importData = async (type: 'customers' | 'properties' | 'businesses'
         console.error(`Import ${type} error:`, error);
         throw error.response?.data || error;
     }
+};
+
+// Privileged action requests (print / delete approvals)
+export const requestPrivilegedAction = async (data: {
+    action_type: 'PRINT_BILL' | 'DELETE_BILL';
+    bill_id: string;
+    reason?: string;
+}) => {
+    const response = await apiClient.post('/action-requests', data);
+    return response.data;
+};
+
+export const fetchActionRequests = async (params?: { status?: string; limit?: number }) => {
+    const response = await apiClient.get('/action-requests', { params });
+    return response.data.data || [];
+};
+
+export const approveActionRequest = async (id: string, review_note?: string) => {
+    const response = await apiClient.post(`/action-requests/${id}/approve`, { review_note });
+    return response.data;
+};
+
+export const rejectActionRequest = async (id: string, review_note?: string) => {
+    const response = await apiClient.post(`/action-requests/${id}/reject`, { review_note });
+    return response.data;
 };

@@ -9,6 +9,7 @@ import {
     Briefcase, ClipboardList, Settings, Menu, Database
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import BackButton from '@/components/BackButton';
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
     const { user, logout, isLoading, hasPermission } = useAuth();
@@ -54,6 +55,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                             <CollectorNavLink href="/properties" icon={<Building2 className="w-6 h-6" />} label="Property Rates" onClick={() => setIsSidebarOpen(false)} />
                             <CollectorNavLink href="/businesses" icon={<Briefcase className="w-6 h-6" />} label="Business Owners" onClick={() => setIsSidebarOpen(false)} />
                             <CollectorNavLink href="/businesses#permits" icon={<ClipboardList className="w-6 h-6" />} label="Business Operation Permits" onClick={() => setIsSidebarOpen(false)} />
+                            {(hasPermission('request_print') || hasPermission('request_delete') || hasPermission('record_payment')) && (
+                                <CollectorNavLink href="/billing" icon={<ClipboardList className="w-6 h-6" />} label="Bills & Requests" onClick={() => setIsSidebarOpen(false)} />
+                            )}
                         </ul>
                     </nav>
 
@@ -76,10 +80,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                 {/* Main Content Area */}
                 <div className="flex-1 ml-0 md:ml-64 flex flex-col transition-all duration-300">
                     <header className="bg-white border-b h-16 flex items-center px-4 md:px-8 justify-between sticky top-0 z-10">
-                        <div className="flex items-center text-gray-400">
-                            <button className="md:hidden mr-4 p-1 hover:bg-gray-100 rounded-md" onClick={() => setIsSidebarOpen(true)}>
+                        <div className="flex items-center text-gray-400 gap-3">
+                            <button className="md:hidden p-1 hover:bg-gray-100 rounded-md" onClick={() => setIsSidebarOpen(true)}>
                                 <Menu className="w-6 h-6 text-gray-600" />
                             </button>
+                            <BackButton />
                             <span className="text-sm font-medium hidden sm:inline-block">Municipal Revenue Management System</span>
                             <span className="text-sm font-medium sm:hidden">MRMS</span>
                         </div>
@@ -145,6 +150,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                             <NavLink href="/billing" icon={<DollarSign className="w-5 h-5" />} label="Billing" onClick={() => setIsSidebarOpen(false)} />
                         }
 
+                        {/* Cashier / collectors who pay or request actions */}
+                        {!hasPermission('generate_bill') && (hasPermission('record_payment') || hasPermission('request_print') || hasPermission('request_delete')) &&
+                            <NavLink href="/billing" icon={<DollarSign className="w-5 h-5" />} label="Billing & Payments" onClick={() => setIsSidebarOpen(false)} />
+                        }
+
                         {hasPermission('view_reports') &&
                             <NavLink href="/reports" icon={<BarChart3 className="w-5 h-5" />} label="Reports" onClick={() => setIsSidebarOpen(false)} />
                         }
@@ -154,7 +164,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                         }
 
                         {/* Admin Links */}
-                        {(hasPermission('manage_users') || hasPermission('configure_rates') || hasPermission('view_logs') || hasPermission('approve_amount_changes')) && (
+                        {(hasPermission('manage_users') || hasPermission('configure_rates') || hasPermission('view_logs') || hasPermission('approve_amount_changes') || hasPermission('approve_privileged_actions')) && (
                             <div className="pt-4 pb-2">
                                 <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Administration</p>
                             </div>
@@ -164,8 +174,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                             <NavLink href="/admin/users" icon={<Shield className="w-5 h-5" />} label="User Management" onClick={() => setIsSidebarOpen(false)} />
                         }
 
-                        {hasPermission('approve_amount_changes') &&
-                            <NavLink href="/admin/approvals" icon={<ClipboardList className="w-5 h-5" />} label="Amount Approvals" onClick={() => setIsSidebarOpen(false)} />
+                        {(hasPermission('approve_amount_changes') || hasPermission('approve_privileged_actions')) &&
+                            <NavLink href="/admin/approvals" icon={<ClipboardList className="w-5 h-5" />} label="Approvals" onClick={() => setIsSidebarOpen(false)} />
                         }
 
                         {hasPermission('configure_rates') &&
@@ -200,10 +210,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             <div className="flex-1 ml-0 md:ml-64 flex flex-col transition-all duration-300">
                 {/* Header */}
                 <header className="bg-white border-b h-16 flex items-center px-4 md:px-8 justify-between sticky top-0 z-10">
-                    <div className="flex items-center text-gray-400">
-                        <button className="md:hidden mr-4 p-1 hover:bg-gray-100 rounded-md" onClick={() => setIsSidebarOpen(true)}>
+                    <div className="flex items-center text-gray-400 gap-3">
+                        <button className="md:hidden p-1 hover:bg-gray-100 rounded-md" onClick={() => setIsSidebarOpen(true)}>
                             <Menu className="w-6 h-6 text-gray-600" />
                         </button>
+                        <BackButton />
                         <span className="text-sm font-medium hidden sm:inline-block">Municipal Revenue Management System</span>
                         <span className="text-sm font-medium sm:hidden">MRMS</span>
                     </div>

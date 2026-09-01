@@ -189,9 +189,13 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res: Response) =>
             });
         }
 
-        // Get payments for this bill
+        // Get payments for this bill (include recorder name)
         const paymentsResult = await pool.query(
-            `SELECT * FROM payments WHERE bill_id = $1 ORDER BY payment_date DESC`,
+            `SELECT p.*, u.full_name as recorded_by_name
+             FROM payments p
+             LEFT JOIN system_users u ON p.recorded_by = u.id
+             WHERE p.bill_id = $1
+             ORDER BY p.payment_date DESC, p.created_at DESC`,
             [id]
         );
 
@@ -367,12 +371,18 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
 
 /**
  * DELETE /api/bills/:id
- * Delete a bill
+ * Delete a bill (direct permission). Roles without delete_bill must request approval.
  */
 router.delete('/:id', authenticateToken, authorize(['delete_bill']), async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
-        const result = await pool.query('DELETE FROM bills WHERE id = $1 RETURNING id', [id]);
+
+        await pool.query('DELETE FROM payments WHERE bill_id = $1', [id]);
+        await pool.query(
+            'UPDATE bills SET rolled_into_bill_id = NULL WHERE rolled_into_bill_id = $1',
+            [id]
+        );
+        const result = await pool.query('DELETE FROM bills WHERE id = $1 RETURNING id, bill_number', [id]);
 
         if (result.rows.length === 0) {
             return res.status(404).json({
@@ -380,6 +390,16 @@ router.delete('/:id', authenticateToken, authorize(['delete_bill']), async (req:
                 error: 'Bill not found',
             });
         }
+
+        await logAction(
+            req.user!.id,
+            'BILL_DELETED',
+            'bills',
+            id,
+            { bill_number: result.rows[0].bill_number },
+            null,
+            getAuditContext(req)
+        );
 
         res.json({
             success: true,
@@ -406,7 +426,12 @@ router.post('/:id/payment', authenticateToken, authorize(['record_payment']), as
             customer_id: Joi.string().uuid().required(),
             amount: Joi.number().positive().required(),
             payment_method: Joi.string().required(),
-            gcr_number: Joi.string().required(),
+            gcr_number: Joi.string().trim().min(4).max(20).required()
+                .pattern(/^[A-Za-z0-9][A-Za-z0-9\-]{3,19}$/)
+                .messages({
+                    'string.pattern.base':
+                        'GCR must be 4–20 characters (letters, numbers, hyphens). Example: 012345 or GCR-012345',
+                }),
             payment_reference: Joi.string().optional().allow(''),
         });
 
@@ -427,7 +452,8 @@ router.post('/:id/payment', authenticateToken, authorize(['record_payment']), as
             amount,
             payment_method,
             gcr_number,
-            payment_reference
+            payment_reference,
+            req.user!.id
         );
 
         await logAction(
@@ -439,8 +465,9 @@ router.post('/:id/payment', authenticateToken, authorize(['record_payment']), as
             {
                 bill_id: id,
                 amount,
-                gcr_number,
+                gcr_number: payment.gcr_number,
                 receipt_number: payment.receipt_number,
+                recorded_by: req.user!.id,
             },
             getAuditContext(req)
         );

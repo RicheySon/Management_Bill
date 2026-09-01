@@ -1,18 +1,28 @@
 import { Router, Request, Response } from 'express';
-import { authenticateToken, authorize } from '../middlewares/auth.middleware';
+import { authenticateToken, authorize, AuthRequest } from '../middlewares/auth.middleware';
 import pool from '../config/database';
 
 const router = Router();
 
 // Apply authentication to all reports routes
 router.use(authenticateToken);
-router.use(authorize(['view_reports']));
+
+const requireReportsOrPayment = (req: AuthRequest, res: Response, next: Function) => {
+    const perms = req.user?.permissions || [];
+    if (perms.includes('view_reports') || perms.includes('record_payment') || perms.includes('manage_users')) {
+        return next();
+    }
+    return res.status(403).json({
+        success: false,
+        error: 'Permission denied. You do not have the required access for this action.',
+    });
+};
 
 /**
  * GET /api/reports/revenue
  * Revenue summary report
  */
-router.get('/revenue', async (req: Request, res: Response) => {
+router.get('/revenue', authorize(['view_reports']), async (req: Request, res: Response) => {
     try {
         const { period = 'month', year, month } = req.query;
 
@@ -64,7 +74,7 @@ router.get('/revenue', async (req: Request, res: Response) => {
  * GET /api/reports/defaulters
  * List of customers with unpaid bills
  */
-router.get('/defaulters', async (req: Request, res: Response) => {
+router.get('/defaulters', authorize(['view_reports']), async (req: Request, res: Response) => {
     try {
         const { electoral_area_id, bill_type } = req.query;
 
@@ -117,7 +127,7 @@ router.get('/defaulters', async (req: Request, res: Response) => {
  * GET /api/reports/by-area
  * Revenue grouped by electoral area
  */
-router.get('/by-area', async (req: Request, res: Response) => {
+router.get('/by-area', authorize(['view_reports']), async (req: Request, res: Response) => {
     try {
         const { year } = req.query;
 
@@ -163,7 +173,7 @@ router.get('/by-area', async (req: Request, res: Response) => {
  * GET /api/reports/by-category
  * BOP revenue grouped by business category
  */
-router.get('/by-category', async (req: Request, res: Response) => {
+router.get('/by-category', authorize(['view_reports']), async (req: Request, res: Response) => {
     try {
         const { year } = req.query;
 
@@ -209,7 +219,7 @@ router.get('/by-category', async (req: Request, res: Response) => {
  * GET /api/reports/dashboard
  * Summary statistics for admin dashboard
  */
-router.get('/dashboard', async (req: Request, res: Response) => {
+router.get('/dashboard', requireReportsOrPayment, async (req: Request, res: Response) => {
     try {
         const currentYear = new Date().getFullYear();
 
@@ -244,13 +254,14 @@ router.get('/dashboard', async (req: Request, res: Response) => {
             `SELECT COUNT(*) as unpaid_count FROM bills WHERE payment_status != 'PAID'`
         );
 
-        // Recent payments (last 10)
+        // Recent payments (last 10) with recorder name
         const paymentsResult = await pool.query(
-            `SELECT p.*, c.full_name, b.bill_number
+            `SELECT p.*, c.full_name, b.bill_number, u.full_name as recorded_by_name
        FROM payments p
        LEFT JOIN customers c ON p.customer_id = c.id
        LEFT JOIN bills b ON p.bill_id = b.id
-       ORDER BY p.payment_date DESC
+       LEFT JOIN system_users u ON p.recorded_by = u.id
+       ORDER BY p.created_at DESC NULLS LAST, p.payment_date DESC
        LIMIT 10`
         );
 
