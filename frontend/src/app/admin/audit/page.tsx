@@ -1,16 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { fetchAuditLogs } from '@/lib/api-client';
+import { fetchAuditLogs, exportAuditLogs } from '@/lib/api-client';
 import { useAuth } from '@/context/AuthContext';
 import {
-    Shield, Filter, Clock, User, Monitor
+    Shield, Filter, Clock, User, Monitor, Download
 } from 'lucide-react';
 
 export default function AuditPage() {
     const { hasPermission } = useAuth();
     const [logs, setLogs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [exporting, setExporting] = useState(false);
     const [filters, setFilters] = useState({
         action_type: '',
         start_date: '',
@@ -39,6 +40,18 @@ export default function AuditPage() {
         setFilters((prev) => ({ ...prev, [name]: value }));
     };
 
+    const handleExport = async () => {
+        try {
+            setExporting(true);
+            await exportAuditLogs(filters);
+        } catch (err) {
+            console.error('Export failed:', err);
+            alert('Failed to export audit logs');
+        } finally {
+            setExporting(false);
+        }
+    };
+
     const actionTypes = [
         'USER_LOGIN',
         'USER_LOGIN_FAILED',
@@ -46,10 +59,17 @@ export default function AuditPage() {
         'USER_CREATED',
         'USER_STATUS_CHANGED',
         'BILL_GENERATED',
+        'BILL_DELETED',
         'PAYMENT_RECORDED',
         'AMOUNT_CHANGE_REQUESTED',
         'AMOUNT_CHANGE_APPROVED',
         'AMOUNT_CHANGE_REJECTED',
+        'PRINT_REQUESTED',
+        'PRINT_APPROVED',
+        'PRINT_REJECTED',
+        'DELETE_REQUESTED',
+        'DELETE_APPROVED',
+        'DELETE_REJECTED',
         'CUSTOMER_CREATED',
         'PROPERTY_CREATED',
         'BUSINESS_CREATED',
@@ -69,14 +89,24 @@ export default function AuditPage() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                    <Shield className="w-8 h-8 text-municipal-red" />
-                    System Audit Logs
-                </h1>
-                <p className="text-gray-500">
-                    Logins, amount changes, and system activity with IP / device metadata. MAC is unavailable in browsers.
-                </p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                        <Shield className="w-8 h-8 text-municipal-red" />
+                        System Audit Logs
+                    </h1>
+                    <p className="text-gray-500">
+                        Logins, amount changes, payments, and system activity with IP / device metadata.
+                    </p>
+                </div>
+                <button
+                    onClick={handleExport}
+                    disabled={exporting}
+                    className="btn-primary flex items-center justify-center gap-2 self-start"
+                >
+                    <Download className="w-4 h-4" />
+                    {exporting ? 'Exporting…' : 'Export Logs (CSV)'}
+                </button>
             </div>
 
             <div className="card p-4">

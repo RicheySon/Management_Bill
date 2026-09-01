@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import Joi from 'joi';
-import { authenticateToken, authorize } from '../middlewares/auth.middleware';
+import { authenticateToken, authorize, AuthRequest } from '../middlewares/auth.middleware';
 import { generateBillPDF, generateBulkBillsPDF } from '../services/pdf.service';
+import { canUserPrintBill, markPrintRequestCompleted } from '../services/action-request.service';
 import pool from '../config/database';
 
 const router = Router();
@@ -12,12 +13,26 @@ router.use(authenticateToken);
 /**
  * GET /api/print/bill/:id
  * Generate and download a single bill PDF
+ * Requires print_bill permission OR an approved print request (RO / Collector)
  */
-router.get('/bill/:id', async (req: Request, res: Response) => {
+router.get('/bill/:id', async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
+        const perms = req.user?.permissions || [];
+
+        const access = await canUserPrintBill(req.user!.id, perms, id);
+        if (!access.allowed) {
+            return res.status(403).json({
+                success: false,
+                error: 'Print requires admin approval. Submit a print request first, then print after approval.',
+            });
+        }
 
         const doc = await generateBillPDF(id);
+
+        if (access.requestId) {
+            await markPrintRequestCompleted(access.requestId);
+        }
 
         // Set response headers for PDF download
         res.setHeader('Content-Type', 'application/pdf');

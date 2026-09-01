@@ -122,11 +122,19 @@ describe('billing.service smoke', () => {
             'cust-1',
             100,
             'CASH',
-            'GCR-001'
+            'GCR-001',
+            undefined,
+            'user-1'
         );
         expect(payment.receipt_number).toBe('GN-RCT-2026-000001');
         expect(client.query).toHaveBeenCalledWith('BEGIN');
         expect(client.query).toHaveBeenCalledWith('COMMIT');
+        const insertCall = client.query.mock.calls.find(
+            (c: any[]) => typeof c[0] === 'string' && c[0].includes('INSERT INTO payments')
+        );
+        expect(insertCall).toBeTruthy();
+        expect(insertCall[1]).toContain('user-1');
+        expect(insertCall[1]).toContain('GCR-001');
     });
 });
 

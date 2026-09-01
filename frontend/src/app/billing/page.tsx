@@ -1,18 +1,28 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { fetchBills, downloadBillPDF, printBillPDF, fetchElectoralAreas, deleteBill } from '@/lib/api-client';
 import {
-    FileText, Search, Filter, Printer,
+    fetchBills,
+    downloadBillPDF,
+    printBillPDF,
+    fetchElectoralAreas,
+    deleteBill,
+    requestPrivilegedAction,
+} from '@/lib/api-client';
+import { useAuth } from '@/context/AuthContext';
+import {
+    FileText, Search, Printer,
     CreditCard, Plus, CheckCircle2, AlertCircle, Clock, Trash, Pencil,
-    FileDown
+    FileDown, Send
 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function BillingPage() {
+    const { hasPermission } = useAuth();
     const [bills, setBills] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [electoralAreas, setElectoralAreas] = useState<any[]>([]);
+    const [message, setMessage] = useState<string | null>(null);
     const [filters, setFilters] = useState({
         status: '',
         type: '',
@@ -20,10 +30,15 @@ export default function BillingPage() {
         search: '',
     });
 
+    const canGenerate = hasPermission('generate_bill');
+    const canPrintDirect = hasPermission('print_bill') || hasPermission('bulk_print') || hasPermission('manage_users');
+    const canDeleteDirect = hasPermission('delete_bill');
+    const canRequestPrint = hasPermission('request_print');
+    const canRequestDelete = hasPermission('request_delete');
+
     const loadData = async () => {
         setLoading(true);
         try {
-            // Map 'type' to 'bill_type' for backend compatibility
             const apiParams = {
                 ...filters,
                 bill_type: filters.type,
@@ -46,7 +61,7 @@ export default function BillingPage() {
     useEffect(() => {
         const timer = setTimeout(() => {
             loadData();
-        }, filters.search ? 500 : 0); // Debounce search
+        }, filters.search ? 500 : 0);
 
         return () => clearTimeout(timer);
     }, [filters.status, filters.type, filters.electoral_area_id, filters.search]);
@@ -55,10 +70,30 @@ export default function BillingPage() {
         if (!confirm('Are you sure you want to delete this bill?')) return;
         try {
             await deleteBill(id);
+            setMessage('Bill deleted successfully');
             loadData();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Delete failed:', error);
-            alert('Failed to delete bill');
+            alert(error?.response?.data?.error || 'Failed to delete bill');
+        }
+    };
+
+    const handleRequest = async (billId: string, action_type: 'PRINT_BILL' | 'DELETE_BILL') => {
+        const reason = prompt(
+            action_type === 'PRINT_BILL'
+                ? 'Optional reason for print request:'
+                : 'Reason for delete request (recommended):'
+        );
+        if (reason === null) return;
+        try {
+            const res = await requestPrivilegedAction({
+                action_type,
+                bill_id: billId,
+                reason: reason || undefined,
+            });
+            setMessage(res.message || 'Request submitted for admin approval');
+        } catch (error: any) {
+            alert(error?.response?.data?.error || 'Failed to submit request');
         }
     };
 
@@ -74,13 +109,20 @@ export default function BillingPage() {
                     <h1 className="text-3xl font-bold text-gray-900">Billing Management</h1>
                     <p className="text-gray-600 mt-1">Manage invoices, payments and collection status</p>
                 </div>
-                <Link href="/billing/generate" className="btn-primary flex items-center space-x-2 self-start md:self-auto">
-                    <Plus className="w-4 h-4" />
-                    <span>Generate New Bill</span>
-                </Link>
+                {canGenerate && (
+                    <Link href="/billing/generate" className="btn-primary flex items-center space-x-2 self-start md:self-auto">
+                        <Plus className="w-4 h-4" />
+                        <span>Generate New Bill</span>
+                    </Link>
+                )}
             </div>
 
-            {/* Filters & Search */}
+            {message && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg text-sm">
+                    {message}
+                </div>
+            )}
+
             <div className="card">
                 <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="relative">
@@ -125,7 +167,6 @@ export default function BillingPage() {
                 </form>
             </div>
 
-            {/* Bills Table */}
             <div className="card overflow-hidden">
                 {loading ? (
                     <div className="flex items-center justify-center h-64">
@@ -149,7 +190,7 @@ export default function BillingPage() {
                                     <tr key={bill.id} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm font-bold text-municipal-red">{bill.bill_number}</div>
-                                            <div className="text-xs text-gray-500">{bill.bill_type} ({bill.billing_year})</div>
+                                            <div className="text-xs text-gray-500">{bill.bill_type} ({bill.billing_year || bill.bill_period_year})</div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm font-semibold text-gray-900">{bill.full_name}</div>
@@ -166,54 +207,77 @@ export default function BillingPage() {
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <StatusBadge status={bill.payment_status} />
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm space-x-2">
-                                            <button
-                                                onClick={() => downloadBillPDF(bill.id)}
-                                                className="inline-flex items-center p-2 text-gray-600 hover:text-municipal-red hover:bg-red-50 rounded-lg transition-all"
-                                                title="Download PDF"
-                                            >
-                                                <FileDown className="w-5 h-5" />
-                                            </button>
-                                            <button
-                                                onClick={() => printBillPDF(bill.id)}
-                                                className="inline-flex items-center p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-all"
-                                                title="Print Hardcopy"
-                                            >
-                                                <Printer className="w-5 h-5" />
-                                            </button>
-                                            <Link
-                                                href={
-                                                    bill.bill_type === 'PROPERTY_RATE'
-                                                        ? `/properties/${bill.property_id}/edit`
-                                                        : bill.bill_type === 'BOP'
-                                                            ? `/businesses/${bill.business_id}/edit`
-                                                            : `/customers/${bill.customer_id}/edit`
-                                                }
-                                                className="inline-flex items-center p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                                title={
-                                                    bill.bill_type === 'PROPERTY_RATE'
-                                                        ? "Edit Property Details"
-                                                        : bill.bill_type === 'BOP'
-                                                            ? "Edit Business Details"
-                                                            : "Edit Customer Details"
-                                                }
-                                            >
-                                                <Pencil className="w-5 h-5" />
-                                            </Link>
-                                            <Link
-                                                href={`/billing/${bill.id}`}
-                                                className="inline-flex items-center p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
-                                                title="View & Pay"
-                                            >
-                                                <CreditCard className="w-5 h-5" />
-                                            </Link>
-                                            <button
-                                                onClick={() => handleDelete(bill.id)}
-                                                className="inline-flex items-center p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                                title="Delete Bill"
-                                            >
-                                                <Trash className="w-5 h-5" />
-                                            </button>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm space-x-1">
+                                            {canPrintDirect ? (
+                                                <>
+                                                    <button
+                                                        onClick={() => downloadBillPDF(bill.id)}
+                                                        className="inline-flex items-center p-2 text-gray-600 hover:text-municipal-red hover:bg-red-50 rounded-lg transition-all"
+                                                        title="Download PDF"
+                                                    >
+                                                        <FileDown className="w-5 h-5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => printBillPDF(bill.id)}
+                                                        className="inline-flex items-center p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-all"
+                                                        title="Print Hardcopy"
+                                                    >
+                                                        <Printer className="w-5 h-5" />
+                                                    </button>
+                                                </>
+                                            ) : canRequestPrint ? (
+                                                <button
+                                                    onClick={() => handleRequest(bill.id, 'PRINT_BILL')}
+                                                    className="inline-flex items-center p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                                                    title="Request print approval"
+                                                >
+                                                    <Send className="w-5 h-5" />
+                                                </button>
+                                            ) : null}
+
+                                            {canGenerate && (
+                                                <Link
+                                                    href={
+                                                        bill.bill_type === 'PROPERTY_RATE'
+                                                            ? `/properties/${bill.property_id}/edit`
+                                                            : bill.bill_type === 'BOP'
+                                                                ? `/businesses/${bill.business_id}/edit`
+                                                                : `/customers/${bill.customer_id}/edit`
+                                                    }
+                                                    className="inline-flex items-center p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                                    title="Edit linked record"
+                                                >
+                                                    <Pencil className="w-5 h-5" />
+                                                </Link>
+                                            )}
+
+                                            {(hasPermission('record_payment') || canGenerate) && (
+                                                <Link
+                                                    href={`/billing/${bill.id}`}
+                                                    className="inline-flex items-center p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
+                                                    title="View & Pay"
+                                                >
+                                                    <CreditCard className="w-5 h-5" />
+                                                </Link>
+                                            )}
+
+                                            {canDeleteDirect ? (
+                                                <button
+                                                    onClick={() => handleDelete(bill.id)}
+                                                    className="inline-flex items-center p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                                    title="Delete Bill"
+                                                >
+                                                    <Trash className="w-5 h-5" />
+                                                </button>
+                                            ) : canRequestDelete ? (
+                                                <button
+                                                    onClick={() => handleRequest(bill.id, 'DELETE_BILL')}
+                                                    className="inline-flex items-center p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                                    title="Request delete approval"
+                                                >
+                                                    <Trash className="w-5 h-5" />
+                                                </button>
+                                            ) : null}
                                         </td>
                                     </tr>
                                 ))}

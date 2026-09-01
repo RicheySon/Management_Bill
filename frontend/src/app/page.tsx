@@ -121,6 +121,7 @@ export default function HomePage() {
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bill No.</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Recorded By</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                                 </tr>
                             </thead>
@@ -141,6 +142,9 @@ export default function HomePage() {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
                                             GHS {parseFloat(payment.amount).toFixed(2)}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-municipal-red">
+                                            {payment.recorded_by_name || '—'}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                                             {new Date(payment.payment_date).toLocaleDateString()}

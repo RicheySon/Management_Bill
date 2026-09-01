@@ -90,6 +90,19 @@ router.post('/', authenticateToken, authorize(['manage_users']), async (req: Aut
             [newUser.id, value.role_id]
         );
 
+        // Supervisor is also linked to Data Entry role
+        const roleInfo = await client.query('SELECT name FROM roles WHERE id = $1', [value.role_id]);
+        if (roleInfo.rows[0]?.name === 'Supervisor') {
+            const dataEntry = await client.query(`SELECT id FROM roles WHERE name = 'Data Entry'`);
+            if (dataEntry.rows[0]) {
+                await client.query(
+                    `INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)
+                     ON CONFLICT DO NOTHING`,
+                    [newUser.id, dataEntry.rows[0].id]
+                );
+            }
+        }
+
         // Assign electoral areas if provided
         if (value.electoral_areas && value.electoral_areas.length > 0) {
             for (const areaId of value.electoral_areas) {

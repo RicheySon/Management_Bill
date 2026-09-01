@@ -2,21 +2,28 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { fetchBill, recordPayment, downloadBillPDF, printBillPDF, requestBillAmountChange } from '@/lib/api-client';
+import {
+    fetchBill,
+    recordPayment,
+    downloadBillPDF,
+    printBillPDF,
+    requestBillAmountChange,
+    requestPrivilegedAction,
+} from '@/lib/api-client';
 import { useAuth } from '@/context/AuthContext';
 import {
     ArrowLeft, Printer, CreditCard,
     User, Building2, Briefcase, Calendar,
     Wallet, CheckCircle2, AlertCircle, History,
-    FileDown, Pencil
+    FileDown, Pencil, Send
 } from 'lucide-react';
-import Link from 'next/link';
+
+const GCR_HINT = 'Enter the General Counterfoil Receipt serial from the GCR book (4–20 characters). Examples: 012345 or GCR-012345';
 
 export default function BillDetailPage() {
     const { id } = useParams();
     const router = useRouter();
-    const { hasPermission } = useAuth();
-    // bill holds the full bill row; payments holds the payment history
+    const { hasPermission, user } = useAuth();
     const [bill, setBill] = useState<any>(null);
     const [payments, setPayments] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -28,11 +35,15 @@ export default function BillDetailPage() {
     const [success, setSuccess] = useState(false);
     const [amountForm, setAmountForm] = useState({ current_rate: '', arrears: '', rebate: '', reason: '' });
     const [amountMsg, setAmountMsg] = useState<string | null>(null);
+    const [actionMsg, setActionMsg] = useState<string | null>(null);
+
+    const canPrintDirect = hasPermission('print_bill') || hasPermission('bulk_print') || hasPermission('manage_users');
+    const canRequestPrint = hasPermission('request_print');
+    const canPay = hasPermission('record_payment');
 
     const loadBill = async () => {
         try {
             const data = await fetchBill(id as string);
-            // API returns { bill: {...}, payments: [...] }
             const billRow = data.bill ?? data;
             const paymentRows = data.payments ?? [];
             setBill(billRow);
@@ -61,17 +72,22 @@ export default function BillDetailPage() {
         setIsSubmitting(true);
         setError(null);
         try {
+            const gcr = gcrNumber.trim().toUpperCase();
+            if (!/^[A-Z0-9][A-Z0-9\-]{3,19}$/.test(gcr)) {
+                throw new Error(GCR_HINT);
+            }
             await recordPayment(id as string, {
                 amount: parseFloat(paymentAmount),
                 payment_method: paymentMethod,
-                gcr_number: gcrNumber,
+                gcr_number: gcr,
                 customer_id: bill.customer_id,
             });
             setSuccess(true);
+            setGcrNumber('');
             await loadBill();
             setTimeout(() => setSuccess(false), 3000);
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Failed to record payment');
+            setError(err.response?.data?.error || err.message || 'Failed to record payment');
         } finally {
             setIsSubmitting(false);
         }
@@ -100,6 +116,19 @@ export default function BillDetailPage() {
         }
     };
 
+    const handleRequestPrint = async () => {
+        try {
+            const res = await requestPrivilegedAction({
+                action_type: 'PRINT_BILL',
+                bill_id: bill.id,
+                reason: 'Bill hardcopy / PDF print',
+            });
+            setActionMsg(res.message);
+        } catch (err: any) {
+            setError(err.response?.data?.error || 'Failed to request print');
+        }
+    };
+
     if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-municipal-red"></div></div>;
     if (!bill) return <div className="text-center py-20 text-red-500">Bill not found</div>;
 
@@ -107,31 +136,58 @@ export default function BillDetailPage() {
 
     return (
         <div className="max-w-5xl mx-auto space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-3">
                 <button onClick={() => router.back()} className="btn-secondary flex items-center space-x-2">
                     <ArrowLeft className="w-4 h-4" />
                     <span>Back</span>
                 </button>
-                <div className="flex space-x-3">
-                    <button
-                        onClick={() => printBillPDF(bill.id)}
-                        className="btn-primary flex items-center space-x-2"
-                    >
-                        <Printer className="w-4 h-4" />
-                        <span>Print Hardcopy</span>
-                    </button>
-                    <button
-                        onClick={() => downloadBillPDF(bill.id)}
-                        className="btn-secondary flex items-center space-x-2"
-                    >
-                        <FileDown className="w-4 h-4" />
-                        <span>Download PDF</span>
-                    </button>
+                <div className="flex space-x-3 flex-wrap">
+                    {canPrintDirect ? (
+                        <>
+                            <button
+                                onClick={() => printBillPDF(bill.id)}
+                                className="btn-primary flex items-center space-x-2"
+                            >
+                                <Printer className="w-4 h-4" />
+                                <span>Print Hardcopy</span>
+                            </button>
+                            <button
+                                onClick={() => downloadBillPDF(bill.id)}
+                                className="btn-secondary flex items-center space-x-2"
+                            >
+                                <FileDown className="w-4 h-4" />
+                                <span>Download PDF</span>
+                            </button>
+                        </>
+                    ) : canRequestPrint ? (
+                        <>
+                            <button
+                                onClick={handleRequestPrint}
+                                className="btn-secondary flex items-center space-x-2"
+                            >
+                                <Send className="w-4 h-4" />
+                                <span>Request Print Approval</span>
+                            </button>
+                            <button
+                                onClick={() => downloadBillPDF(bill.id).catch(() => undefined)}
+                                className="btn-secondary flex items-center space-x-2"
+                                title="Works after admin approves your print request"
+                            >
+                                <FileDown className="w-4 h-4" />
+                                <span>Print If Approved</span>
+                            </button>
+                        </>
+                    ) : null}
                 </div>
             </div>
 
+            {actionMsg && (
+                <div className="bg-amber-50 text-amber-800 p-3 rounded-lg text-sm border border-amber-200">
+                    {actionMsg}
+                </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Bill Info Card */}
                 <div className="lg:col-span-2 space-y-6">
                     <div className="card overflow-hidden">
                         <div className={`px-6 py-4 flex justify-between items-center ${bill.payment_status === 'PAID' ? 'bg-green-600' : 'bg-municipal-red'} text-white`}>
@@ -211,7 +267,6 @@ export default function BillDetailPage() {
                         </div>
                     </div>
 
-                    {/* Payment History */}
                     <div className="card">
                         <h3 className="text-lg font-bold mb-4 flex items-center space-x-2">
                             <History className="w-5 h-5 text-municipal-red" />
@@ -223,7 +278,12 @@ export default function BillDetailPage() {
                                     <div key={p.id} className="flex justify-between items-center p-3 border rounded-lg bg-white">
                                         <div>
                                             <p className="font-bold text-gray-900">{p.receipt_number}</p>
-                                            <p className="text-xs text-gray-500">GCR: {p.gcr_number || 'N/A'} • {new Date(p.payment_date).toLocaleString()} • {p.payment_method}</p>
+                                            <p className="text-xs text-gray-500">
+                                                GCR: {p.gcr_number || 'N/A'} • {new Date(p.payment_date).toLocaleString()} • {p.payment_method}
+                                            </p>
+                                            <p className="text-xs text-municipal-red font-medium mt-1">
+                                                Recorded by: {p.recorded_by_name || user?.full_name || 'Unknown'}
+                                            </p>
                                         </div>
                                         <div className="text-right">
                                             <p className="font-bold text-green-600">GHS {parseFloat(p.amount).toFixed(2)}</p>
@@ -240,10 +300,10 @@ export default function BillDetailPage() {
                         <div className="card">
                             <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
                                 <Pencil className="w-5 h-5 text-municipal-red" />
-                                Request Amount Change
+                                Edit Amounts (incl. Arrears)
                             </h3>
                             <p className="text-sm text-gray-500 mb-4">
-                                Changes go to Super Admin for approval before they take effect.
+                                Edit current rate, <strong>arrears</strong>, and rebate. Changes go to Super Admin for approval before they take effect.
                             </p>
                             {amountMsg && (
                                 <div className="bg-amber-50 text-amber-800 p-3 rounded-lg text-sm mb-4 border border-amber-200">
@@ -256,6 +316,7 @@ export default function BillDetailPage() {
                                     <input
                                         type="number"
                                         step="0.01"
+                                        min="0"
                                         className="input-field mt-1"
                                         value={amountForm.current_rate}
                                         onChange={(e) => setAmountForm({ ...amountForm, current_rate: e.target.value })}
@@ -267,17 +328,20 @@ export default function BillDetailPage() {
                                     <input
                                         type="number"
                                         step="0.01"
-                                        className="input-field mt-1"
+                                        min="0"
+                                        className="input-field mt-1 border-amber-300 focus:ring-amber-500"
                                         value={amountForm.arrears}
                                         onChange={(e) => setAmountForm({ ...amountForm, arrears: e.target.value })}
                                         required
                                     />
+                                    <p className="text-[11px] text-gray-500 mt-1">Adjust outstanding prior-year balance here.</p>
                                 </div>
                                 <div>
                                     <label className="text-xs font-bold text-gray-500 uppercase">Rebate</label>
                                     <input
                                         type="number"
                                         step="0.01"
+                                        min="0"
                                         className="input-field mt-1"
                                         value={amountForm.rebate}
                                         onChange={(e) => setAmountForm({ ...amountForm, rebate: e.target.value })}
@@ -296,7 +360,7 @@ export default function BillDetailPage() {
                                 </div>
                                 <div className="md:col-span-2">
                                     <button type="submit" className="btn-secondary">
-                                        Submit for Approval
+                                        Submit Amount / Arrears Change for Approval
                                     </button>
                                 </div>
                             </form>
@@ -304,98 +368,107 @@ export default function BillDetailPage() {
                     )}
                 </div>
 
-                {/* Payment Form */}
                 <div className="space-y-6">
-                    <div className="card sticky top-6">
-                        <h3 className="text-lg font-bold mb-4 flex items-center space-x-2">
-                            <CreditCard className="w-5 h-5 text-municipal-red" />
-                            <span>Record Payment</span>
-                        </h3>
+                    {canPay && (
+                        <div className="card sticky top-6">
+                            <h3 className="text-lg font-bold mb-4 flex items-center space-x-2">
+                                <CreditCard className="w-5 h-5 text-municipal-red" />
+                                <span>Record Payment</span>
+                            </h3>
 
-                        {success && (
-                            <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm mb-4 border border-green-200 flex items-center space-x-2">
-                                <CheckCircle2 className="w-4 h-4" />
-                                <span>Payment recorded successfully!</span>
-                            </div>
-                        )}
-
-                        {error && (
-                            <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm mb-4 border border-red-200 flex items-center space-x-2">
-                                <AlertCircle className="w-4 h-4" />
-                                <span>{error}</span>
-                            </div>
-                        )}
-
-                        <form onSubmit={handlePayment} className="space-y-4">
-                            <div>
-                                <label className="label">Amount to Pay (GHS)</label>
-                                <div className="relative">
-                                    <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        className="input-field pl-10"
-                                        placeholder="0.00"
-                                        value={paymentAmount}
-                                        onChange={(e) => setPaymentAmount(e.target.value)}
-                                        disabled={balance <= 0}
-                                        max={balance}
-                                        required
-                                    />
+                            {success && (
+                                <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm mb-4 border border-green-200 flex items-center space-x-2">
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    <span>Payment recorded successfully!</span>
                                 </div>
-                            </div>
+                            )}
 
-                            <div>
-                                <label className="label">Payment Method</label>
-                                <select
-                                    className="input-field"
-                                    value={paymentMethod}
-                                    onChange={(e) => setPaymentMethod(e.target.value)}
-                                    disabled={balance <= 0}
-                                >
-                                    <option value="CASH">Cash</option>
-                                    <option value="MOBILE_MONEY">Mobile Money</option>
-                                    <option value="BANK_TRANSFER">Bank Transfer</option>
-                                    <option value="CHEQUE">Cheque</option>
-                                </select>
-                            </div>
+                            {error && (
+                                <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm mb-4 border border-red-200 flex items-center space-x-2">
+                                    <AlertCircle className="w-4 h-4" />
+                                    <span>{error}</span>
+                                </div>
+                            )}
 
-                            <div>
-                                <label className="label">General Counterfoil Receipt (GCR) Number</label>
-                                <div className="relative">
+                            <form onSubmit={handlePayment} className="space-y-4">
+                                <div>
+                                    <label className="label">Amount to Pay (GHS)</label>
+                                    <div className="relative">
+                                        <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            className="input-field pl-10"
+                                            placeholder="0.00"
+                                            value={paymentAmount}
+                                            onChange={(e) => setPaymentAmount(e.target.value)}
+                                            disabled={balance <= 0}
+                                            max={balance}
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="label">Payment Method</label>
+                                    <select
+                                        className="input-field"
+                                        value={paymentMethod}
+                                        onChange={(e) => setPaymentMethod(e.target.value)}
+                                        disabled={balance <= 0}
+                                    >
+                                        <option value="CASH">Cash</option>
+                                        <option value="MOBILE_MONEY">Mobile Money</option>
+                                        <option value="BANK_TRANSFER">Bank Transfer</option>
+                                        <option value="CHEQUE">Cheque</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="label">General Counterfoil Receipt (GCR) Number</label>
                                     <input
                                         type="text"
-                                        className="input-field"
-                                        placeholder="Enter GCR number"
+                                        className="input-field font-mono uppercase"
+                                        placeholder="e.g. 012345 or GCR-012345"
                                         value={gcrNumber}
-                                        onChange={(e) => setGcrNumber(e.target.value)}
+                                        onChange={(e) => setGcrNumber(e.target.value.toUpperCase())}
                                         disabled={balance <= 0}
+                                        minLength={4}
+                                        maxLength={20}
+                                        pattern="[A-Za-z0-9][A-Za-z0-9\-]{3,19}"
                                         required
                                     />
+                                    <p className="text-[11px] text-gray-500 mt-1 leading-snug">{GCR_HINT}</p>
                                 </div>
-                            </div>
 
-                            <button
-                                type="submit"
-                                className="w-full btn-primary py-3 flex items-center justify-center space-x-2 disabled:bg-gray-300 disabled:shadow-none"
-                                disabled={isSubmitting || balance <= 0 || !paymentAmount || !gcrNumber.trim()}
-                            >
-                                {isSubmitting ? (
-                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                ) : (
-                                    <CheckCircle2 className="w-5 h-5" />
-                                )}
-                                <span>Confirm Payment</span>
-                            </button>
-                        </form>
+                                <button
+                                    type="submit"
+                                    className="w-full btn-primary py-3 flex items-center justify-center space-x-2 disabled:bg-gray-300 disabled:shadow-none"
+                                    disabled={isSubmitting || balance <= 0 || !paymentAmount || !gcrNumber.trim()}
+                                >
+                                    {isSubmitting ? (
+                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                    ) : (
+                                        <CheckCircle2 className="w-5 h-5" />
+                                    )}
+                                    <span>Confirm Payment</span>
+                                </button>
+                            </form>
 
-                        {balance <= 0 && (
-                            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg text-center">
-                                <CheckCircle2 className="w-8 h-8 text-green-600 mx-auto mb-2" />
-                                <p className="text-green-800 font-bold">This bill is fully paid!</p>
-                            </div>
-                        )}
-                    </div>
+                            {balance <= 0 && (
+                                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg text-center">
+                                    <CheckCircle2 className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                                    <p className="text-green-800 font-bold">This bill is fully paid!</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {!canPay && (
+                        <div className="card text-sm text-gray-500">
+                            You do not have permission to record payments on this bill.
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
