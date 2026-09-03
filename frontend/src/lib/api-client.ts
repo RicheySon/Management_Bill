@@ -56,6 +56,9 @@ export const fetchElectoralAreas = async () => {
 
 export const fetchLocalAreas = async (electoralAreaId?: number) => {
     try {
+        if (electoralAreaId === undefined || electoralAreaId === null || Number.isNaN(Number(electoralAreaId))) {
+            return [];
+        }
         const response = await apiClient.get('/lookups/local-areas', {
             params: { electoral_area_id: electoralAreaId },
         });
@@ -84,6 +87,39 @@ export const fetchBusinessCategories = async () => {
         console.error('fetchBusinessCategories error:', error);
         return [];
     }
+};
+
+export const createElectoralArea = async (data: { name: string; code: string }) => {
+    const response = await apiClient.post('/lookups/electoral-areas', data);
+    return response.data.data;
+};
+
+export const updateElectoralArea = async (id: number, data: { name: string; code: string }) => {
+    const response = await apiClient.put(`/lookups/electoral-areas/${id}`, data);
+    return response.data.data;
+};
+
+export const deleteElectoralArea = async (id: number) => {
+    const response = await apiClient.delete(`/lookups/electoral-areas/${id}`);
+    return response.data;
+};
+
+export const createLocalArea = async (data: { name: string; electoral_area_id: number }) => {
+    const response = await apiClient.post('/lookups/local-areas', data);
+    return response.data.data;
+};
+
+export const updateLocalArea = async (
+    id: number,
+    data: { name: string; electoral_area_id: number }
+) => {
+    const response = await apiClient.put(`/lookups/local-areas/${id}`, data);
+    return response.data.data;
+};
+
+export const deleteLocalArea = async (id: number) => {
+    const response = await apiClient.delete(`/lookups/local-areas/${id}`);
+    return response.data;
 };
 
 // Customers
@@ -511,18 +547,118 @@ export const commitFeeScheduleImport = async (scheduleId: number, data: any) => 
 };
 
 // Active Fee Schedule Lookups (for forms)
+/** Ga North Municipal bbox: minLon,minLat,maxLon,maxLat (Mapbox) */
+const GA_NORTH_BBOX = '-0.38,5.52,-0.12,5.78';
+
+const getMapboxToken = () =>
+    process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
+
 export const reverseGeocode = async (lat: number, lon: number) => {
+    const token = getMapboxToken();
+    if (!token) {
+        console.warn('Mapbox token missing; reverse geocode skipped');
+        return null;
+    }
     try {
-        const response = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`, {
-            headers: {
-                'Accept-Language': 'en-US,en;q=0.9',
+        const response = await axios.get(
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${lon},${lat}.json`,
+            {
+                params: {
+                    access_token: token,
+                    types: 'address,poi,neighborhood,locality,place',
+                    limit: 1,
+                    language: 'en',
+                },
             }
-        });
-        return response.data;
+        );
+        return response.data?.features?.[0] || null;
     } catch (error) {
         console.error('Reverse geocoding failed:', error);
         return null;
     }
+};
+
+export const searchPlaces = async (query: string) => {
+    const token = getMapboxToken();
+    if (!token) {
+        console.warn('Mapbox token missing; place search skipped');
+        return [];
+    }
+    try {
+        const response = await axios.get(
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`,
+            {
+                params: {
+                    access_token: token,
+                    country: 'gh',
+                    bbox: GA_NORTH_BBOX,
+                    limit: 8,
+                    language: 'en',
+                    autocomplete: true,
+                },
+            }
+        );
+        const features = Array.isArray(response.data?.features) ? response.data.features : [];
+        // Normalize to a shape used by MapSelector (lat/lon + display_name)
+        return features.map((f: any) => ({
+            id: f.id,
+            place_id: f.id,
+            display_name: f.place_name,
+            text: f.text,
+            lat: f.center?.[1],
+            lon: f.center?.[0],
+            center: f.center,
+            raw: f,
+        }));
+    } catch (error) {
+        console.error('Place search failed:', error);
+        return [];
+    }
+};
+
+/** Works with Mapbox Geocoding features (and legacy Nominatim-like address objects). */
+export const formatGeoAddress = (geoData: any): { town: string; street: string; landmark: string; label: string } => {
+    if (!geoData) return { town: '', street: '', landmark: '', label: '' };
+
+    // Mapbox feature
+    if (geoData.place_type || geoData.place_name || geoData.context) {
+        const context: any[] = geoData.context || [];
+        const ctx = (prefix: string) =>
+            context.find((c) => String(c.id || '').startsWith(prefix))?.text || '';
+
+        const placeType: string[] = geoData.place_type || [];
+        const street =
+            placeType.includes('address') || placeType.includes('poi')
+                ? geoData.text || ''
+                : ctx('address.') || '';
+        const town =
+            ctx('neighborhood.') ||
+            ctx('locality.') ||
+            ctx('place.') ||
+            ctx('district.') ||
+            (placeType.includes('neighborhood') || placeType.includes('locality') || placeType.includes('place')
+                ? geoData.text
+                : '') ||
+            '';
+        const landmark = placeType.includes('poi') ? geoData.text || '' : '';
+        const label = geoData.place_name || [street, town, 'Ga North'].filter(Boolean).join(', ');
+        return { town, street, landmark, label };
+    }
+
+    // Legacy Nominatim-style
+    const addr = geoData?.address || {};
+    const town =
+        addr.suburb ||
+        addr.neighbourhood ||
+        addr.village ||
+        addr.town ||
+        addr.city_district ||
+        addr.city ||
+        '';
+    const street = addr.road || addr.pedestrian || addr.residential || '';
+    const landmark = addr.amenity || addr.shop || addr.building || '';
+    const label = [street, town, 'Ga North'].filter(Boolean).join(', ');
+    return { town, street, landmark, label };
 };
 
 export const fetchActivePropertyRateZones = async (year?: number) => {

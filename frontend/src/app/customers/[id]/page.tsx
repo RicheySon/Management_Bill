@@ -147,6 +147,7 @@ export default function CustomerDetailPage() {
                                     <thead className="bg-gray-50">
                                         <tr>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prop. Number</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account Number</th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Classification</th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
                                             <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Balance</th>
@@ -158,6 +159,7 @@ export default function CustomerDetailPage() {
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-municipal-red">
                                                     <Link href={`/properties/${prop.id}`}>{prop.property_number}</Link>
                                                 </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-mono text-gray-600">{prop.account_number || '—'}</td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{prop.classification_name}</td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 truncate max-w-[150px]">{prop.physical_location}</td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-right font-bold text-red-600">GHS {parseFloat(prop.total_outstanding || 0).toFixed(2)}</td>
@@ -188,6 +190,7 @@ export default function CustomerDetailPage() {
                                     <thead className="bg-gray-50">
                                         <tr>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">BOP Number</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account Number</th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Business Name</th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
                                             <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Balance</th>
@@ -199,8 +202,9 @@ export default function CustomerDetailPage() {
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-municipal-red">
                                                     <Link href={`/businesses/${biz.id}`}>{biz.business_number}</Link>
                                                 </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-mono text-gray-600">{biz.account_number || '—'}</td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">{biz.business_name}</td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{biz.category_name}</td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{biz.business_category_class || biz.category_name || '—'}</td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-right font-bold text-red-600">GHS {parseFloat(biz.total_outstanding || 0).toFixed(2)}</td>
                                             </tr>
                                         ))}

@@ -1,21 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import {
     fetchProperty,
     updateProperty,
     updateCustomer,
+    fetchCustomer,
     fetchPropertyClassifications,
     fetchElectoralAreas,
     fetchLocalAreas,
     fetchActivePropertyRateZones,
     reverseGeocode,
+    formatGeoAddress,
 } from '@/lib/api-client';
 import { ArrowLeft, Save, Navigation, Map as MapIcon, X, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+
+const toNullableId = (v: any) =>
+    (v === '' || v === undefined || v === null || Number.isNaN(Number(v)) ? null : Number(v));
 
 const MapSelector = dynamic(() => import('@/components/MapSelector'), {
     ssr: false,
@@ -81,6 +86,7 @@ export default function EditPropertyPage() {
     const [isDetecting, setIsDetecting] = useState(false);
     const [showMap, setShowMap] = useState(false);
     const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
+    const prevElectoralAreaRef = useRef<number | null>(null);
 
     const selectedElectoralArea = watch('electoral_area_id');
 
@@ -104,15 +110,14 @@ export default function EditPropertyPage() {
                 // Attempt reverse geocoding
                 try {
                     const geoData = await reverseGeocode(lat, lng);
-                    if (geoData && geoData.address) {
-                        const addr = geoData.address;
-                        const town = addr.city || addr.town || addr.village || addr.suburb || '';
-                        const street = addr.road || addr.street || '';
-                        const suburb = addr.neighbourhood || addr.suburb || '';
-                        
-                        if (town) setValue('town', town);
-                        if (street) setValue('street_name', street);
-                        if (suburb) setValue('landmark', suburb);
+                    if (geoData) {
+                        const geo = formatGeoAddress(geoData);
+                        if (geo.town) setValue('town', geo.town);
+                        if (geo.street) setValue('street_name', geo.street);
+                        if (geo.landmark) setValue('landmark', geo.landmark);
+                        if (!watch('gps_address')) {
+                            setValue('gps_address', `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                        }
                     }
                 } catch (err) {
                     console.error('Auto-address failed:', err);
@@ -139,7 +144,7 @@ export default function EditPropertyPage() {
                 ]);
 
                 const p = propertyData.property;
-                const c = propertyData.customer;
+                let c = propertyData.customer;
 
                 // Fill property fields
                 Object.keys(p).forEach(key => {
@@ -148,7 +153,16 @@ export default function EditPropertyPage() {
                     }
                 });
 
-                // Fill rate payer fields from linked customer
+                // Fill rate payer fields from linked customer (API returns owner_* when customer nest is absent)
+                if (!c && p.customer_id) {
+                    try {
+                        const customerResp = await fetchCustomer(p.customer_id);
+                        c = customerResp.customer || customerResp;
+                    } catch (err) {
+                        console.error('Failed to fetch linked customer:', err);
+                    }
+                }
+
                 if (c) {
                     setCustomerId(c.id);
                     setValue('full_name', c.full_name || '');
@@ -159,6 +173,10 @@ export default function EditPropertyPage() {
                     setValue('next_of_kin_name', c.next_of_kin_name || '');
                     setValue('next_of_kin_contact', c.next_of_kin_contact || '');
                     setValue('ghana_card_no', c.ghana_card_no || '');
+                } else {
+                    if (p.customer_id) setCustomerId(p.customer_id);
+                    setValue('full_name', p.owner_name || '');
+                    setValue('phone_number', p.owner_phone || '');
                 }
 
                 if (p.property_rate_zone_id) {
@@ -173,6 +191,7 @@ export default function EditPropertyPage() {
                     const locals = await fetchLocalAreas(p.electoral_area_id);
                     setLocalAreas(locals);
                     setValue('local_area_id', p.local_area_id);
+                    prevElectoralAreaRef.current = Number(p.electoral_area_id);
                 }
             } catch (err: any) {
                 console.error('Failed to load property data:', err);
@@ -185,12 +204,23 @@ export default function EditPropertyPage() {
     }, [id, setValue]);
 
     useEffect(() => {
-        if (selectedElectoralArea) {
-            fetchLocalAreas(selectedElectoralArea).then(setLocalAreas).catch(() => setLocalAreas([]));
-        } else {
+        if (!selectedElectoralArea) {
             setLocalAreas([]);
+            return;
         }
-    }, [selectedElectoralArea]);
+        const areaId = Number(selectedElectoralArea);
+        if (Number.isNaN(areaId)) {
+            setLocalAreas([]);
+            return;
+        }
+        fetchLocalAreas(areaId).then((areas) => {
+            setLocalAreas(areas);
+            if (prevElectoralAreaRef.current !== null && prevElectoralAreaRef.current !== areaId) {
+                setValue('local_area_id', undefined);
+            }
+            prevElectoralAreaRef.current = areaId;
+        }).catch(() => setLocalAreas([]));
+    }, [selectedElectoralArea, setValue]);
 
     const onSubmit = async (data: PropertyEditForm) => {
         setError(null);
@@ -211,7 +241,7 @@ export default function EditPropertyPage() {
 
             // Update property
             await updateProperty(id as string, {
-                classification_id: data.classification_id,
+                classification_id: toNullableId(data.classification_id),
                 property_use: data.property_use,
                 building_type: data.building_type,
                 no_of_storeys: data.no_of_storeys,
@@ -235,8 +265,8 @@ export default function EditPropertyPage() {
                 town: data.town,
                 street_name: data.street_name,
                 landmark: data.landmark,
-                electoral_area_id: data.electoral_area_id,
-                local_area_id: data.local_area_id,
+                electoral_area_id: toNullableId(data.electoral_area_id),
+                local_area_id: toNullableId(data.local_area_id),
                 population_density: data.population_density,
                 property_rate_zone_id: selectedRateZoneId ? parseInt(selectedRateZoneId) : null,
             });
@@ -572,13 +602,14 @@ export default function EditPropertyPage() {
                                             // Attempt reverse geocoding
                                             try {
                                                 const geoData = await reverseGeocode(lat, lng);
-                                                if (geoData && geoData.address) {
-                                                    const addr = geoData.address;
-                                                    const town = addr.city || addr.town || addr.village || addr.suburb || '';
-                                                    const street = addr.road || addr.street || '';
-                                                    
-                                                    if (town) setValue('town', town);
-                                                    if (street) setValue('street_name', street);
+                                                if (geoData) {
+                                                    const geo = formatGeoAddress(geoData);
+                                                    if (geo.town) setValue('town', geo.town);
+                                                    if (geo.street) setValue('street_name', geo.street);
+                                                    if (geo.landmark) setValue('landmark', geo.landmark);
+                                                    if (!watch('gps_address')) {
+                                                        setValue('gps_address', `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                                                    }
                                                 }
                                             } catch (err) {
                                                 console.error('Auto-address from map failed:', err);

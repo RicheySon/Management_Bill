@@ -122,7 +122,7 @@ describe('billing.service smoke', () => {
             'cust-1',
             100,
             'CASH',
-            'GCR-001',
+            '25/1234567',
             undefined,
             'user-1'
         );
@@ -134,7 +134,7 @@ describe('billing.service smoke', () => {
         );
         expect(insertCall).toBeTruthy();
         expect(insertCall[1]).toContain('user-1');
-        expect(insertCall[1]).toContain('GCR-001');
+        expect(insertCall[1]).toContain('25/1234567');
     });
 });
 

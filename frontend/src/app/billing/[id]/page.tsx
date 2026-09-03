@@ -18,7 +18,7 @@ import {
     FileDown, Pencil, Send
 } from 'lucide-react';
 
-const GCR_HINT = 'Enter the General Counterfoil Receipt serial from the GCR book (4–20 characters). Examples: 012345 or GCR-012345';
+import { GCR_HINT, GCR_INPUT_PATTERN, GCR_PLACEHOLDER, isValidGcr, normalizeGcr } from '@/lib/gcr';
 
 export default function BillDetailPage() {
     const { id } = useParams();
@@ -72,8 +72,8 @@ export default function BillDetailPage() {
         setIsSubmitting(true);
         setError(null);
         try {
-            const gcr = gcrNumber.trim().toUpperCase();
-            if (!/^[A-Z0-9][A-Z0-9\-]{3,19}$/.test(gcr)) {
+            const gcr = normalizeGcr(gcrNumber);
+            if (!isValidGcr(gcr)) {
                 throw new Error(GCR_HINT);
             }
             await recordPayment(id as string, {
@@ -428,14 +428,15 @@ export default function BillDetailPage() {
                                     <label className="label">General Counterfoil Receipt (GCR) Number</label>
                                     <input
                                         type="text"
-                                        className="input-field font-mono uppercase"
-                                        placeholder="e.g. 012345 or GCR-012345"
+                                        className="input-field font-mono"
+                                        placeholder={GCR_PLACEHOLDER}
                                         value={gcrNumber}
-                                        onChange={(e) => setGcrNumber(e.target.value.toUpperCase())}
+                                        onChange={(e) => setGcrNumber(e.target.value.replace(/[^\d/]/g, '').slice(0, 10))}
                                         disabled={balance <= 0}
-                                        minLength={4}
-                                        maxLength={20}
-                                        pattern="[A-Za-z0-9][A-Za-z0-9\-]{3,19}"
+                                        minLength={10}
+                                        maxLength={10}
+                                        pattern={GCR_INPUT_PATTERN}
+                                        inputMode="numeric"
                                         required
                                     />
                                     <p className="text-[11px] text-gray-500 mt-1 leading-snug">{GCR_HINT}</p>

@@ -74,6 +74,9 @@ export default function BusinessesPage() {
                                         <h3 className="text-xl font-bold text-gray-900">{biz.business_name}</h3>
                                     </div>
                                     <p className="text-xs font-mono font-bold text-municipal-red">{biz.business_number}</p>
+                                    {biz.account_number && (
+                                        <p className="text-xs text-gray-500 mt-0.5">Acct: <span className="font-mono">{biz.account_number}</span></p>
+                                    )}
                                 </div>
                                 <span className={`px-2 py-1 text-xs font-bold rounded-full ${biz.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                                     }`}>

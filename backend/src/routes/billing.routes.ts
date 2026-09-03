@@ -426,11 +426,11 @@ router.post('/:id/payment', authenticateToken, authorize(['record_payment']), as
             customer_id: Joi.string().uuid().required(),
             amount: Joi.number().positive().required(),
             payment_method: Joi.string().required(),
-            gcr_number: Joi.string().trim().min(4).max(20).required()
-                .pattern(/^[A-Za-z0-9][A-Za-z0-9\-]{3,19}$/)
+            gcr_number: Joi.string().trim().required()
+                .pattern(/^\d{2}\/\d{7}$/)
                 .messages({
                     'string.pattern.base':
-                        'GCR must be 4–20 characters (letters, numbers, hyphens). Example: 012345 or GCR-012345',
+                        'GCR must be in format 00/0000000 (2 digits, slash, 7 digits). Example: 25/1234567',
                 }),
             payment_reference: Joi.string().optional().allow(''),
         });

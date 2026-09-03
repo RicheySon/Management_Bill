@@ -123,6 +123,10 @@ export default function PropertyDetailPage() {
                         <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Property Specs</h3>
                         <div className="space-y-4">
                             <div className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
+                                <span className="text-gray-500">Account Number</span>
+                                <span className="font-semibold font-mono text-gray-900">{property.account_number || '—'}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
                                 <span className="text-gray-500 flex items-center"><Tag className="w-3.5 h-3.5 mr-1.5" /> Type</span>
                                 <span className="font-semibold text-gray-900">{property.classification_name}</span>
                             </div>
@@ -153,6 +157,8 @@ export default function PropertyDetailPage() {
                                 <div>
                                     <p className="font-bold text-gray-900">{property.physical_location || 'Not Set'}</p>
                                     <p className="text-gray-500">Landmark: {property.landmark || 'None'}</p>
+                                    <p className="text-gray-500 mt-1">Electoral Area: {property.electoral_area_name || '—'}</p>
+                                    <p className="text-gray-500">Community: {property.local_area_name || '—'}</p>
                                 </div>
                             </div>
                             <div className="bg-gray-50 p-3 rounded-lg flex items-center justify-between">

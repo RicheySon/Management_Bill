@@ -6,16 +6,20 @@ import { useForm } from 'react-hook-form';
 import {
     createBusiness,
     createCustomer,
-    fetchCustomers,
     fetchCustomer,
-    fetchBusinessCategories,
     fetchElectoralAreas,
+    fetchLocalAreas,
     fetchActiveBusinessFeeItems,
     reverseGeocode,
+    formatGeoAddress,
 } from '@/lib/api-client';
 import { ArrowLeft, Save, UserPlus, UserCheck, Navigation, MapPin, Map as MapIcon, X, CheckCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import CustomerSearchSelect from '@/components/CustomerSearchSelect';
+
+const toNullableId = (v: any) =>
+    (v === '' || v === undefined || v === null || Number.isNaN(Number(v)) ? null : Number(v));
 
 const MapSelector = dynamic(() => import('@/components/MapSelector'), {
     ssr: false,
@@ -35,7 +39,6 @@ interface BusinessForm {
     customer_id?: string;
     business_name: string;
     business_contact?: string;
-    category_id: number;
     business_type_main?: string;
     business_type_sub?: string;
     business_category_class?: string;
@@ -54,6 +57,7 @@ interface BusinessForm {
     street_name?: string;
     landmark?: string;
     electoral_area_id?: number;
+    local_area_id?: number;
 }
 
 const BUSINESS_TYPE_MAIN_OPTIONS = [
@@ -83,16 +87,14 @@ export default function NewBusinessPage() {
     const router = useRouter();
     const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<BusinessForm>();
 
-    const [customers, setCustomers] = useState([]);
-    const [categories, setCategories] = useState([]);
     const [electoralAreas, setElectoralAreas] = useState([]);
+    const [localAreas, setLocalAreas] = useState([]);
     const [feeItems, setFeeItems] = useState<any[]>([]);
     const [selectedFeeItemId, setSelectedFeeItemId] = useState<string>('');
     const [selectedFeeAmount, setSelectedFeeAmount] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const [businessNumber, setBusinessNumber] = useState<string | null>(null);
-    const [customerId, setCustomerId] = useState<string | null>(null);
     const [isNewOwner, setIsNewOwner] = useState(true);
     const [isDetecting, setIsDetecting] = useState(false);
     const [showMap, setShowMap] = useState(false);
@@ -101,6 +103,7 @@ export default function NewBusinessPage() {
     const [loadingProfile, setLoadingProfile] = useState(false);
 
     const watchedCustomerId = watch('customer_id');
+    const selectedElectoralArea = watch('electoral_area_id');
 
     // Auto-fetch customer profile when existing owner is selected
     useEffect(() => {
@@ -144,15 +147,14 @@ export default function NewBusinessPage() {
                 // Attempt reverse geocoding
                 try {
                     const geoData = await reverseGeocode(lat, lng);
-                    if (geoData && geoData.address) {
-                        const addr = geoData.address;
-                        const town = addr.city || addr.town || addr.village || addr.suburb || '';
-                        const street = addr.road || addr.street || '';
-                        const suburb = addr.neighbourhood || addr.suburb || '';
-                        
-                        if (town) setValue('town', town);
-                        if (street) setValue('street_name', street);
-                        if (suburb) setValue('landmark', suburb);
+                    if (geoData) {
+                        const geo = formatGeoAddress(geoData);
+                        if (geo.town) setValue('town', geo.town);
+                        if (geo.street) setValue('street_name', geo.street);
+                        if (geo.landmark) setValue('landmark', geo.landmark);
+                        if (!watch('gps_address')) {
+                            setValue('gps_address', `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                        }
                     }
                 } catch (err) {
                     console.error('Auto-address failed:', err);
@@ -172,14 +174,10 @@ export default function NewBusinessPage() {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const [customersData, categoriesData, areasData, feeItemsData] = await Promise.all([
-                    fetchCustomers({ limit: 1000 }),
-                    fetchBusinessCategories(),
+                const [areasData, feeItemsData] = await Promise.all([
                     fetchElectoralAreas(),
                     fetchActiveBusinessFeeItems(new Date().getFullYear()),
                 ]);
-                setCustomers(customersData.data || []);
-                setCategories(categoriesData || []);
                 setElectoralAreas(areasData || []);
                 setFeeItems(feeItemsData || []);
             } catch (err) {
@@ -189,6 +187,18 @@ export default function NewBusinessPage() {
         };
         loadData();
     }, []);
+
+    useEffect(() => {
+        if (!selectedElectoralArea) {
+            setLocalAreas([]);
+            setValue('local_area_id', undefined);
+            return;
+        }
+        fetchLocalAreas(Number(selectedElectoralArea))
+            .then((areas) => setLocalAreas(areas || []))
+            .catch(() => setLocalAreas([]));
+        setValue('local_area_id', undefined);
+    }, [selectedElectoralArea, setValue]);
 
     const onSubmit = async (data: BusinessForm) => {
         setError(null);
@@ -221,7 +231,7 @@ export default function NewBusinessPage() {
             const result = await createBusiness({
                 business_name: data.business_name,
                 customer_id: customerId,
-                category_id: data.category_id,
+                category_id: null,
                 business_activity: data.business_activity,
                 business_contact: data.business_contact,
                 business_type_main: data.business_type_main,
@@ -238,7 +248,8 @@ export default function NewBusinessPage() {
                 town: data.town,
                 street_name: data.street_name,
                 landmark: data.landmark,
-                electoral_area_id: data.electoral_area_id,
+                electoral_area_id: toNullableId(data.electoral_area_id),
+                local_area_id: toNullableId(data.local_area_id),
                 fee_item_id: selectedFeeItemId ? parseInt(selectedFeeItemId) : null,
             });
 
@@ -395,22 +406,20 @@ export default function NewBusinessPage() {
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            <div>
-                                <label className="label">
-                                    Select Existing Business Owner <span className="text-municipal-red">*</span>
-                                </label>
-                                <select
-                                    {...register('customer_id', { required: !isNewOwner ? 'Please select a business owner' : false })}
-                                    className="input-field"
-                                >
-                                    <option value="">-- Select Business Owner --</option>
-                                    {customers.map((customer: any) => (
-                                        <option key={customer.id} value={customer.id}>
-                                            {customer.full_name} ({customer.phone_number})
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                            <CustomerSearchSelect
+                                value={watchedCustomerId}
+                                label="Select Existing Business Owner"
+                                required={!isNewOwner}
+                                error={errors.customer_id?.message as string | undefined}
+                                onChange={(id, customer) => {
+                                    setValue('customer_id', id || undefined, { shouldValidate: true });
+                                    setSelectedCustomerProfile(customer);
+                                }}
+                            />
+                            <input
+                                type="hidden"
+                                {...register('customer_id', { required: !isNewOwner ? 'Please select a business owner' : false })}
+                            />
 
                             {/* Loading spinner */}
                             {loadingProfile && (
@@ -533,36 +542,20 @@ export default function NewBusinessPage() {
 
                         <div>
                             <label className="label">
-                                Business Category <span className="text-municipal-red">*</span>
+                                Business Category Class <span className="text-municipal-red">*</span>
                             </label>
                             <select
-                                {...register('business_category_class')}
+                                {...register('business_category_class', { required: 'Please select a category class' })}
                                 className="input-field"
                             >
                                 <option value="">Select category</option>
                                 <option value="Category A">Category A</option>
                                 <option value="Category B">Category B</option>
                                 <option value="Category C">Category C</option>
+                                <option value="Category D">Category D</option>
                             </select>
-                        </div>
-
-                        <div>
-                            <label className="label">
-                                Fee Category <span className="text-municipal-red">*</span>
-                            </label>
-                            <select
-                                {...register('category_id', { required: 'Please select fee category' })}
-                                className="input-field"
-                            >
-                                <option value="">Select fee category</option>
-                                {categories.map((category: any) => (
-                                    <option key={category.id} value={category.id}>
-                                        {category.name} (GHS {category.base_fee})
-                                    </option>
-                                ))}
-                            </select>
-                            {errors.category_id && (
-                                <p className="text-red-500 text-sm mt-1">{errors.category_id.message}</p>
+                            {errors.business_category_class && (
+                                <p className="text-red-500 text-sm mt-1">{errors.business_category_class.message}</p>
                             )}
                         </div>
 
@@ -723,13 +716,14 @@ export default function NewBusinessPage() {
                                             // Attempt reverse geocoding
                                             try {
                                                 const geoData = await reverseGeocode(lat, lng);
-                                                if (geoData && geoData.address) {
-                                                    const addr = geoData.address;
-                                                    const town = addr.city || addr.town || addr.village || addr.suburb || '';
-                                                    const street = addr.road || addr.street || '';
-                                                    
-                                                    if (town) setValue('town', town);
-                                                    if (street) setValue('street_name', street);
+                                                if (geoData) {
+                                                    const geo = formatGeoAddress(geoData);
+                                                    if (geo.town) setValue('town', geo.town);
+                                                    if (geo.street) setValue('street_name', geo.street);
+                                                    if (geo.landmark) setValue('landmark', geo.landmark);
+                                                    if (!watch('gps_address')) {
+                                                        setValue('gps_address', `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                                                    }
                                                 }
                                             } catch (err) {
                                                 console.error('Auto-address from map failed:', err);
@@ -804,9 +798,25 @@ export default function NewBusinessPage() {
 
                         <div>
                             <label className="label">Electoral Area</label>
-                            <select {...register('electoral_area_id')} className="input-field">
+                            <select {...register('electoral_area_id', { valueAsNumber: true })} className="input-field">
                                 <option value="">Electoral area</option>
                                 {electoralAreas.map((area: any) => (
+                                    <option key={area.id} value={area.id}>
+                                        {area.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="label">Local Area / Community</label>
+                            <select
+                                {...register('local_area_id', { valueAsNumber: true })}
+                                className="input-field"
+                                disabled={!selectedElectoralArea}
+                            >
+                                <option value="">Select Local Area</option>
+                                {localAreas.map((area: any) => (
                                     <option key={area.id} value={area.id}>
                                         {area.name}
                                     </option>

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
     Home, Users, Building2, FileText,
     DollarSign, BarChart3, Printer, LogOut, Loader2, Shield,
-    Briefcase, ClipboardList, Settings, Menu, Database
+    Briefcase, ClipboardList, Settings, Menu, Database, MapPinned
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import BackButton from '@/components/BackButton';
@@ -176,6 +176,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
                         {(hasPermission('approve_amount_changes') || hasPermission('approve_privileged_actions')) &&
                             <NavLink href="/admin/approvals" icon={<ClipboardList className="w-5 h-5" />} label="Approvals" onClick={() => setIsSidebarOpen(false)} />
+                        }
+
+                        {hasPermission('manage_users') &&
+                            <NavLink href="/admin/areas" icon={<MapPinned className="w-5 h-5" />} label="Areas & Communities" onClick={() => setIsSidebarOpen(false)} />
                         }
 
                         {hasPermission('configure_rates') &&

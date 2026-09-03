@@ -6,17 +6,21 @@ import { useForm } from 'react-hook-form';
 import {
     createProperty,
     createCustomer,
-    fetchCustomers,
     fetchCustomer,
     fetchPropertyClassifications,
     fetchElectoralAreas,
     fetchLocalAreas,
     fetchActivePropertyRateZones,
     reverseGeocode,
+    formatGeoAddress,
 } from '@/lib/api-client';
 import { ArrowLeft, Save, UserPlus, UserCheck, MapPin, Navigation, Map as MapIcon, X, Phone, Mail, User, CheckCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import CustomerSearchSelect from '@/components/CustomerSearchSelect';
+
+const toNullableId = (v: any) =>
+    (v === '' || v === undefined || v === null || Number.isNaN(Number(v)) ? null : Number(v));
 
 const MapSelector = dynamic(() => import('@/components/MapSelector'), {
     ssr: false,
@@ -60,6 +64,7 @@ interface PropertyForm {
     street_name?: string;
     landmark?: string;
     electoral_area_id?: number;
+    local_area_id?: number;
     population_density?: string;
     property_size?: number;
 }
@@ -68,9 +73,9 @@ export default function NewPropertyPage() {
     const router = useRouter();
     const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<PropertyForm>();
 
-    const [customers, setCustomers] = useState([]);
     const [classifications, setClassifications] = useState([]);
     const [electoralAreas, setElectoralAreas] = useState([]);
+    const [localAreas, setLocalAreas] = useState([]);
     const [rateZones, setRateZones] = useState<any[]>([]);
     const [selectedRateZoneId, setSelectedRateZoneId] = useState<string>('');
     const [selectedRateInfo, setSelectedRateInfo] = useState<string>('');
@@ -85,6 +90,7 @@ export default function NewPropertyPage() {
     const [loadingProfile, setLoadingProfile] = useState(false);
 
     const watchedCustomerId = watch('customer_id');
+    const selectedElectoralArea = watch('electoral_area_id');
 
     // Auto-fetch customer profile when existing rate payer is selected
     useEffect(() => {
@@ -132,19 +138,14 @@ export default function NewPropertyPage() {
                 // Attempt reverse geocoding
                 try {
                     const geoData = await reverseGeocode(lat, lng);
-                    if (geoData && geoData.address) {
-                        const addr = geoData.address;
-                        const town = addr.city || addr.town || addr.village || addr.suburb || '';
-                        const street = addr.road || addr.street || '';
-                        const suburb = addr.neighbourhood || addr.suburb || '';
-                        
-                        if (town) setValue('town', town);
-                        if (street) setValue('street_name', street);
-                        if (suburb) setValue('landmark', suburb);
-                        
-                        // Combine for physical location if needed
-                        const physical = [street, suburb, town].filter(Boolean).join(', ');
-                        if (physical) setValue('street_name', physical);
+                    if (geoData) {
+                        const geo = formatGeoAddress(geoData);
+                        if (geo.town) setValue('town', geo.town);
+                        if (geo.street) setValue('street_name', geo.street);
+                        if (geo.landmark) setValue('landmark', geo.landmark);
+                        if (!watch('gps_address')) {
+                            setValue('gps_address', `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                        }
                     }
                 } catch (err) {
                     console.error('Auto-address failed:', err);
@@ -164,13 +165,11 @@ export default function NewPropertyPage() {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const [customersData, classificationsData, areasData, rateZonesData] = await Promise.all([
-                    fetchCustomers({ limit: 1000 }),
+                const [classificationsData, areasData, rateZonesData] = await Promise.all([
                     fetchPropertyClassifications(),
                     fetchElectoralAreas(),
                     fetchActivePropertyRateZones(new Date().getFullYear()),
                 ]);
-                setCustomers(customersData.data || []);
                 setClassifications(classificationsData || []);
                 setElectoralAreas(areasData || []);
                 setRateZones(rateZonesData || []);
@@ -181,6 +180,18 @@ export default function NewPropertyPage() {
         };
         loadData();
     }, []);
+
+    useEffect(() => {
+        if (!selectedElectoralArea) {
+            setLocalAreas([]);
+            setValue('local_area_id', undefined);
+            return;
+        }
+        fetchLocalAreas(Number(selectedElectoralArea))
+            .then((areas) => setLocalAreas(areas || []))
+            .catch(() => setLocalAreas([]));
+        setValue('local_area_id', undefined);
+    }, [selectedElectoralArea, setValue]);
 
     const onSubmit = async (data: PropertyForm) => {
         setError(null);
@@ -213,7 +224,7 @@ export default function NewPropertyPage() {
 
             const propertyResult = await createProperty({
                 customer_id: customerId,
-                classification_id: data.classification_id,
+                classification_id: toNullableId(data.classification_id),
                 property_use: data.property_use,
                 building_type: data.building_type,
                 no_of_storeys: data.no_of_storeys,
@@ -236,7 +247,8 @@ export default function NewPropertyPage() {
                 town: data.town,
                 street_name: data.street_name,
                 landmark: data.landmark,
-                electoral_area_id: data.electoral_area_id,
+                electoral_area_id: toNullableId(data.electoral_area_id),
+                local_area_id: toNullableId(data.local_area_id),
                 population_density: data.population_density,
                 property_size: data.property_size,
                 property_rate_zone_id: selectedRateZoneId ? parseInt(selectedRateZoneId) : null,
@@ -410,22 +422,20 @@ export default function NewPropertyPage() {
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            <div>
-                                <label className="label">
-                                    Select Existing Rate Payer <span className="text-municipal-red">*</span>
-                                </label>
-                                <select
-                                    {...register('customer_id', { required: !isNewRatePayer ? 'Please select a rate payer' : false })}
-                                    className="input-field"
-                                >
-                                    <option value="">-- Select Rate Payer --</option>
-                                    {customers.map((customer: any) => (
-                                        <option key={customer.id} value={customer.id}>
-                                            {customer.full_name} ({customer.phone_number})
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                            <CustomerSearchSelect
+                                value={watchedCustomerId}
+                                label="Select Existing Rate Payer"
+                                required={!isNewRatePayer}
+                                error={errors.customer_id?.message as string | undefined}
+                                onChange={(id, customer) => {
+                                    setValue('customer_id', id || undefined, { shouldValidate: true });
+                                    setSelectedCustomerProfile(customer);
+                                }}
+                            />
+                            <input
+                                type="hidden"
+                                {...register('customer_id', { required: !isNewRatePayer ? 'Please select a rate payer' : false })}
+                            />
 
                             {/* Loading spinner */}
                             {loadingProfile && (
@@ -819,13 +829,14 @@ export default function NewPropertyPage() {
                                             // Attempt reverse geocoding
                                             try {
                                                 const geoData = await reverseGeocode(lat, lng);
-                                                if (geoData && geoData.address) {
-                                                    const addr = geoData.address;
-                                                    const town = addr.city || addr.town || addr.village || addr.suburb || '';
-                                                    const street = addr.road || addr.street || '';
-                                                    
-                                                    const physical = [street, town].filter(Boolean).join(', ');
-                                                    if (physical) setValue('street_name', physical);
+                                                if (geoData) {
+                                                    const geo = formatGeoAddress(geoData);
+                                                    if (geo.town) setValue('town', geo.town);
+                                                    if (geo.street) setValue('street_name', geo.street);
+                                                    if (geo.landmark) setValue('landmark', geo.landmark);
+                                                    if (!watch('gps_address')) {
+                                                        setValue('gps_address', `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                                                    }
                                                 }
                                             } catch (err) {
                                                 console.error('Auto-address from map failed:', err);
@@ -900,9 +911,25 @@ export default function NewPropertyPage() {
 
                         <div>
                             <label className="label">Electoral Area</label>
-                            <select {...register('electoral_area_id')} className="input-field">
+                            <select {...register('electoral_area_id', { valueAsNumber: true })} className="input-field">
                                 <option value="">Electoral area</option>
                                 {electoralAreas.map((area: any) => (
+                                    <option key={area.id} value={area.id}>
+                                        {area.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="label">Local Area / Community</label>
+                            <select
+                                {...register('local_area_id', { valueAsNumber: true })}
+                                className="input-field"
+                                disabled={!selectedElectoralArea}
+                            >
+                                <option value="">Select Local Area</option>
+                                {localAreas.map((area: any) => (
                                     <option key={area.id} value={area.id}>
                                         {area.name}
                                     </option>
