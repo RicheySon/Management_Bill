@@ -254,6 +254,15 @@ export const fetchRevenueReport = async (params?: any) => {
     return response.data.data;
 };
 
+export const fetchMonthlyReport = async (params?: {
+    year?: number;
+    month?: number | '';
+    electoral_area_id?: string;
+}) => {
+    const response = await apiClient.get('/reports/monthly', { params });
+    return response.data.data;
+};
+
 export const fetchDefaulters = async (params?: any) => {
     const response = await apiClient.get('/reports/defaulters', { params });
     return response.data.data;

@@ -53,7 +53,7 @@ router.get('/revenue', authorize(['view_reports']), async (req: Request, res: Re
             paramIndex++;
         }
 
-        query += ` GROUP BY DATE_TRUNC($1, b.issue_date), b.bill_type ORDER BY period DESC`;
+        query += ` GROUP BY DATE_TRUNC($1, b.issue_date), b.bill_type ORDER BY period ASC`;
 
         const result = await pool.query(query, queryParams);
 
@@ -66,6 +66,153 @@ router.get('/revenue', authorize(['view_reports']), async (req: Request, res: Re
         res.status(500).json({
             success: false,
             error: 'Failed to fetch revenue report',
+        });
+    }
+});
+
+/**
+ * GET /api/reports/monthly
+ * Monthly billing + payment collection report (chronological)
+ */
+router.get('/monthly', authorize(['view_reports']), async (req: Request, res: Response) => {
+    try {
+        const year = parseInt(String(req.query.year || new Date().getFullYear()), 10);
+        const month = req.query.month ? parseInt(String(req.query.month), 10) : null;
+        const electoralAreaId = req.query.electoral_area_id
+            ? String(req.query.electoral_area_id)
+            : null;
+
+        const billedParams: any[] = [year];
+        let billedAreaJoin = '';
+        let billedAreaFilter = '';
+        if (electoralAreaId) {
+            billedAreaJoin = ' INNER JOIN customers c ON b.customer_id = c.id';
+            billedAreaFilter = ' AND c.electoral_area_id = $2';
+            billedParams.push(electoralAreaId);
+        }
+        if (month) {
+            billedParams.push(month);
+            billedAreaFilter += ` AND EXTRACT(MONTH FROM b.issue_date) = $${billedParams.length}`;
+        }
+
+        const billedResult = await pool.query(
+            `SELECT
+                EXTRACT(YEAR FROM b.issue_date)::int AS year,
+                EXTRACT(MONTH FROM b.issue_date)::int AS month,
+                COUNT(*)::int AS bill_count,
+                COALESCE(SUM(b.total_amount), 0) AS total_billed,
+                COALESCE(SUM(b.amount_paid), 0) AS amount_paid_on_bills,
+                COALESCE(SUM(b.amount_due), 0) AS total_outstanding
+             FROM bills b
+             ${billedAreaJoin}
+             WHERE EXTRACT(YEAR FROM b.issue_date) = $1
+             ${billedAreaFilter}
+             GROUP BY 1, 2
+             ORDER BY 1 ASC, 2 ASC`,
+            billedParams
+        );
+
+        const paymentParams: any[] = [year];
+        let paymentAreaJoin = '';
+        let paymentAreaFilter = '';
+        if (electoralAreaId) {
+            paymentAreaJoin = ' INNER JOIN customers c ON p.customer_id = c.id';
+            paymentAreaFilter = ' AND c.electoral_area_id = $2';
+            paymentParams.push(electoralAreaId);
+        }
+        if (month) {
+            paymentParams.push(month);
+            paymentAreaFilter += ` AND EXTRACT(MONTH FROM p.payment_date) = $${paymentParams.length}`;
+        }
+
+        const paymentsResult = await pool.query(
+            `SELECT
+                EXTRACT(YEAR FROM p.payment_date)::int AS year,
+                EXTRACT(MONTH FROM p.payment_date)::int AS month,
+                COUNT(*)::int AS payment_count,
+                COALESCE(SUM(p.amount), 0) AS total_collected
+             FROM payments p
+             ${paymentAreaJoin}
+             WHERE EXTRACT(YEAR FROM p.payment_date) = $1
+             ${paymentAreaFilter}
+             GROUP BY 1, 2
+             ORDER BY 1 ASC, 2 ASC`,
+            paymentParams
+        );
+
+        const byKey = new Map<string, any>();
+        const ensure = (y: number, m: number) => {
+            const key = `${y}-${m}`;
+            if (!byKey.has(key)) {
+                byKey.set(key, {
+                    year: y,
+                    month: m,
+                    period: new Date(Date.UTC(y, m - 1, 1)).toISOString(),
+                    label: new Date(Date.UTC(y, m - 1, 1)).toLocaleString('en-GB', {
+                        month: 'short',
+                        year: 'numeric',
+                        timeZone: 'UTC',
+                    }),
+                    bill_count: 0,
+                    total_billed: 0,
+                    amount_paid_on_bills: 0,
+                    total_outstanding: 0,
+                    payment_count: 0,
+                    total_collected: 0,
+                });
+            }
+            return byKey.get(key);
+        };
+
+        for (const row of billedResult.rows) {
+            const entry = ensure(row.year, row.month);
+            entry.bill_count = row.bill_count;
+            entry.total_billed = parseFloat(row.total_billed);
+            entry.amount_paid_on_bills = parseFloat(row.amount_paid_on_bills);
+            entry.total_outstanding = parseFloat(row.total_outstanding);
+        }
+        for (const row of paymentsResult.rows) {
+            const entry = ensure(row.year, row.month);
+            entry.payment_count = row.payment_count;
+            entry.total_collected = parseFloat(row.total_collected);
+        }
+
+        const months = Array.from(byKey.values()).sort(
+            (a, b) => a.year - b.year || a.month - b.month
+        );
+
+        const totals = months.reduce(
+            (acc, m) => {
+                acc.bill_count += m.bill_count;
+                acc.total_billed += m.total_billed;
+                acc.total_outstanding += m.total_outstanding;
+                acc.payment_count += m.payment_count;
+                acc.total_collected += m.total_collected;
+                return acc;
+            },
+            {
+                bill_count: 0,
+                total_billed: 0,
+                total_outstanding: 0,
+                payment_count: 0,
+                total_collected: 0,
+            }
+        );
+
+        res.json({
+            success: true,
+            data: {
+                year,
+                month,
+                months,
+                totals,
+            },
+        });
+    } catch (error: any) {
+        console.error('Error fetching monthly report:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch monthly report',
         });
     }
 });
