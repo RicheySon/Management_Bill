@@ -82,7 +82,7 @@ export default function ReportsPage() {
         : `Year ${filters.year}`;
 
     const exportCsv = () => {
-        const rows =
+        const rows: Array<Array<string | number>> =
             activeTab === 'monthly'
                 ? [
                       ['Month', 'Bills', 'Total Billed', 'Payments', 'Collected', 'Outstanding'],
@@ -105,7 +105,7 @@ export default function ReportsPage() {
                   ]
                 : [
                       ['Customer', 'Phone', 'Electoral Area', 'Unpaid Bills', 'Outstanding'],
-                      ...defaulters.map((d) => [
+                      ...defaulters.map((d: any) => [
                           d.full_name || '',
                           d.phone_number || '',
                           d.electoral_area || '',
@@ -114,7 +114,9 @@ export default function ReportsPage() {
                       ]),
                   ];
 
-        const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+        const csv = rows
+            .map((row) => row.map((cell: string | number) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+            .join('\n');
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
