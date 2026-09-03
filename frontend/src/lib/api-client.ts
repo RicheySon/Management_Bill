@@ -547,24 +547,31 @@ export const commitFeeScheduleImport = async (scheduleId: number, data: any) => 
 };
 
 // Active Fee Schedule Lookups (for forms)
-/** Ga North Municipal approximate bounding box for map search */
-const GA_NORTH_VIEWBOX = '-0.35,5.75,-0.15,5.55'; // left,top,right,bottom
+/** Ga North Municipal bbox: minLon,minLat,maxLon,maxLat (Mapbox) */
+const GA_NORTH_BBOX = '-0.38,5.52,-0.12,5.78';
+
+const getMapboxToken = () =>
+    process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
 export const reverseGeocode = async (lat: number, lon: number) => {
+    const token = getMapboxToken();
+    if (!token) {
+        console.warn('Mapbox token missing; reverse geocode skipped');
+        return null;
+    }
     try {
-        const response = await axios.get('https://nominatim.openstreetmap.org/reverse', {
-            params: {
-                format: 'json',
-                lat,
-                lon,
-                zoom: 18,
-                addressdetails: 1,
-            },
-            headers: {
-                'Accept-Language': 'en',
-            },
-        });
-        return response.data;
+        const response = await axios.get(
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${lon},${lat}.json`,
+            {
+                params: {
+                    access_token: token,
+                    types: 'address,poi,neighborhood,locality,place',
+                    limit: 1,
+                    language: 'en',
+                },
+            }
+        );
+        return response.data?.features?.[0] || null;
     } catch (error) {
         console.error('Reverse geocoding failed:', error);
         return null;
@@ -572,28 +579,73 @@ export const reverseGeocode = async (lat: number, lon: number) => {
 };
 
 export const searchPlaces = async (query: string) => {
+    const token = getMapboxToken();
+    if (!token) {
+        console.warn('Mapbox token missing; place search skipped');
+        return [];
+    }
     try {
-        const response = await axios.get('https://nominatim.openstreetmap.org/search', {
-            params: {
-                format: 'json',
-                q: `${query}, Ga North, Ghana`,
-                addressdetails: 1,
-                limit: 8,
-                viewbox: GA_NORTH_VIEWBOX,
-                bounded: 1,
-            },
-            headers: {
-                'Accept-Language': 'en',
-            },
-        });
-        return Array.isArray(response.data) ? response.data : [];
+        const response = await axios.get(
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`,
+            {
+                params: {
+                    access_token: token,
+                    country: 'gh',
+                    bbox: GA_NORTH_BBOX,
+                    limit: 8,
+                    language: 'en',
+                    autocomplete: true,
+                },
+            }
+        );
+        const features = Array.isArray(response.data?.features) ? response.data.features : [];
+        // Normalize to a shape used by MapSelector (lat/lon + display_name)
+        return features.map((f: any) => ({
+            id: f.id,
+            place_id: f.id,
+            display_name: f.place_name,
+            text: f.text,
+            lat: f.center?.[1],
+            lon: f.center?.[0],
+            center: f.center,
+            raw: f,
+        }));
     } catch (error) {
         console.error('Place search failed:', error);
         return [];
     }
 };
 
+/** Works with Mapbox Geocoding features (and legacy Nominatim-like address objects). */
 export const formatGeoAddress = (geoData: any): { town: string; street: string; landmark: string; label: string } => {
+    if (!geoData) return { town: '', street: '', landmark: '', label: '' };
+
+    // Mapbox feature
+    if (geoData.place_type || geoData.place_name || geoData.context) {
+        const context: any[] = geoData.context || [];
+        const ctx = (prefix: string) =>
+            context.find((c) => String(c.id || '').startsWith(prefix))?.text || '';
+
+        const placeType: string[] = geoData.place_type || [];
+        const street =
+            placeType.includes('address') || placeType.includes('poi')
+                ? geoData.text || ''
+                : ctx('address.') || '';
+        const town =
+            ctx('neighborhood.') ||
+            ctx('locality.') ||
+            ctx('place.') ||
+            ctx('district.') ||
+            (placeType.includes('neighborhood') || placeType.includes('locality') || placeType.includes('place')
+                ? geoData.text
+                : '') ||
+            '';
+        const landmark = placeType.includes('poi') ? geoData.text || '' : '';
+        const label = geoData.place_name || [street, town, 'Ga North'].filter(Boolean).join(', ');
+        return { town, street, landmark, label };
+    }
+
+    // Legacy Nominatim-style
     const addr = geoData?.address || {};
     const town =
         addr.suburb ||

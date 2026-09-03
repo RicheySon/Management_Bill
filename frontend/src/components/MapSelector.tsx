@@ -1,43 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useEffect, useRef, useState } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import { searchPlaces } from '@/lib/api-client';
 
-const icon = L.icon({
-    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-});
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
 
-type TileLayerOption = {
-    name: string;
-    url: string;
-    attribution: string;
-    maxZoom?: number;
-};
+const STYLES = [
+    { name: 'Street', url: 'mapbox://styles/mapbox/streets-v12' },
+    { name: 'Satellite', url: 'mapbox://styles/mapbox/satellite-streets-v12' },
+    { name: 'Outdoors', url: 'mapbox://styles/mapbox/outdoors-v12' },
+];
 
-const TILE_LAYERS: TileLayerOption[] = [
-    {
-        name: 'Street',
-        url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    },
-    {
-        name: 'Satellite',
-        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attribution: 'Tiles &copy; Esri',
-        maxZoom: 19,
-    },
-    {
-        name: 'Terrain',
-        url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-        attribution: 'Map style: &copy; OpenTopoMap',
-        maxZoom: 17,
-    },
+const GA_NORTH_CENTER: [number, number] = [-0.27, 5.68]; // lng, lat
+const GA_NORTH_BOUNDS: [[number, number], [number, number]] = [
+    [-0.38, 5.52],
+    [-0.12, 5.78],
 ];
 
 interface MapSelectorProps {
@@ -47,62 +26,135 @@ interface MapSelectorProps {
     accuracy?: number;
 }
 
-function LocationMarker({
-    position,
-    setPosition,
-    onLocationSelectAction,
-}: {
-    position: [number, number] | null;
-    setPosition: (pos: [number, number]) => void;
-    onLocationSelectAction: (lat: number, lng: number) => void;
-}) {
-    const map = useMap();
-
-    useMapEvents({
-        click(e) {
-            const newPos: [number, number] = [e.latlng.lat, e.latlng.lng];
-            setPosition(newPos);
-            onLocationSelectAction(e.latlng.lat, e.latlng.lng);
-            map.flyTo(e.latlng, map.getZoom());
-        },
-    });
-
-    return position === null ? null : <Marker position={position} icon={icon} />;
-}
-
-function ChangeView({
-    center,
-    zoom,
-    accuracy,
-}: {
-    center: [number, number];
-    zoom: number;
-    accuracy?: number;
-}) {
-    const map = useMap();
-    useEffect(() => {
-        map.setView(center, accuracy && accuracy < 2000 ? 17 : zoom);
-    }, [center, zoom, accuracy, map]);
-    return null;
-}
-
 export default function MapSelector({
     onLocationSelectAction,
     initialLat,
     initialLng,
     accuracy,
 }: MapSelectorProps) {
-    const defaultCenter: [number, number] = [5.68, -0.27]; // Ga North
-    const [position, setPosition] = useState<[number, number] | null>(
-        initialLat && initialLng ? [initialLat, initialLng] : null
-    );
-    const [activeLayer, setActiveLayer] = useState(0);
+    const mapContainerRef = useRef<HTMLDivElement | null>(null);
+    const mapRef = useRef<mapboxgl.Map | null>(null);
+    const markerRef = useRef<mapboxgl.Marker | null>(null);
+    const onSelectRef = useRef(onLocationSelectAction);
+
+    const [styleIndex, setStyleIndex] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
     const [results, setResults] = useState<any[]>([]);
+    const [mapError, setMapError] = useState<string | null>(null);
 
-    const center = position || defaultCenter;
-    const layer = TILE_LAYERS[activeLayer];
+    useEffect(() => {
+        onSelectRef.current = onLocationSelectAction;
+    }, [onLocationSelectAction]);
+
+    const placeMarker = (lng: number, lat: number, notify = true) => {
+        if (!mapRef.current) return;
+        if (!markerRef.current) {
+            markerRef.current = new mapboxgl.Marker({ color: '#C8102E', draggable: true })
+                .setLngLat([lng, lat])
+                .addTo(mapRef.current);
+            markerRef.current.on('dragend', () => {
+                const pos = markerRef.current?.getLngLat();
+                if (pos) onSelectRef.current(pos.lat, pos.lng);
+            });
+        } else {
+            markerRef.current.setLngLat([lng, lat]);
+        }
+        if (notify) onSelectRef.current(lat, lng);
+    };
+
+    useEffect(() => {
+        if (!MAPBOX_TOKEN) {
+            setMapError(
+                'Mapbox token missing. Set NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN in Vercel / .env.local'
+            );
+            return;
+        }
+        if (!mapContainerRef.current || mapRef.current) return;
+
+        mapboxgl.accessToken = MAPBOX_TOKEN;
+
+        try {
+            const hasInitial = typeof initialLat === 'number' && typeof initialLng === 'number';
+            const map = new mapboxgl.Map({
+                container: mapContainerRef.current,
+                style: STYLES[0].url,
+                center: hasInitial ? [initialLng!, initialLat!] : GA_NORTH_CENTER,
+                zoom: hasInitial ? 16 : 12,
+                maxBounds: GA_NORTH_BOUNDS,
+                attributionControl: true,
+            });
+
+            map.addControl(new mapboxgl.NavigationControl({ visualizePitch: false }), 'bottom-right');
+            map.addControl(
+                new mapboxgl.GeolocateControl({
+                    positionOptions: { enableHighAccuracy: true },
+                    trackUserLocation: false,
+                    showAccuracyCircle: true,
+                }),
+                'bottom-right'
+            );
+
+            map.on('click', (e) => {
+                placeMarker(e.lngLat.lng, e.lngLat.lat, true);
+            });
+
+            map.on('load', () => {
+                if (hasInitial) {
+                    placeMarker(initialLng!, initialLat!, false);
+                }
+                if (accuracy && accuracy < 2000 && hasInitial) {
+                    map.easeTo({ center: [initialLng!, initialLat!], zoom: 17 });
+                }
+            });
+
+            map.on('error', (e) => {
+                console.error('Mapbox error', e.error);
+                setMapError(e.error?.message || 'Mapbox failed to load. Check the access token.');
+            });
+
+            mapRef.current = map;
+        } catch (err: any) {
+            console.error(err);
+            setMapError(err?.message || 'Failed to initialize Mapbox');
+        }
+
+        return () => {
+            markerRef.current?.remove();
+            markerRef.current = null;
+            mapRef.current?.remove();
+            mapRef.current = null;
+        };
+        // intentionally mount once
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        if (!mapRef.current || !MAPBOX_TOKEN) return;
+        mapRef.current.setStyle(STYLES[styleIndex].url);
+        // Re-add marker after style reload
+        mapRef.current.once('style.load', () => {
+            const pos = markerRef.current?.getLngLat();
+            if (pos) placeMarker(pos.lng, pos.lat, false);
+        });
+    }, [styleIndex]);
+
+    useEffect(() => {
+        if (
+            !mapRef.current ||
+            typeof initialLat !== 'number' ||
+            typeof initialLng !== 'number' ||
+            Number.isNaN(initialLat) ||
+            Number.isNaN(initialLng)
+        ) {
+            return;
+        }
+        placeMarker(initialLng, initialLat, false);
+        mapRef.current.easeTo({
+            center: [initialLng, initialLat],
+            zoom: accuracy && accuracy < 2000 ? 17 : Math.max(mapRef.current.getZoom(), 15),
+        });
+    }, [initialLat, initialLng, accuracy]);
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -112,10 +164,7 @@ export default function MapSelector({
             const data = await searchPlaces(searchQuery.trim());
             setResults(data);
             if (data.length === 1) {
-                const { lat, lon } = data[0];
-                const newPos: [number, number] = [parseFloat(lat), parseFloat(lon)];
-                setPosition(newPos);
-                onLocationSelectAction(newPos[0], newPos[1]);
+                pickResult(data[0]);
             } else if (data.length === 0) {
                 alert('Place not found in Ga North. Try a nearby community name.');
             }
@@ -127,12 +176,26 @@ export default function MapSelector({
     };
 
     const pickResult = (item: any) => {
-        const newPos: [number, number] = [parseFloat(item.lat), parseFloat(item.lon)];
-        setPosition(newPos);
-        onLocationSelectAction(newPos[0], newPos[1]);
+        const lat = parseFloat(item.lat ?? item.center?.[1]);
+        const lng = parseFloat(item.lon ?? item.center?.[0]);
+        if (Number.isNaN(lat) || Number.isNaN(lng)) return;
+        placeMarker(lng, lat, true);
+        mapRef.current?.easeTo({ center: [lng, lat], zoom: 16 });
         setResults([]);
-        setSearchQuery(item.display_name?.split(',')[0] || searchQuery);
+        setSearchQuery(item.display_name?.split(',')[0] || item.text || searchQuery);
     };
+
+    if (mapError) {
+        return (
+            <div className="h-[400px] w-full rounded-lg border border-amber-300 bg-amber-50 p-6 flex flex-col justify-center gap-2">
+                <p className="font-semibold text-amber-900">Mapbox map unavailable</p>
+                <p className="text-sm text-amber-800">{mapError}</p>
+                <p className="text-xs text-amber-700">
+                    Create a token at mapbox.com, then set <code className="font-mono">NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN</code> and redeploy.
+                </p>
+            </div>
+        );
+    }
 
     return (
         <div className="h-[400px] w-full rounded-lg overflow-hidden border border-gray-300 relative z-0">
@@ -142,8 +205,8 @@ export default function MapSelector({
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search Ga North community…"
-                        className="flex-1 px-3 py-2 text-sm rounded-l border-r-0 border-gray-300 focus:ring-0 focus:border-municipal-teal"
+                        placeholder="Search Ga North with Mapbox…"
+                        className="flex-1 px-3 py-2 text-sm rounded-l border-r-0 border-gray-300 focus:ring-0 focus:border-municipal-teal bg-white"
                     />
                     <button
                         type="submit"
@@ -157,7 +220,7 @@ export default function MapSelector({
                     <div className="mt-1 max-h-40 overflow-y-auto bg-white rounded shadow border text-sm">
                         {results.map((item) => (
                             <button
-                                key={`${item.place_id}`}
+                                key={`${item.id || item.place_id || item.display_name}`}
                                 type="button"
                                 onClick={() => pickResult(item)}
                                 className="block w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-0"
@@ -170,36 +233,26 @@ export default function MapSelector({
             </div>
 
             <div className="absolute top-2 right-2 z-[1000] flex gap-1 flex-wrap justify-end">
-                {TILE_LAYERS.map((tl, i) => (
+                {STYLES.map((style, i) => (
                     <button
-                        key={tl.name}
+                        key={style.name}
                         type="button"
-                        onClick={() => setActiveLayer(i)}
+                        onClick={() => setStyleIndex(i)}
                         className={`px-2 py-1 text-[11px] font-bold rounded shadow-md transition-all border ${
-                            activeLayer === i
+                            styleIndex === i
                                 ? 'bg-municipal-red text-white border-red-700'
                                 : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                         }`}
                     >
-                        {tl.name}
+                        {style.name}
                     </button>
                 ))}
             </div>
 
-            <MapContainer center={center} zoom={13} scrollWheelZoom className="h-full w-full">
-                <TileLayer
-                    key={layer.url}
-                    attribution={layer.attribution}
-                    url={layer.url}
-                    maxZoom={layer.maxZoom ?? 19}
-                />
-                <LocationMarker
-                    position={position}
-                    setPosition={setPosition}
-                    onLocationSelectAction={onLocationSelectAction}
-                />
-                <ChangeView center={center} zoom={13} accuracy={accuracy} />
-            </MapContainer>
+            <div ref={mapContainerRef} className="h-full w-full" />
+            <div className="absolute bottom-2 left-2 z-[1000] bg-white/90 text-[10px] px-2 py-1 rounded shadow text-gray-600">
+                Click map or drag pin · Powered by Mapbox
+            </div>
         </div>
     );
 }
