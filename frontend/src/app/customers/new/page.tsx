@@ -1,12 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { createCustomer, fetchElectoralAreas, fetchLocalAreas, reverseGeocode } from '@/lib/api-client';
+import { createCustomer, fetchElectoralAreas, fetchLocalAreas, reverseGeocode, formatGeoAddress } from '@/lib/api-client';
 import { ArrowLeft, Save, Navigation, Map as MapIcon, X, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+
+const toNullableId = (v: any) =>
+    (v === '' || v === undefined || v === null || Number.isNaN(Number(v)) ? null : Number(v));
 
 const MapSelector = dynamic(() => import('@/components/MapSelector'), {
     ssr: false,
@@ -46,6 +49,7 @@ export default function NewCustomerPage() {
     const [isDetecting, setIsDetecting] = useState(false);
     const [showMap, setShowMap] = useState(false);
     const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
+    const prevElectoralAreaRef = useRef<number | null>(null);
 
     const selectedElectoralArea = watch('electoral_area_id');
 
@@ -69,16 +73,13 @@ export default function NewCustomerPage() {
                 // Attempt reverse geocoding
                 try {
                     const geoData = await reverseGeocode(lat, lng);
-                    if (geoData && geoData.address) {
-                        const addr = geoData.address;
-                        const town = addr.city || addr.town || addr.village || addr.suburb || '';
-                        const street = addr.road || addr.street || '';
-                        const suburb = addr.neighbourhood || addr.suburb || '';
-                        
-                        // Populate physical location
-                        const physical = [street, suburb, town].filter(Boolean).join(', ');
-                        if (physical) setValue('physical_location', physical);
-                        if (suburb) setValue('landmark', suburb);
+                    if (geoData) {
+                        const geo = formatGeoAddress(geoData);
+                        if (geo.label) setValue('physical_location', geo.label);
+                        if (geo.landmark) setValue('landmark', geo.landmark);
+                        if (!watch('gps_address')) {
+                            setValue('gps_address', `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                        }
                     }
                 } catch (err) {
                     console.error('Auto-address failed:', err);
@@ -108,19 +109,36 @@ export default function NewCustomerPage() {
     }, []);
 
     useEffect(() => {
-        if (selectedElectoralArea) {
-            fetchLocalAreas(Number(selectedElectoralArea))
-                .then(areas => setLocalAreas(Array.isArray(areas) ? areas : []))
-                .catch(() => setLocalAreas([]));
-        } else {
+        if (!selectedElectoralArea) {
             setLocalAreas([]);
+            setValue('local_area_id', undefined);
+            prevElectoralAreaRef.current = null;
+            return;
         }
-    }, [selectedElectoralArea]);
+        const areaId = Number(selectedElectoralArea);
+        if (Number.isNaN(areaId)) {
+            setLocalAreas([]);
+            return;
+        }
+        fetchLocalAreas(areaId)
+            .then(areas => {
+                setLocalAreas(Array.isArray(areas) ? areas : []);
+                if (prevElectoralAreaRef.current !== null && prevElectoralAreaRef.current !== areaId) {
+                    setValue('local_area_id', undefined);
+                }
+                prevElectoralAreaRef.current = areaId;
+            })
+            .catch(() => setLocalAreas([]));
+    }, [selectedElectoralArea, setValue]);
 
     const onSubmit = async (data: CustomerForm) => {
         setError(null);
         try {
-            const result = await createCustomer(data);
+            const result = await createCustomer({
+                ...data,
+                electoral_area_id: toNullableId(data.electoral_area_id) as any,
+                local_area_id: toNullableId(data.local_area_id) as any,
+            });
             setSuccess(true);
             setTimeout(() => {
                 router.push(`/customers/${result.data.id}`);
@@ -312,13 +330,13 @@ export default function NewCustomerPage() {
                                             // Attempt reverse geocoding
                                             try {
                                                 const geoData = await reverseGeocode(lat, lng);
-                                                if (geoData && geoData.address) {
-                                                    const addr = geoData.address;
-                                                    const town = addr.city || addr.town || addr.village || addr.suburb || '';
-                                                    const street = addr.road || addr.street || '';
-                                                    
-                                                    const physical = [street, town].filter(Boolean).join(', ');
-                                                    if (physical) setValue('physical_location', physical);
+                                                if (geoData) {
+                                                    const geo = formatGeoAddress(geoData);
+                                                    if (geo.label) setValue('physical_location', geo.label);
+                                                    if (geo.landmark) setValue('landmark', geo.landmark);
+                                                    if (!watch('gps_address')) {
+                                                        setValue('gps_address', `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                                                    }
                                                 }
                                             } catch (err) {
                                                 console.error('Auto-address from map failed:', err);

@@ -388,11 +388,11 @@ export const recordPayment = async (
             throw new Error(`Payment amount exceeds outstanding balance of GHS ${outstanding.toFixed(2)}`);
         }
 
-        // GCR format: 4–20 chars, digits with optional letters/hyphens (e.g. 012345 or GCR-012345)
-        const gcr = String(gcrNumber || '').trim().toUpperCase();
-        if (!/^[A-Z0-9][A-Z0-9\-]{3,19}$/.test(gcr)) {
+        // GCR format: YY/####### (e.g. 25/1234567)
+        const gcr = String(gcrNumber || '').trim();
+        if (!/^\d{2}\/\d{7}$/.test(gcr)) {
             throw new Error(
-                'Invalid GCR format. Enter the General Counterfoil Receipt serial (4–20 characters), e.g. 012345 or GCR-012345'
+                'Invalid GCR format. Use 00/0000000 (2 digits, slash, 7 digits), e.g. 25/1234567'
             );
         }
 

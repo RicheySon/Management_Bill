@@ -20,12 +20,12 @@ const customerSchema = Joi.object({
     longitude: Joi.number().precision(8).min(-180).max(180).optional().allow(null),
     physical_location: Joi.string().optional().allow(''),
     landmark: Joi.string().optional().allow(''),
-    electoral_area_id: Joi.number().integer().optional(),
-    local_area_id: Joi.number().integer().optional(),
+    electoral_area_id: Joi.alternatives().try(Joi.number().integer(), Joi.valid(null, '')).optional(),
+    local_area_id: Joi.alternatives().try(Joi.number().integer(), Joi.valid(null, '')).optional(),
     next_of_kin_name: Joi.string().optional().allow('').max(200),
     next_of_kin_contact: Joi.string().optional().allow('').max(20),
     ghana_card_no: Joi.string().optional().allow('').max(50),
-});
+}).prefs({ convert: true });
 
 /**
  * POST /api/customers

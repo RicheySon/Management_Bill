@@ -1,21 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import {
     fetchBusiness,
     updateBusiness,
     updateCustomer,
-    fetchBusinessCategories,
+    fetchCustomer,
     fetchElectoralAreas,
     fetchLocalAreas,
     fetchActiveBusinessFeeItems,
     reverseGeocode,
+    formatGeoAddress,
 } from '@/lib/api-client';
 import { ArrowLeft, Save, Navigation, Map as MapIcon, X, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+
+const toNullableId = (v: any) =>
+    (v === '' || v === undefined || v === null || Number.isNaN(Number(v)) ? null : Number(v));
 
 const MapSelector = dynamic(() => import('@/components/MapSelector'), {
     ssr: false,
@@ -34,7 +38,6 @@ interface BusinessEditForm {
     // Business fields
     business_name: string;
     business_contact?: string;
-    category_id: number;
     business_type_main?: string;
     business_type_sub?: string;
     business_category_class?: string;
@@ -68,7 +71,6 @@ export default function EditBusinessPage() {
     const { id } = useParams();
     const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<BusinessEditForm>();
 
-    const [categories, setCategories] = useState([]);
     const [electoralAreas, setElectoralAreas] = useState([]);
     const [localAreas, setLocalAreas] = useState([]);
     const [feeItems, setFeeItems] = useState<any[]>([]);
@@ -80,6 +82,7 @@ export default function EditBusinessPage() {
     const [isDetecting, setIsDetecting] = useState(false);
     const [showMap, setShowMap] = useState(false);
     const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
+    const prevElectoralAreaRef = useRef<number | null>(null);
 
     const selectedElectoralArea = watch('electoral_area_id');
 
@@ -103,15 +106,14 @@ export default function EditBusinessPage() {
                 // Attempt reverse geocoding
                 try {
                     const geoData = await reverseGeocode(lat, lng);
-                    if (geoData && geoData.address) {
-                        const addr = geoData.address;
-                        const town = addr.city || addr.town || addr.village || addr.suburb || '';
-                        const street = addr.road || addr.street || '';
-                        const suburb = addr.neighbourhood || addr.suburb || '';
-                        
-                        if (town) setValue('town', town);
-                        if (street) setValue('street_name', street);
-                        if (suburb) setValue('landmark', suburb);
+                    if (geoData) {
+                        const geo = formatGeoAddress(geoData);
+                        if (geo.town) setValue('town', geo.town);
+                        if (geo.street) setValue('street_name', geo.street);
+                        if (geo.landmark) setValue('landmark', geo.landmark);
+                        if (!watch('gps_address')) {
+                            setValue('gps_address', `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                        }
                     }
                 } catch (err) {
                     console.error('Auto-address failed:', err);
@@ -130,15 +132,14 @@ export default function EditBusinessPage() {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const [businessData, categoriesData, areasData, feeItemsData] = await Promise.all([
+                const [businessData, areasData, feeItemsData] = await Promise.all([
                     fetchBusiness(id as string),
-                    fetchBusinessCategories(),
                     fetchElectoralAreas(),
                     fetchActiveBusinessFeeItems(new Date().getFullYear()),
                 ]);
 
                 const b = businessData.business;
-                const c = businessData.customer;
+                let c = businessData.customer;
 
                 // Fill business fields
                 Object.keys(b).forEach(key => {
@@ -152,6 +153,15 @@ export default function EditBusinessPage() {
                 }
 
                 // Fill business owner (customer) fields
+                if (!c && b.customer_id) {
+                    try {
+                        const customerResp = await fetchCustomer(b.customer_id);
+                        c = customerResp.customer || customerResp;
+                    } catch (err) {
+                        console.error('Failed to fetch linked customer:', err);
+                    }
+                }
+
                 if (c) {
                     setCustomerId(c.id);
                     setValue('full_name', c.full_name || '');
@@ -161,9 +171,12 @@ export default function EditBusinessPage() {
                     setValue('gender', c.gender || '');
                     setValue('marital_status', c.marital_status || '');
                     setValue('ghana_card_no', c.ghana_card_no || '');
+                } else {
+                    if (b.customer_id) setCustomerId(b.customer_id);
+                    setValue('full_name', b.owner_name || '');
+                    setValue('phone_number', b.owner_phone || '');
                 }
 
-                setCategories(categoriesData);
                 setElectoralAreas(areasData);
                 setFeeItems(feeItemsData || []);
 
@@ -171,6 +184,7 @@ export default function EditBusinessPage() {
                     const locals = await fetchLocalAreas(b.electoral_area_id);
                     setLocalAreas(locals);
                     setValue('local_area_id', b.local_area_id);
+                    prevElectoralAreaRef.current = Number(b.electoral_area_id);
                 }
             } catch (err: any) {
                 console.error('Failed to load business data:', err);
@@ -183,12 +197,23 @@ export default function EditBusinessPage() {
     }, [id, setValue]);
 
     useEffect(() => {
-        if (selectedElectoralArea) {
-            fetchLocalAreas(selectedElectoralArea).then(setLocalAreas).catch(() => setLocalAreas([]));
-        } else {
+        if (!selectedElectoralArea) {
             setLocalAreas([]);
+            return;
         }
-    }, [selectedElectoralArea]);
+        const areaId = Number(selectedElectoralArea);
+        if (Number.isNaN(areaId)) {
+            setLocalAreas([]);
+            return;
+        }
+        fetchLocalAreas(areaId).then((areas) => {
+            setLocalAreas(areas);
+            if (prevElectoralAreaRef.current !== null && prevElectoralAreaRef.current !== areaId) {
+                setValue('local_area_id', undefined);
+            }
+            prevElectoralAreaRef.current = areaId;
+        }).catch(() => setLocalAreas([]));
+    }, [selectedElectoralArea, setValue]);
 
     const onSubmit = async (data: BusinessEditForm) => {
         setError(null);
@@ -209,7 +234,7 @@ export default function EditBusinessPage() {
             // Update business
             await updateBusiness(id as string, {
                 business_name: data.business_name,
-                category_id: data.category_id,
+                category_id: null,
                 business_activity: data.business_activity,
                 business_contact: data.business_contact,
                 business_type_main: data.business_type_main,
@@ -226,8 +251,8 @@ export default function EditBusinessPage() {
                 town: data.town,
                 street_name: data.street_name,
                 landmark: data.landmark,
-                electoral_area_id: data.electoral_area_id,
-                local_area_id: data.local_area_id,
+                electoral_area_id: toNullableId(data.electoral_area_id),
+                local_area_id: toNullableId(data.local_area_id),
                 fee_item_id: selectedFeeItemId ? parseInt(selectedFeeItemId) : null,
             });
 
@@ -366,26 +391,15 @@ export default function EditBusinessPage() {
                         </div>
 
                         <div>
-                            <label className="label">Business Category <span className="text-municipal-red">*</span></label>
-                            <select {...register('business_category_class')} className="input-field">
+                            <label className="label">Business Category Class <span className="text-municipal-red">*</span></label>
+                            <select {...register('business_category_class', { required: 'Please select a category class' })} className="input-field">
                                 <option value="">Select category</option>
                                 <option value="Category A">Category A</option>
                                 <option value="Category B">Category B</option>
                                 <option value="Category C">Category C</option>
+                                <option value="Category D">Category D</option>
                             </select>
-                        </div>
-
-                        <div>
-                            <label className="label">Fee Category <span className="text-municipal-red">*</span></label>
-                            <select {...register('category_id', { required: 'Please select fee category' })} className="input-field">
-                                <option value="">Select fee category</option>
-                                {categories.map((category: any) => (
-                                    <option key={category.id} value={category.id}>
-                                        {category.name} (GHS {category.base_fee})
-                                    </option>
-                                ))}
-                            </select>
-                            {errors.category_id && <p className="text-red-500 text-sm mt-1">{errors.category_id.message}</p>}
+                            {errors.business_category_class && <p className="text-red-500 text-sm mt-1">{errors.business_category_class.message}</p>}
                         </div>
 
                         {feeItems.length > 0 && (
@@ -476,13 +490,14 @@ export default function EditBusinessPage() {
                                             // Attempt reverse geocoding
                                             try {
                                                 const geoData = await reverseGeocode(lat, lng);
-                                                if (geoData && geoData.address) {
-                                                    const addr = geoData.address;
-                                                    const town = addr.city || addr.town || addr.village || addr.suburb || '';
-                                                    const street = addr.road || addr.street || '';
-                                                    
-                                                    if (town) setValue('town', town);
-                                                    if (street) setValue('street_name', street);
+                                                if (geoData) {
+                                                    const geo = formatGeoAddress(geoData);
+                                                    if (geo.town) setValue('town', geo.town);
+                                                    if (geo.street) setValue('street_name', geo.street);
+                                                    if (geo.landmark) setValue('landmark', geo.landmark);
+                                                    if (!watch('gps_address')) {
+                                                        setValue('gps_address', `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                                                    }
                                                 }
                                             } catch (err) {
                                                 console.error('Auto-address from map failed:', err);

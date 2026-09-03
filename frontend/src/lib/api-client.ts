@@ -56,6 +56,9 @@ export const fetchElectoralAreas = async () => {
 
 export const fetchLocalAreas = async (electoralAreaId?: number) => {
     try {
+        if (electoralAreaId === undefined || electoralAreaId === null || Number.isNaN(Number(electoralAreaId))) {
+            return [];
+        }
         const response = await apiClient.get('/lookups/local-areas', {
             params: { electoral_area_id: electoralAreaId },
         });
@@ -84,6 +87,39 @@ export const fetchBusinessCategories = async () => {
         console.error('fetchBusinessCategories error:', error);
         return [];
     }
+};
+
+export const createElectoralArea = async (data: { name: string; code: string }) => {
+    const response = await apiClient.post('/lookups/electoral-areas', data);
+    return response.data.data;
+};
+
+export const updateElectoralArea = async (id: number, data: { name: string; code: string }) => {
+    const response = await apiClient.put(`/lookups/electoral-areas/${id}`, data);
+    return response.data.data;
+};
+
+export const deleteElectoralArea = async (id: number) => {
+    const response = await apiClient.delete(`/lookups/electoral-areas/${id}`);
+    return response.data;
+};
+
+export const createLocalArea = async (data: { name: string; electoral_area_id: number }) => {
+    const response = await apiClient.post('/lookups/local-areas', data);
+    return response.data.data;
+};
+
+export const updateLocalArea = async (
+    id: number,
+    data: { name: string; electoral_area_id: number }
+) => {
+    const response = await apiClient.put(`/lookups/local-areas/${id}`, data);
+    return response.data.data;
+};
+
+export const deleteLocalArea = async (id: number) => {
+    const response = await apiClient.delete(`/lookups/local-areas/${id}`);
+    return response.data;
 };
 
 // Customers
@@ -511,18 +547,66 @@ export const commitFeeScheduleImport = async (scheduleId: number, data: any) => 
 };
 
 // Active Fee Schedule Lookups (for forms)
+/** Ga North Municipal approximate bounding box for map search */
+const GA_NORTH_VIEWBOX = '-0.35,5.75,-0.15,5.55'; // left,top,right,bottom
+
 export const reverseGeocode = async (lat: number, lon: number) => {
     try {
-        const response = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`, {
+        const response = await axios.get('https://nominatim.openstreetmap.org/reverse', {
+            params: {
+                format: 'json',
+                lat,
+                lon,
+                zoom: 18,
+                addressdetails: 1,
+            },
             headers: {
-                'Accept-Language': 'en-US,en;q=0.9',
-            }
+                'Accept-Language': 'en',
+            },
         });
         return response.data;
     } catch (error) {
         console.error('Reverse geocoding failed:', error);
         return null;
     }
+};
+
+export const searchPlaces = async (query: string) => {
+    try {
+        const response = await axios.get('https://nominatim.openstreetmap.org/search', {
+            params: {
+                format: 'json',
+                q: `${query}, Ga North, Ghana`,
+                addressdetails: 1,
+                limit: 8,
+                viewbox: GA_NORTH_VIEWBOX,
+                bounded: 1,
+            },
+            headers: {
+                'Accept-Language': 'en',
+            },
+        });
+        return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+        console.error('Place search failed:', error);
+        return [];
+    }
+};
+
+export const formatGeoAddress = (geoData: any): { town: string; street: string; landmark: string; label: string } => {
+    const addr = geoData?.address || {};
+    const town =
+        addr.suburb ||
+        addr.neighbourhood ||
+        addr.village ||
+        addr.town ||
+        addr.city_district ||
+        addr.city ||
+        '';
+    const street = addr.road || addr.pedestrian || addr.residential || '';
+    const landmark = addr.amenity || addr.shop || addr.building || '';
+    const label = [street, town, 'Ga North'].filter(Boolean).join(', ');
+    return { town, street, landmark, label };
 };
 
 export const fetchActivePropertyRateZones = async (year?: number) => {

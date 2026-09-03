@@ -66,6 +66,7 @@ export default function PropertiesPage() {
                         <thead className="bg-gray-50">
                             <tr>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Property Number</th>
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Account Number</th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Owner</th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Location</th>
@@ -83,6 +84,9 @@ export default function PropertiesPage() {
                                             </div>
                                             <span className="font-mono font-bold text-gray-900">{prop.property_number}</span>
                                         </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">
+                                        {prop.account_number || '—'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="flex items-center text-sm text-gray-700">
