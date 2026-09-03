@@ -60,7 +60,6 @@ INSERT INTO business_categories (name, description, base_fee) VALUES
 ('GROCERY', 'General merchandise and groceries', 450.00),
 ('PHARMACY', 'Pharmaceutical and medical supplies', 550.00),
 ('HARDWARE', 'Hardware and construction materials', 500.00),
-('HARDWARE', 'Hardware and construction materials', 500.00),
 ('SALON/BARBER', 'Personal grooming services', 350.00),
 ('GENERAL MERCHANDISE', 'Various retail goods', 400.00);
 

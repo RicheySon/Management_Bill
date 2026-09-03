@@ -112,9 +112,15 @@ const drawBill = async (doc: typeof PDFDocument, billId: string): Promise<void> 
     }
 
     const isBOP = bill.bill_type === 'BOP';
-    const billDetails = typeof bill.bill_details === 'string'
+    let billDetails = typeof bill.bill_details === 'string'
         ? JSON.parse(bill.bill_details)
         : bill.bill_details;
+    if (!billDetails || typeof billDetails !== 'object') {
+        billDetails = { items: [] };
+    }
+    if (!Array.isArray(billDetails.items)) {
+        billDetails.items = [];
+    }
 
     // Header Logos
     try {
@@ -254,7 +260,10 @@ const drawBill = async (doc: typeof PDFDocument, billId: string): Promise<void> 
     currentY += 20;
 
     // Bill Item Row
-    const item = billDetails.items[0] || { description: 'Basic Rate Charge', current_rate: 0 };
+    const item = billDetails.items[0] || {
+        description: isBOP ? 'Business Operating Permit' : 'Basic Rate Charge',
+        current_rate: bill.current_rate || 0,
+    };
     doc.rect(margin + 10, currentY, col1, 60).stroke();
     doc.rect(margin + 10 + col1, currentY, col2, 60).stroke();
     doc.rect(margin + 10 + col1 + col2, currentY, col3, 60).stroke();

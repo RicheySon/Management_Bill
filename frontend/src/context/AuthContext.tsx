@@ -87,9 +87,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(newUser);
         localStorage.setItem('auth_token', newToken);
         localStorage.setItem('auth_user', JSON.stringify(newUser));
-        document.cookie = `auth_token=${newToken}; path=/; SameSite=Lax`;
+        const secure = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : '';
+        document.cookie = `auth_token=${newToken}; path=/; SameSite=Lax${secure}`;
 
-        router.push('/');
+        const params = new URLSearchParams(window.location.search);
+        const next = params.get('next');
+        router.push(next && next.startsWith('/') ? next : '/');
     };
 
     const logout = async () => {

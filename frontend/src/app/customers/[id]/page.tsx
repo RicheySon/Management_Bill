@@ -223,22 +223,27 @@ export default function CustomerDetailPage() {
                         </div>
                         {customer.bills && customer.bills.length > 0 ? (
                             <div className="space-y-3">
-                                {customer.bills.slice(0, 5).map((bill: any) => (
+                                {customer.bills.slice(0, 5).map((bill: any) => {
+                                    const status = bill.payment_status || bill.status;
+                                    const year = bill.bill_period_year || bill.billing_year;
+                                    const paid = parseFloat(bill.amount_paid || 0);
+                                    const total = parseFloat(bill.total_amount || 0);
+                                    return (
                                     <div key={bill.id} className="flex items-center justify-between p-4 border rounded-lg hover:border-municipal-red transition-colors">
                                         <div className="flex items-center space-x-4">
-                                            <div className={`p-2 rounded-full ${bill.status === 'PAID' ? 'bg-green-100 text-green-600' : bill.status === 'PARTIAL' ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'}`}>
+                                            <div className={`p-2 rounded-full ${status === 'PAID' ? 'bg-green-100 text-green-600' : status === 'PARTIAL' ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'}`}>
                                                 <FileText className="w-5 h-5" />
                                             </div>
                                             <div>
                                                 <p className="font-bold text-gray-900">{bill.bill_number}</p>
-                                                <p className="text-xs text-gray-500">{bill.bill_type} ({bill.billing_year}) • Issued {new Date(bill.issue_date).toLocaleDateString()}</p>
+                                                <p className="text-xs text-gray-500">{bill.bill_type} ({year}) • Issued {new Date(bill.issue_date).toLocaleDateString()}</p>
                                             </div>
                                         </div>
                                         <div className="flex items-center space-x-6">
                                             <div className="text-right">
-                                                <p className="font-bold text-gray-900">GHS {parseFloat(bill.total_amount).toFixed(2)}</p>
-                                                <p className={`text-xs font-bold ${bill.status === 'PAID' ? 'text-green-600' : 'text-red-600'}`}>
-                                                    {bill.status === 'PAID' ? 'FULLY PAID' : `DUE: GHS ${(parseFloat(bill.total_amount) - parseFloat(bill.amount_paid)).toFixed(2)}`}
+                                                <p className="font-bold text-gray-900">GHS {total.toFixed(2)}</p>
+                                                <p className={`text-xs font-bold ${status === 'PAID' ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {status === 'PAID' ? 'FULLY PAID' : `DUE: GHS ${(total - paid).toFixed(2)}`}
                                                 </p>
                                             </div>
                                             <div className="flex items-center space-x-2">
@@ -249,9 +254,9 @@ export default function CustomerDetailPage() {
                                                 >
                                                     <Printer className="w-5 h-5" />
                                                 </button>
-                                                {bill.status !== 'PAID' && (
+                                                {status !== 'PAID' && (
                                                     <Link
-                                                        href={`/billing/${bill.id}/payment`}
+                                                        href={`/billing/${bill.id}`}
                                                         className="p-2 text-gray-500 hover:text-green-600 transition-colors"
                                                         title="Record Payment"
                                                     >
@@ -261,7 +266,8 @@ export default function CustomerDetailPage() {
                                             </div>
                                         </div>
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         ) : (
                             <p className="text-gray-500 text-center py-4 italic">No billing history found.</p>
