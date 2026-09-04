@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { fetchCustomer, updateCustomer, fetchElectoralAreas, fetchLocalAreas, reverseGeocode, formatGeoAddress } from '@/lib/api-client';
+import { toCoord } from '@/lib/geo';
 import { ArrowLeft, Save, AlertCircle, Navigation, Map as MapIcon, X } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -86,7 +87,7 @@ export default function EditCustomerPage() {
                 setIsDetecting(false);
             },
             (err) => {
-                alert(`Failed to get location: ${err.message}`);
+                alert(err.code === 1 ? 'Location permission was denied. Allow location for this site, or use “Select on Map”.' : `Failed to get location: ${err.message}. You can use “Select on Map” instead.`);
                 setIsDetecting(false);
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
@@ -319,8 +320,8 @@ export default function EditCustomerPage() {
                                                 console.error('Auto-address from map failed:', err);
                                             }
                                         }}
-                                        initialLat={watch('latitude')}
-                                        initialLng={watch('longitude')}
+                                        initialLat={toCoord(watch('latitude'))}
+                                        initialLng={toCoord(watch('longitude'))}
                                         accuracy={locationAccuracy || undefined}
                                     />
                                     {locationAccuracy && locationAccuracy > 100 && (
