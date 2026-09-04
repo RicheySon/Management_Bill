@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { searchPlaces } from '@/lib/api-client';
+import { isValidCoord } from '@/lib/geo';
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
 
@@ -43,19 +44,27 @@ export default function MapSelector({
     const [results, setResults] = useState<any[]>([]);
     const [mapError, setMapError] = useState<string | null>(null);
 
+    const safeLat = isValidCoord(initialLat) ? initialLat : undefined;
+    const safeLng = isValidCoord(initialLng) ? initialLng : undefined;
+    const hasInitial = safeLat !== undefined && safeLng !== undefined;
+
     useEffect(() => {
         onSelectRef.current = onLocationSelectAction;
     }, [onLocationSelectAction]);
 
     const placeMarker = (lng: number, lat: number, notify = true) => {
         if (!mapRef.current) return;
+        if (!isValidCoord(lng) || !isValidCoord(lat)) return;
+
         if (!markerRef.current) {
             markerRef.current = new mapboxgl.Marker({ color: '#C8102E', draggable: true })
                 .setLngLat([lng, lat])
                 .addTo(mapRef.current);
             markerRef.current.on('dragend', () => {
                 const pos = markerRef.current?.getLngLat();
-                if (pos) onSelectRef.current(pos.lat, pos.lng);
+                if (pos && isValidCoord(pos.lat) && isValidCoord(pos.lng)) {
+                    onSelectRef.current(pos.lat, pos.lng);
+                }
             });
         } else {
             markerRef.current.setLngLat([lng, lat]);
@@ -66,20 +75,20 @@ export default function MapSelector({
     useEffect(() => {
         if (!MAPBOX_TOKEN) {
             setMapError(
-                'Mapbox token missing. Set NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN in Vercel / .env.local'
+                'Mapbox token missing. Set NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN as a Config variable in Vercel, then Redeploy.'
             );
             return;
         }
         if (!mapContainerRef.current || mapRef.current) return;
 
         mapboxgl.accessToken = MAPBOX_TOKEN;
+        setMapError(null);
 
         try {
-            const hasInitial = typeof initialLat === 'number' && typeof initialLng === 'number';
             const map = new mapboxgl.Map({
                 container: mapContainerRef.current,
                 style: STYLES[0].url,
-                center: hasInitial ? [initialLng!, initialLat!] : GA_NORTH_CENTER,
+                center: hasInitial ? [safeLng!, safeLat!] : GA_NORTH_CENTER,
                 zoom: hasInitial ? 16 : 12,
                 maxBounds: GA_NORTH_BOUNDS,
                 attributionControl: true,
@@ -101,16 +110,20 @@ export default function MapSelector({
 
             map.on('load', () => {
                 if (hasInitial) {
-                    placeMarker(initialLng!, initialLat!, false);
+                    placeMarker(safeLng!, safeLat!, false);
                 }
                 if (accuracy && accuracy < 2000 && hasInitial) {
-                    map.easeTo({ center: [initialLng!, initialLat!], zoom: 17 });
+                    map.easeTo({ center: [safeLng!, safeLat!], zoom: 17 });
                 }
             });
 
             map.on('error', (e) => {
                 console.error('Mapbox error', e.error);
-                setMapError(e.error?.message || 'Mapbox failed to load. Check the access token.');
+                const msg = e.error?.message || 'Mapbox failed to load. Check the access token and redeploy.';
+                // Ignore benign style/image noise; surface init/token failures
+                if (/token|Unauthorized|401|403|LngLat|Failed to fetch/i.test(msg)) {
+                    setMapError(msg);
+                }
             });
 
             mapRef.current = map;
@@ -131,30 +144,24 @@ export default function MapSelector({
 
     useEffect(() => {
         if (!mapRef.current || !MAPBOX_TOKEN) return;
-        mapRef.current.setStyle(STYLES[styleIndex].url);
-        // Re-add marker after style reload
-        mapRef.current.once('style.load', () => {
+        const map = mapRef.current;
+        map.setStyle(STYLES[styleIndex].url);
+        map.once('style.load', () => {
             const pos = markerRef.current?.getLngLat();
-            if (pos) placeMarker(pos.lng, pos.lat, false);
+            if (pos && isValidCoord(pos.lng) && isValidCoord(pos.lat)) {
+                placeMarker(pos.lng, pos.lat, false);
+            }
         });
     }, [styleIndex]);
 
     useEffect(() => {
-        if (
-            !mapRef.current ||
-            typeof initialLat !== 'number' ||
-            typeof initialLng !== 'number' ||
-            Number.isNaN(initialLat) ||
-            Number.isNaN(initialLng)
-        ) {
-            return;
-        }
-        placeMarker(initialLng, initialLat, false);
+        if (!mapRef.current || !hasInitial) return;
+        placeMarker(safeLng!, safeLat!, false);
         mapRef.current.easeTo({
-            center: [initialLng, initialLat],
+            center: [safeLng!, safeLat!],
             zoom: accuracy && accuracy < 2000 ? 17 : Math.max(mapRef.current.getZoom(), 15),
         });
-    }, [initialLat, initialLng, accuracy]);
+    }, [safeLat, safeLng, accuracy, hasInitial]);
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -176,9 +183,9 @@ export default function MapSelector({
     };
 
     const pickResult = (item: any) => {
-        const lat = parseFloat(item.lat ?? item.center?.[1]);
-        const lng = parseFloat(item.lon ?? item.center?.[0]);
-        if (Number.isNaN(lat) || Number.isNaN(lng)) return;
+        const lat = Number(item.lat ?? item.center?.[1]);
+        const lng = Number(item.lon ?? item.center?.[0]);
+        if (!isValidCoord(lat) || !isValidCoord(lng)) return;
         placeMarker(lng, lat, true);
         mapRef.current?.easeTo({ center: [lng, lat], zoom: 16 });
         setResults([]);
@@ -191,7 +198,8 @@ export default function MapSelector({
                 <p className="font-semibold text-amber-900">Mapbox map unavailable</p>
                 <p className="text-sm text-amber-800">{mapError}</p>
                 <p className="text-xs text-amber-700">
-                    Create a token at mapbox.com, then set <code className="font-mono">NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN</code> and redeploy.
+                    In Vercel, add <code className="font-mono">NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN</code> as{' '}
+                    <strong>Config</strong> (not Secret), then click <strong>Redeploy</strong>.
                 </p>
             </div>
         );
@@ -199,7 +207,7 @@ export default function MapSelector({
 
     return (
         <div className="h-[400px] w-full rounded-lg overflow-hidden border border-gray-300 relative z-0">
-            <div className="absolute top-2 left-2 z-[1000] w-72">
+            <div className="absolute top-2 left-2 z-[1000] w-72 max-w-[calc(100%-1rem)]">
                 <form onSubmit={handleSearch} className="flex shadow-md">
                     <input
                         type="text"

@@ -13,6 +13,7 @@ import {
     reverseGeocode,
     formatGeoAddress,
 } from '@/lib/api-client';
+import { toCoord } from '@/lib/geo';
 import { ArrowLeft, Save, UserPlus, UserCheck, Navigation, MapPin, Map as MapIcon, X, CheckCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -164,7 +165,7 @@ export default function NewBusinessPage() {
             },
             (error) => {
                 console.error('Geolocation error:', error);
-                alert(`Failed to get location: ${error.message}`);
+                alert(error.code === 1 ? 'Location permission was denied. Allow location for this site, or use “Select on Map”.' : `Failed to get location: ${error.message}. You can use “Select on Map” instead.`);
                 setIsDetecting(false);
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
@@ -729,8 +730,8 @@ export default function NewBusinessPage() {
                                                 console.error('Auto-address from map failed:', err);
                                             }
                                         }}
-                                        initialLat={watch('latitude')}
-                                        initialLng={watch('longitude')}
+                                        initialLat={toCoord(watch('latitude'))}
+                                        initialLng={toCoord(watch('longitude'))}
                                         accuracy={locationAccuracy || undefined}
                                     />
                                     {locationAccuracy && locationAccuracy > 100 && (
