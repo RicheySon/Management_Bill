@@ -421,6 +421,11 @@ export const fetchUsers = async () => {
     return response.data.data;
 };
 
+export const fetchUser = async (id: string) => {
+    const response = await apiClient.get(`/users/${id}`);
+    return response.data.data;
+};
+
 export const fetchRoles = async () => {
     const response = await apiClient.get('/users/roles');
     return response.data.data;
@@ -431,8 +436,23 @@ export const createUser = async (data: any) => {
     return response.data;
 };
 
+export const updateUser = async (id: string, data: any) => {
+    const response = await apiClient.put(`/users/${id}`, data);
+    return response.data;
+};
+
 export const updateUserStatus = async (id: string, status: string) => {
     const response = await apiClient.patch(`/users/${id}/status`, { status });
+    return response.data;
+};
+
+export const updateUserPassword = async (id: string, password: string) => {
+    const response = await apiClient.patch(`/users/${id}/password`, { password });
+    return response.data;
+};
+
+export const deleteUser = async (id: string) => {
+    const response = await apiClient.delete(`/users/${id}`);
     return response.data;
 };
 
