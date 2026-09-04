@@ -23,6 +23,13 @@ import CustomerSearchSelect from '@/components/CustomerSearchSelect';
 const toNullableId = (v: any) =>
     (v === '' || v === undefined || v === null || Number.isNaN(Number(v)) ? null : Number(v));
 
+/** Empty / NaN number inputs become null so optional fields never block submit */
+const toOptionalNumber = (v: any) => {
+    if (v === '' || v === undefined || v === null) return null;
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) ? n : null;
+};
+
 const MapSelector = dynamic(() => import('@/components/MapSelector'), {
     ssr: false,
     loading: () => <div className="h-[400px] w-full bg-gray-100 animate-pulse rounded-lg flex items-center justify-center text-gray-500">Loading Map...</div>
@@ -183,15 +190,24 @@ export default function NewPropertyPage() {
     }, []);
 
     useEffect(() => {
-        if (!selectedElectoralArea) {
+        const eaId = toNullableId(selectedElectoralArea);
+        if (!eaId) {
             setLocalAreas([]);
-            setValue('local_area_id', undefined);
+            setValue('local_area_id', undefined as any);
             return;
         }
-        fetchLocalAreas(Number(selectedElectoralArea))
-            .then((areas) => setLocalAreas(areas || []))
-            .catch(() => setLocalAreas([]));
-        setValue('local_area_id', undefined);
+        let cancelled = false;
+        fetchLocalAreas(eaId)
+            .then((areas) => {
+                if (!cancelled) setLocalAreas(areas || []);
+            })
+            .catch(() => {
+                if (!cancelled) setLocalAreas([]);
+            });
+        setValue('local_area_id', undefined as any);
+        return () => {
+            cancelled = true;
+        };
     }, [selectedElectoralArea, setValue]);
 
     const onSubmit = async (data: PropertyForm) => {
@@ -223,35 +239,40 @@ export default function NewPropertyPage() {
                 return;
             }
 
+            if (!toNullableId(data.classification_id)) {
+                setError('Please select a property class');
+                return;
+            }
+
             const propertyResult = await createProperty({
                 customer_id: customerId,
                 classification_id: toNullableId(data.classification_id),
-                property_use: data.property_use,
-                building_type: data.building_type,
-                no_of_storeys: data.no_of_storeys,
-                ownership: data.ownership,
-                building_permit_status: data.building_permit_status,
-                account_number: data.account_number,
-                parcel_number: data.parcel_number,
-                house_number: data.house_number,
-                source_of_water: data.source_of_water,
-                sanitation_facility: data.sanitation_facility,
-                solid_waste_disposal: data.solid_waste_disposal,
-                liquid_waste_disposal: data.liquid_waste_disposal,
-                no_of_people: data.no_of_people,
-                no_of_bedrooms: data.no_of_bedrooms,
-                no_of_washrooms: data.no_of_washrooms,
-                no_of_other_rooms: data.no_of_other_rooms,
-                gps_address: data.gps_address,
-                latitude: data.latitude,
-                longitude: data.longitude,
-                town: data.town,
-                street_name: data.street_name,
-                landmark: data.landmark,
+                property_use: data.property_use || null,
+                building_type: data.building_type || null,
+                no_of_storeys: toOptionalNumber(data.no_of_storeys),
+                ownership: data.ownership || null,
+                building_permit_status: data.building_permit_status || null,
+                account_number: data.account_number || null,
+                parcel_number: data.parcel_number || null,
+                house_number: data.house_number || null,
+                source_of_water: data.source_of_water || null,
+                sanitation_facility: data.sanitation_facility || null,
+                solid_waste_disposal: data.solid_waste_disposal || null,
+                liquid_waste_disposal: data.liquid_waste_disposal || null,
+                no_of_people: toOptionalNumber(data.no_of_people),
+                no_of_bedrooms: toOptionalNumber(data.no_of_bedrooms),
+                no_of_washrooms: toOptionalNumber(data.no_of_washrooms),
+                no_of_other_rooms: toOptionalNumber(data.no_of_other_rooms),
+                gps_address: data.gps_address || null,
+                latitude: toOptionalNumber(data.latitude),
+                longitude: toOptionalNumber(data.longitude),
+                town: data.town || null,
+                street_name: data.street_name || null,
+                landmark: data.landmark || null,
                 electoral_area_id: toNullableId(data.electoral_area_id),
                 local_area_id: toNullableId(data.local_area_id),
-                population_density: data.population_density,
-                property_size: data.property_size,
+                population_density: data.population_density || null,
+                property_size: toOptionalNumber(data.property_size),
                 property_rate_zone_id: selectedRateZoneId ? parseInt(selectedRateZoneId) : null,
             });
 
@@ -712,57 +733,58 @@ export default function NewPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">No of People</label>
+                            <label className="label">No of People <span className="text-gray-400 font-normal">(optional)</span></label>
                             <input
                                 type="number"
                                 min="0"
                                 {...register('no_of_people')}
                                 className="input-field"
-                                placeholder="0"
+                                placeholder="Optional"
                             />
                         </div>
 
                         <div>
-                            <label className="label">No of Bedrooms</label>
+                            <label className="label">No of Bedrooms <span className="text-gray-400 font-normal">(optional)</span></label>
                             <input
                                 type="number"
                                 min="0"
                                 {...register('no_of_bedrooms')}
                                 className="input-field"
-                                placeholder="0"
+                                placeholder="Optional"
                             />
                         </div>
 
                         <div>
-                            <label className="label">No of Washrooms</label>
+                            <label className="label">No of Washrooms <span className="text-gray-400 font-normal">(optional)</span></label>
                             <input
                                 type="number"
                                 min="0"
                                 {...register('no_of_washrooms')}
                                 className="input-field"
-                                placeholder="0"
+                                placeholder="Optional"
                             />
                         </div>
 
                         <div>
-                            <label className="label">No of Other Rooms</label>
+                            <label className="label">No of Other Rooms <span className="text-gray-400 font-normal">(optional)</span></label>
                             <input
                                 type="number"
                                 min="0"
                                 {...register('no_of_other_rooms')}
                                 className="input-field"
-                                placeholder="0"
+                                placeholder="Optional"
                             />
                         </div>
 
                         <div>
-                            <label className="label">Property Size (sqm)</label>
+                            <label className="label">Property Size (sqm) <span className="text-gray-400 font-normal">(optional)</span></label>
                             <input
                                 type="number"
                                 step="0.01"
+                                min="0"
                                 {...register('property_size')}
                                 className="input-field"
-                                placeholder="0.00"
+                                placeholder="Optional"
                             />
                         </div>
                     </div>
@@ -911,9 +933,9 @@ export default function NewPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">Electoral Area</label>
-                            <select {...register('electoral_area_id', { valueAsNumber: true })} className="input-field">
-                                <option value="">Electoral area</option>
+                            <label className="label">Electoral Area <span className="text-gray-400 font-normal">(optional)</span></label>
+                            <select {...register('electoral_area_id')} className="input-field">
+                                <option value="">Select Electoral Area</option>
                                 {electoralAreas.map((area: any) => (
                                     <option key={area.id} value={area.id}>
                                         {area.name}
@@ -923,19 +945,28 @@ export default function NewPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">Local Area / Community</label>
-                            <select
-                                {...register('local_area_id', { valueAsNumber: true })}
-                                className="input-field"
-                                disabled={!selectedElectoralArea}
-                            >
-                                <option value="">Select Local Area</option>
+                            <label className="label">Local Area / Community <span className="text-gray-400 font-normal">(optional)</span></label>
+                            <select {...register('local_area_id')} className="input-field">
+                                <option value="">
+                                    {!toNullableId(selectedElectoralArea)
+                                        ? 'Select electoral area first'
+                                        : localAreas.length === 0
+                                          ? 'No communities for this area yet'
+                                          : 'Select Local Area'}
+                                </option>
                                 {localAreas.map((area: any) => (
                                     <option key={area.id} value={area.id}>
                                         {area.name}
                                     </option>
                                 ))}
                             </select>
+                            {!toNullableId(selectedElectoralArea) ? (
+                                <p className="text-xs text-gray-500 mt-1">Choose an electoral area above to load communities.</p>
+                            ) : localAreas.length === 0 ? (
+                                <p className="text-xs text-amber-700 mt-1">
+                                    No communities linked yet. An admin can add them under Administration → Areas & Communities.
+                                </p>
+                            ) : null}
                         </div>
 
                         <div>
