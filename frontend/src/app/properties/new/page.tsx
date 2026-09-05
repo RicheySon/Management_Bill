@@ -23,7 +23,7 @@ import CustomerSearchSelect from '@/components/CustomerSearchSelect';
 const toNullableId = (v: any) =>
     (v === '' || v === undefined || v === null || Number.isNaN(Number(v)) ? null : Number(v));
 
-/** Empty / NaN number inputs become null so optional fields never block submit */
+/** Coerce number inputs; property registration requires every field to be filled */
 const toOptionalNumber = (v: any) => {
     if (v === '' || v === undefined || v === null) return null;
     const n = typeof v === 'number' ? v : Number(v);
@@ -216,21 +216,30 @@ export default function NewPropertyPage() {
         try {
             let customerId = data.customer_id;
 
-            // If creating new rate payer, register them first
+            // Property rate: every rate-payer field is compulsory for a new customer
             if (isNewRatePayer) {
-                if (!data.full_name || !data.phone_number) {
-                    setError('Full Name and Phone Number are required for new rate payer');
+                const missingCustomer: string[] = [];
+                if (!data.full_name?.trim()) missingCustomer.push('Full Name');
+                if (!data.phone_number?.trim()) missingCustomer.push('Phone Number');
+                if (!data.address?.trim()) missingCustomer.push('Address');
+                if (!data.gender) missingCustomer.push('Gender');
+                if (!data.marital_status) missingCustomer.push('Marital Status');
+                if (!data.email?.trim()) missingCustomer.push('Email');
+                if (!data.next_of_kin_name?.trim()) missingCustomer.push('Next of Kin');
+                if (!data.next_of_kin_contact?.trim()) missingCustomer.push('Next of Kin Contact');
+                if (missingCustomer.length) {
+                    setError(`Please complete all rate payer fields: ${missingCustomer.join(', ')}`);
                     return;
                 }
                 const customerResult = await createCustomer({
-                    full_name: data.full_name,
-                    phone_number: data.phone_number,
-                    email: data.email,
-                    address: data.address,
+                    full_name: data.full_name!.trim(),
+                    phone_number: data.phone_number!.trim(),
+                    email: data.email!.trim(),
+                    address: data.address!.trim(),
                     gender: data.gender,
                     marital_status: data.marital_status,
-                    next_of_kin_name: data.next_of_kin_name,
-                    next_of_kin_contact: data.next_of_kin_contact,
+                    next_of_kin_name: data.next_of_kin_name!.trim(),
+                    next_of_kin_contact: data.next_of_kin_contact!.trim(),
                 });
                 customerId = customerResult.data.id;
             }
@@ -240,43 +249,74 @@ export default function NewPropertyPage() {
                 return;
             }
 
-            if (!toNullableId(data.classification_id)) {
-                setError('Please select a property class');
+            const billAmount = toOptionalNumber(assessedAmount);
+            const missingProp: string[] = [];
+            if (!toNullableId(data.classification_id)) missingProp.push('Property Class');
+            if (!data.property_use) missingProp.push('Property Use');
+            if (billAmount === null || billAmount <= 0) missingProp.push('Bill Amount');
+            if (!data.building_type) missingProp.push('Building Type');
+            if (toOptionalNumber(data.no_of_storeys) === null) missingProp.push('No of Storeys');
+            if (!data.ownership) missingProp.push('Ownership');
+            if (!data.building_permit_status) missingProp.push('Building Permit Status');
+            if (!data.account_number?.trim()) missingProp.push('Account Number');
+            if (!data.parcel_number?.trim()) missingProp.push('Parcel Number');
+            if (!data.house_number?.trim()) missingProp.push('House Number');
+            if (!data.source_of_water) missingProp.push('Source of Water');
+            if (!data.sanitation_facility) missingProp.push('Sanitation Facility');
+            if (!data.solid_waste_disposal) missingProp.push('Solid Waste Disposal');
+            if (!data.liquid_waste_disposal) missingProp.push('Liquid Waste Disposal');
+            if (toOptionalNumber(data.no_of_people) === null) missingProp.push('No of People');
+            if (toOptionalNumber(data.no_of_bedrooms) === null) missingProp.push('No of Bedrooms');
+            if (toOptionalNumber(data.no_of_washrooms) === null) missingProp.push('No of Washrooms');
+            if (toOptionalNumber(data.no_of_other_rooms) === null) missingProp.push('No of Other Rooms');
+            if (toOptionalNumber(data.property_size) === null) missingProp.push('Property Size');
+            if (!data.gps_address?.trim()) missingProp.push('GPS Address');
+            if (toOptionalNumber(data.latitude) === null) missingProp.push('Latitude');
+            if (toOptionalNumber(data.longitude) === null) missingProp.push('Longitude');
+            if (!data.town?.trim()) missingProp.push('Town');
+            if (!data.street_name?.trim()) missingProp.push('Street Name');
+            if (!data.landmark?.trim()) missingProp.push('Landmark');
+            if (!toNullableId(data.electoral_area_id)) missingProp.push('Electoral Area');
+            if (!toNullableId(data.local_area_id)) missingProp.push('Local Area / Community');
+            if (!data.population_density) missingProp.push('Population Density');
+            if (missingProp.length) {
+                setError(`Please complete all property fields: ${missingProp.join(', ')}`);
                 return;
             }
 
             const propertyResult = await createProperty({
                 customer_id: customerId,
                 classification_id: toNullableId(data.classification_id),
-                property_use: data.property_use || null,
-                building_type: data.building_type || null,
+                property_use: data.property_use,
+                building_type: data.building_type,
                 no_of_storeys: toOptionalNumber(data.no_of_storeys),
-                ownership: data.ownership || null,
-                building_permit_status: data.building_permit_status || null,
-                account_number: data.account_number || null,
-                parcel_number: data.parcel_number || null,
-                house_number: data.house_number || null,
-                source_of_water: data.source_of_water || null,
-                sanitation_facility: data.sanitation_facility || null,
-                solid_waste_disposal: data.solid_waste_disposal || null,
-                liquid_waste_disposal: data.liquid_waste_disposal || null,
+                ownership: data.ownership,
+                building_permit_status: data.building_permit_status,
+                account_number: data.account_number!.trim(),
+                parcel_number: data.parcel_number!.trim(),
+                house_number: data.house_number!.trim(),
+                source_of_water: data.source_of_water,
+                sanitation_facility: data.sanitation_facility,
+                solid_waste_disposal: data.solid_waste_disposal,
+                liquid_waste_disposal: data.liquid_waste_disposal,
                 no_of_people: toOptionalNumber(data.no_of_people),
                 no_of_bedrooms: toOptionalNumber(data.no_of_bedrooms),
                 no_of_washrooms: toOptionalNumber(data.no_of_washrooms),
                 no_of_other_rooms: toOptionalNumber(data.no_of_other_rooms),
-                gps_address: data.gps_address || null,
+                gps_address: data.gps_address!.trim(),
                 latitude: toOptionalNumber(data.latitude),
                 longitude: toOptionalNumber(data.longitude),
-                town: data.town || null,
-                street_name: data.street_name || null,
-                landmark: data.landmark || null,
+                town: data.town!.trim(),
+                street_name: data.street_name!.trim(),
+                landmark: data.landmark!.trim(),
                 electoral_area_id: toNullableId(data.electoral_area_id),
                 local_area_id: toNullableId(data.local_area_id),
-                population_density: data.population_density || null,
+                population_density: data.population_density,
                 property_size: toOptionalNumber(data.property_size),
                 property_rate_zone_id: selectedRateZoneId ? parseInt(selectedRateZoneId) : null,
-                assessed_amount: toOptionalNumber(assessedAmount),
+                assessed_amount: billAmount,
             });
+
 
             setPropertyNumber(propertyResult.data.property_number);
             setSuccess(true);
@@ -346,15 +386,18 @@ export default function NewPropertyPage() {
                 <div className="card">
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 mb-6">
                         <h2 className="text-municipal-teal font-bold text-lg text-center">Rate Payer Information</h2>
+                        <p className="text-center text-sm text-gray-600 mt-1">
+                            All fields marked <span className="text-municipal-red font-semibold">*</span> are compulsory for property rate registration.
+                        </p>
                     </div>
 
                     {isNewRatePayer ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div className="md:col-span-2">
-                                <label className="label">Full Name</label>
+                                <label className="label">Full Name <span className="text-municipal-red">*</span></label>
                                 <input
                                     type="text"
-                                    {...register('full_name')}
+                                    {...register('full_name', { required: 'This field is required' })}
                                     className="input-field"
                                     placeholder="Full name"
                                 />
@@ -368,7 +411,7 @@ export default function NewPropertyPage() {
                                     <span className="inline-flex items-center px-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg text-sm text-gray-600">+233</span>
                                     <input
                                         type="tel"
-                                        {...register('phone_number')}
+                                        {...register('phone_number', { required: 'This field is required' })}
                                         className="input-field rounded-l-none"
                                         placeholder="245678901"
                                     />
@@ -376,10 +419,10 @@ export default function NewPropertyPage() {
                             </div>
 
                             <div>
-                                <label className="label">Address</label>
+                                <label className="label">Address <span className="text-municipal-red">*</span></label>
                                 <input
                                     type="text"
-                                    {...register('address')}
+                                    {...register('address', { required: 'This field is required' })}
                                     className="input-field"
                                     placeholder="Enter address"
                                 />
@@ -389,7 +432,7 @@ export default function NewPropertyPage() {
                                 <label className="label">
                                     Gender <span className="text-municipal-red">*</span>
                                 </label>
-                                <select {...register('gender')} className="input-field">
+                                <select {...register('gender', { required: 'This field is required' })} className="input-field">
                                     <option value="">Gender</option>
                                     <option value="Male">Male</option>
                                     <option value="Female">Female</option>
@@ -400,7 +443,7 @@ export default function NewPropertyPage() {
                                 <label className="label">
                                     Marital Status <span className="text-municipal-red">*</span>
                                 </label>
-                                <select {...register('marital_status')} className="input-field">
+                                <select {...register('marital_status', { required: 'This field is required' })} className="input-field">
                                     <option value="">Marital Status</option>
                                     <option value="Single">Single</option>
                                     <option value="Married">Married</option>
@@ -410,20 +453,20 @@ export default function NewPropertyPage() {
                             </div>
 
                             <div>
-                                <label className="label">Email</label>
+                                <label className="label">Email <span className="text-municipal-red">*</span></label>
                                 <input
                                     type="email"
-                                    {...register('email')}
+                                    {...register('email', { required: 'This field is required' })}
                                     className="input-field"
                                     placeholder="Email"
                                 />
                             </div>
 
                             <div>
-                                <label className="label">Next of Kin</label>
+                                <label className="label">Next of Kin <span className="text-municipal-red">*</span></label>
                                 <input
                                     type="text"
-                                    {...register('next_of_kin_name')}
+                                    {...register('next_of_kin_name', { required: 'This field is required' })}
                                     className="input-field"
                                     placeholder="Full name"
                                 />
@@ -437,7 +480,7 @@ export default function NewPropertyPage() {
                                     <span className="inline-flex items-center px-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg text-sm text-gray-600">+233</span>
                                     <input
                                         type="tel"
-                                        {...register('next_of_kin_contact')}
+                                        {...register('next_of_kin_contact', { required: 'This field is required' })}
                                         className="input-field rounded-l-none"
                                         placeholder="245678901"
                                     />
@@ -531,12 +574,15 @@ export default function NewPropertyPage() {
                 <div className="card">
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 mb-6">
                         <h2 className="text-municipal-teal font-bold text-lg text-center">Property Information</h2>
+                        <p className="text-center text-sm text-gray-600 mt-1">
+                            Every property field is required. Incomplete forms cannot be submitted.
+                        </p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
-                            <label className="label">Property Use</label>
-                            <select {...register('property_use')} className="input-field">
+                            <label className="label">Property Use <span className="text-municipal-red">*</span></label>
+                            <select {...register('property_use', { required: 'This field is required' })} className="input-field">
                                 <option value="">Select option</option>
                                 <option value="Residential">Residential</option>
                                 <option value="Commercial">Commercial</option>
@@ -570,7 +616,7 @@ export default function NewPropertyPage() {
                         {/* Rating Zone (from configured fee schedule) */}
                         {rateZones.length > 0 && (
                             <div>
-                                <label className="label">Rating Zone (Fee Schedule)</label>
+                                <label className="label">Rating Zone (Fee Schedule) <span className="text-gray-400 font-normal">(select if available)</span></label>
                                 <select
                                     className="input-field"
                                     value={selectedRateZoneId}
@@ -596,7 +642,7 @@ export default function NewPropertyPage() {
                                         }
                                     }}
                                 >
-                                    <option value="">Select rating zone (optional)</option>
+                                    <option value="">Select rating zone </option>
                                     {rateZones.map((zone: any) => (
                                         <option key={zone.id} value={zone.id}>
                                             {zone.zone_name} ({zone.zone_type}) - Min: GHS {Number(zone.minimum_rate_min).toLocaleString()}
@@ -629,8 +675,8 @@ export default function NewPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">Building Type</label>
-                            <select {...register('building_type')} className="input-field">
+                            <label className="label">Building Type <span className="text-municipal-red">*</span></label>
+                            <select {...register('building_type', { required: 'This field is required' })} className="input-field">
                                 <option value="">Select option</option>
                                 <option value="Bungalow">Bungalow</option>
                                 <option value="Story Building">Story Building</option>
@@ -644,8 +690,8 @@ export default function NewPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">No of Storeys</label>
-                            <select {...register('no_of_storeys')} className="input-field">
+                            <label className="label">No of Storeys <span className="text-municipal-red">*</span></label>
+                            <select {...register('no_of_storeys', { required: 'This field is required' })} className="input-field">
                                 <option value="">Select option</option>
                                 <option value="1">1</option>
                                 <option value="2">2</option>
@@ -656,8 +702,8 @@ export default function NewPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">Ownership of Property</label>
-                            <select {...register('ownership')} className="input-field">
+                            <label className="label">Ownership of Property <span className="text-municipal-red">*</span></label>
+                            <select {...register('ownership', { required: 'This field is required' })} className="input-field">
                                 <option value="">Select option</option>
                                 <option value="Owner Occupied">Owner Occupied</option>
                                 <option value="Rented">Rented</option>
@@ -668,8 +714,8 @@ export default function NewPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">Building Permit Status</label>
-                            <select {...register('building_permit_status')} className="input-field">
+                            <label className="label">Building Permit Status <span className="text-municipal-red">*</span></label>
+                            <select {...register('building_permit_status', { required: 'This field is required' })} className="input-field">
                                 <option value="">Select option</option>
                                 <option value="Approved">Approved</option>
                                 <option value="Pending">Pending</option>
@@ -679,38 +725,38 @@ export default function NewPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">Account Number</label>
+                            <label className="label">Account Number <span className="text-municipal-red">*</span></label>
                             <input
                                 type="text"
-                                {...register('account_number')}
+                                {...register('account_number', { required: 'This field is required' })}
                                 className="input-field"
                                 placeholder="Account no"
                             />
                         </div>
 
                         <div>
-                            <label className="label">Parcel Number</label>
+                            <label className="label">Parcel Number <span className="text-municipal-red">*</span></label>
                             <input
                                 type="text"
-                                {...register('parcel_number')}
+                                {...register('parcel_number', { required: 'This field is required' })}
                                 className="input-field"
                                 placeholder="Parcel no"
                             />
                         </div>
 
                         <div>
-                            <label className="label">House Number</label>
+                            <label className="label">House Number <span className="text-municipal-red">*</span></label>
                             <input
                                 type="text"
-                                {...register('house_number')}
+                                {...register('house_number', { required: 'This field is required' })}
                                 className="input-field"
                                 placeholder="House no"
                             />
                         </div>
 
                         <div>
-                            <label className="label">Source of Water</label>
-                            <select {...register('source_of_water')} className="input-field">
+                            <label className="label">Source of Water <span className="text-municipal-red">*</span></label>
+                            <select {...register('source_of_water', { required: 'This field is required' })} className="input-field">
                                 <option value="">Select option</option>
                                 <option value="Pipe-borne">Pipe-borne</option>
                                 <option value="Borehole">Borehole</option>
@@ -722,8 +768,8 @@ export default function NewPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">Sanitation Facility Available</label>
-                            <select {...register('sanitation_facility')} className="input-field">
+                            <label className="label">Sanitation Facility Available <span className="text-municipal-red">*</span></label>
+                            <select {...register('sanitation_facility', { required: 'This field is required' })} className="input-field">
                                 <option value="">Select option</option>
                                 <option value="WC">WC (Water Closet)</option>
                                 <option value="KVIP">KVIP</option>
@@ -734,8 +780,8 @@ export default function NewPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">Solid Waste Disposal Method</label>
-                            <select {...register('solid_waste_disposal')} className="input-field">
+                            <label className="label">Solid Waste Disposal Method <span className="text-municipal-red">*</span></label>
+                            <select {...register('solid_waste_disposal', { required: 'This field is required' })} className="input-field">
                                 <option value="">Select option</option>
                                 <option value="Collected">Collected</option>
                                 <option value="Public Container">Public Container</option>
@@ -746,8 +792,8 @@ export default function NewPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">Liquid Waste Disposal Method</label>
-                            <select {...register('liquid_waste_disposal')} className="input-field">
+                            <label className="label">Liquid Waste Disposal Method <span className="text-municipal-red">*</span></label>
+                            <select {...register('liquid_waste_disposal', { required: 'This field is required' })} className="input-field">
                                 <option value="">Select option</option>
                                 <option value="Sewer">Sewer</option>
                                 <option value="Septic Tank">Septic Tank</option>
@@ -758,56 +804,56 @@ export default function NewPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">No of People <span className="text-gray-400 font-normal">(optional)</span></label>
+                            <label className="label">No of People <span className="text-municipal-red">*</span></label>
                             <input
                                 type="number"
                                 min="0"
-                                {...register('no_of_people')}
+                                {...register('no_of_people', { required: 'This field is required' })}
                                 className="input-field"
                                 placeholder="Optional"
                             />
                         </div>
 
                         <div>
-                            <label className="label">No of Bedrooms <span className="text-gray-400 font-normal">(optional)</span></label>
+                            <label className="label">No of Bedrooms <span className="text-municipal-red">*</span></label>
                             <input
                                 type="number"
                                 min="0"
-                                {...register('no_of_bedrooms')}
+                                {...register('no_of_bedrooms', { required: 'This field is required' })}
                                 className="input-field"
                                 placeholder="Optional"
                             />
                         </div>
 
                         <div>
-                            <label className="label">No of Washrooms <span className="text-gray-400 font-normal">(optional)</span></label>
+                            <label className="label">No of Washrooms <span className="text-municipal-red">*</span></label>
                             <input
                                 type="number"
                                 min="0"
-                                {...register('no_of_washrooms')}
+                                {...register('no_of_washrooms', { required: 'This field is required' })}
                                 className="input-field"
                                 placeholder="Optional"
                             />
                         </div>
 
                         <div>
-                            <label className="label">No of Other Rooms <span className="text-gray-400 font-normal">(optional)</span></label>
+                            <label className="label">No of Other Rooms <span className="text-municipal-red">*</span></label>
                             <input
                                 type="number"
                                 min="0"
-                                {...register('no_of_other_rooms')}
+                                {...register('no_of_other_rooms', { required: 'This field is required' })}
                                 className="input-field"
                                 placeholder="Optional"
                             />
                         </div>
 
                         <div>
-                            <label className="label">Property Size (sqm) <span className="text-gray-400 font-normal">(optional)</span></label>
+                            <label className="label">Property Size (sqm) <span className="text-municipal-red">*</span></label>
                             <input
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                {...register('property_size')}
+                                {...register('property_size', { required: 'This field is required' })}
                                 className="input-field"
                                 placeholder="Optional"
                             />
@@ -821,14 +867,17 @@ export default function NewPropertyPage() {
                 <div className="card">
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 mb-6">
                         <h2 className="text-municipal-teal font-bold text-lg text-center">Location Information</h2>
+                        <p className="text-center text-sm text-gray-600 mt-1">
+                            Location details are compulsory for property rate registration.
+                        </p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
-                            <label className="label">GPS Address</label>
+                            <label className="label">GPS Address <span className="text-municipal-red">*</span></label>
                             <input
                                 type="text"
-                                {...register('gps_address')}
+                                {...register('gps_address', { required: 'This field is required' })}
                                 className="input-field"
                                 placeholder="GPS address"
                             />
@@ -905,21 +954,21 @@ export default function NewPropertyPage() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wider font-bold italic">Latitude</label>
+                                    <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wider font-bold italic">Latitude <span className="text-municipal-red">*</span></label>
                                     <input
                                         type="number"
                                         step="any"
-                                        {...register('latitude', { valueAsNumber: true })}
+                                        {...register('latitude', { valueAsNumber: true, required: 'Latitude is required' })}
                                         className="input-field"
                                         placeholder="5.6037"
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wider font-bold italic">Longitude</label>
+                                    <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wider font-bold italic">Longitude <span className="text-municipal-red">*</span></label>
                                     <input
                                         type="number"
                                         step="any"
-                                        {...register('longitude', { valueAsNumber: true })}
+                                        {...register('longitude', { valueAsNumber: true, required: 'Longitude is required' })}
                                         className="input-field"
                                         placeholder="-0.1870"
                                     />
@@ -928,38 +977,38 @@ export default function NewPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">Town</label>
+                            <label className="label">Town <span className="text-municipal-red">*</span></label>
                             <input
                                 type="text"
-                                {...register('town')}
+                                {...register('town', { required: 'This field is required' })}
                                 className="input-field"
                                 placeholder="Town"
                             />
                         </div>
 
                         <div>
-                            <label className="label">Street Name</label>
+                            <label className="label">Street Name <span className="text-municipal-red">*</span></label>
                             <input
                                 type="text"
-                                {...register('street_name')}
+                                {...register('street_name', { required: 'This field is required' })}
                                 className="input-field"
                                 placeholder="Name of street"
                             />
                         </div>
 
                         <div>
-                            <label className="label">Landmark</label>
+                            <label className="label">Landmark <span className="text-municipal-red">*</span></label>
                             <input
                                 type="text"
-                                {...register('landmark')}
+                                {...register('landmark', { required: 'This field is required' })}
                                 className="input-field"
                                 placeholder="Landmark"
                             />
                         </div>
 
                         <div>
-                            <label className="label">Electoral Area <span className="text-gray-400 font-normal">(optional)</span></label>
-                            <select {...register('electoral_area_id')} className="input-field">
+                            <label className="label">Electoral Area <span className="text-municipal-red">*</span></label>
+                            <select {...register('electoral_area_id', { required: 'This field is required' })} className="input-field">
                                 <option value="">Select Electoral Area</option>
                                 {electoralAreas.map((area: any) => (
                                     <option key={area.id} value={area.id}>
@@ -970,8 +1019,8 @@ export default function NewPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">Local Area / Community <span className="text-gray-400 font-normal">(optional)</span></label>
-                            <select {...register('local_area_id')} className="input-field">
+                            <label className="label">Local Area / Community <span className="text-municipal-red">*</span></label>
+                            <select {...register('local_area_id', { required: 'This field is required' })} className="input-field">
                                 <option value="">
                                     {!toNullableId(selectedElectoralArea)
                                         ? 'Select electoral area first'
@@ -995,8 +1044,8 @@ export default function NewPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">Population Density of Location</label>
-                            <select {...register('population_density')} className="input-field">
+                            <label className="label">Population Density of Location <span className="text-municipal-red">*</span></label>
+                            <select {...register('population_density', { required: 'This field is required' })} className="input-field">
                                 <option value="">Select option</option>
                                 <option value="High">High</option>
                                 <option value="Medium">Medium</option>
