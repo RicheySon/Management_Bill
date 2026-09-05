@@ -66,6 +66,24 @@ export default function PropertyDetailPage() {
         );
     }
 
+    const bills = property.bills || [];
+    const outstandingFromBills = bills
+        .filter((b: any) => ['UNPAID', 'PARTIAL', 'OVERDUE'].includes(b.payment_status))
+        .reduce((sum: number, b: any) => sum + (parseFloat(b.amount_due) || 0), 0);
+    const paidFromBills = bills.reduce(
+        (sum: number, b: any) => sum + (parseFloat(b.amount_paid) || 0),
+        0
+    );
+    const totalOutstanding =
+        property.total_outstanding !== undefined && property.total_outstanding !== null
+            ? parseFloat(property.total_outstanding)
+            : outstandingFromBills;
+    const totalPaid =
+        property.total_paid !== undefined && property.total_paid !== null
+            ? parseFloat(property.total_paid)
+            : paidFromBills;
+    const assessedAmount = parseFloat(property.assessed_amount);
+
     return (
         <div className="max-w-6xl mx-auto space-y-8">
             {/* Header */}
@@ -141,6 +159,14 @@ export default function PropertyDetailPage() {
                                     {property.status}
                                 </span>
                             </div>
+                            <div className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
+                                <span className="text-gray-500">Annual Bill Amount</span>
+                                <span className="font-semibold text-gray-900">
+                                    {!isNaN(assessedAmount) && assessedAmount > 0
+                                        ? `GHS ${assessedAmount.toFixed(2)}`
+                                        : '—'}
+                                </span>
+                            </div>
                             <div className="flex justify-between items-center text-sm">
                                 <span className="text-gray-500">Property Size</span>
                                 <span className="font-semibold text-gray-900">{property.property_size || 'N/A'} sqm</span>
@@ -175,11 +201,11 @@ export default function PropertyDetailPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="card bg-municipal-red text-white">
                             <p className="text-xs text-red-100 font-bold uppercase tracking-wider mb-1">Current Balance</p>
-                            <h4 className="text-3xl font-extrabold">GHS {parseFloat(property.total_outstanding || 0).toFixed(2)}</h4>
+                            <h4 className="text-3xl font-extrabold">GHS {totalOutstanding.toFixed(2)}</h4>
                         </div>
                         <div className="card border-2 border-red-50">
                             <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">Total Paid (All Time)</p>
-                            <h4 className="text-2xl font-extrabold text-green-600">GHS {parseFloat(property.total_paid || 0).toFixed(2)}</h4>
+                            <h4 className="text-2xl font-extrabold text-green-600">GHS {totalPaid.toFixed(2)}</h4>
                         </div>
                     </div>
 
@@ -192,9 +218,9 @@ export default function PropertyDetailPage() {
                             </h2>
                         </div>
 
-                        {property.bills && property.bills.length > 0 ? (
+                        {bills.length > 0 ? (
                             <div className="space-y-4">
-                                {property.bills.map((bill: any) => (
+                                {bills.map((bill: any) => (
                                     <div key={bill.id} className="flex items-center justify-between p-5 border rounded-xl hover:border-municipal-red transition-all group">
                                         <div className="flex items-center space-x-4">
                                             <div className={`w-12 h-12 rounded-full flex items-center justify-center ${bill.payment_status === 'PAID' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
@@ -219,7 +245,20 @@ export default function PropertyDetailPage() {
                         ) : (
                             <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed">
                                 <FileText className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                                <p className="text-gray-500 font-medium italic">No bills found for this property.</p>
+                                <p className="text-gray-500 font-medium mb-1">No bills found for this property.</p>
+                                {!isNaN(assessedAmount) && assessedAmount > 0 && (
+                                    <p className="text-sm text-gray-500 mb-4">
+                                        Annual amount on file:{' '}
+                                        <span className="font-semibold text-gray-800">GHS {assessedAmount.toFixed(2)}</span>
+                                    </p>
+                                )}
+                                <Link
+                                    href={`/billing/generate?property_id=${id}`}
+                                    className="btn-primary inline-flex items-center space-x-2"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    <span>Generate Bill</span>
+                                </Link>
                             </div>
                         )}
                     </div>
