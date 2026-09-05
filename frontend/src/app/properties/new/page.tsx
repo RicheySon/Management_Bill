@@ -223,14 +223,14 @@ export default function NewPropertyPage() {
                     return;
                 }
                 const customerResult = await createCustomer({
-                    full_name: data.full_name,
-                    phone_number: data.phone_number,
-                    email: data.email,
-                    address: data.address,
-                    gender: data.gender,
-                    marital_status: data.marital_status,
-                    next_of_kin_name: data.next_of_kin_name,
-                    next_of_kin_contact: data.next_of_kin_contact,
+                    full_name: data.full_name.trim(),
+                    phone_number: data.phone_number.trim(),
+                    email: data.email?.trim() || undefined,
+                    address: data.address?.trim() || undefined,
+                    gender: data.gender || undefined,
+                    marital_status: data.marital_status || undefined,
+                    next_of_kin_name: data.next_of_kin_name?.trim() || undefined,
+                    next_of_kin_contact: data.next_of_kin_contact?.trim() || undefined,
                 });
                 customerId = customerResult.data.id;
             }
@@ -635,10 +635,9 @@ export default function NewPropertyPage() {
                                 placeholder="e.g. 500"
                                 value={assessedAmount}
                                 onChange={(e) => setAssessedAmount(e.target.value)}
-                                required
                             />
                             <p className="text-xs text-gray-500 mt-1">
-                                This amount is saved with the property and used when generating the bill.
+                                Required. Saved with the property and used when generating the bill.
                             </p>
                         </div>
 

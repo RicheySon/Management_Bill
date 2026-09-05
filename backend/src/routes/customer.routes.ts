@@ -11,21 +11,21 @@ const router = Router();
 const customerSchema = Joi.object({
     full_name: Joi.string().required().max(200),
     phone_number: Joi.string().required().max(20),
-    email: Joi.string().email().optional().allow(''),
-    address: Joi.string().optional().allow(''),
-    gender: Joi.string().optional().allow(''),
-    marital_status: Joi.string().optional().allow(''),
-    gps_address: Joi.string().optional().allow('').max(50),
+    email: Joi.string().email({ tlds: { allow: false } }).optional().allow('', null),
+    address: Joi.string().optional().allow('', null),
+    gender: Joi.string().optional().allow('', null),
+    marital_status: Joi.string().optional().allow('', null),
+    gps_address: Joi.string().optional().allow('', null).max(50),
     latitude: Joi.number().precision(8).min(-90).max(90).optional().allow(null, ''),
     longitude: Joi.number().precision(8).min(-180).max(180).optional().allow(null, ''),
-    physical_location: Joi.string().optional().allow(''),
-    landmark: Joi.string().optional().allow(''),
+    physical_location: Joi.string().optional().allow('', null),
+    landmark: Joi.string().optional().allow('', null),
     electoral_area_id: Joi.alternatives().try(Joi.number().integer(), Joi.valid(null, '')).optional(),
     local_area_id: Joi.alternatives().try(Joi.number().integer(), Joi.valid(null, '')).optional(),
-    next_of_kin_name: Joi.string().optional().allow('').max(200),
-    next_of_kin_contact: Joi.string().optional().allow('').max(20),
-    ghana_card_no: Joi.string().optional().allow('').max(50),
-}).prefs({ convert: true });
+    next_of_kin_name: Joi.string().optional().allow('', null).max(200),
+    next_of_kin_contact: Joi.string().optional().allow('', null).max(20),
+    ghana_card_no: Joi.string().optional().allow('', null).max(50),
+}).prefs({ convert: true, abortEarly: false });
 
 /**
  * POST /api/customers

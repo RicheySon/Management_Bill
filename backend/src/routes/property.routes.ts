@@ -55,7 +55,7 @@ const propertySchema = Joi.object({
     year_registered: Joi.number().integer().min(2000).max(2100).optional().allow(null, ''),
     property_rate_zone_id: Joi.number().integer().optional().allow(null, ''),
     assessed_amount: Joi.number().min(0).optional().allow(null, ''),
-});
+}).prefs({ convert: true, abortEarly: false });
 
 /**
  * POST /api/properties
