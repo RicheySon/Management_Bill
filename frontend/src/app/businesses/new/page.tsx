@@ -339,6 +339,9 @@ export default function NewBusinessPage() {
                 <div className="card">
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 mb-6">
                         <h2 className="text-municipal-teal font-bold text-lg text-center">Business Owner Information</h2>
+                        <p className="text-center text-sm text-gray-600 mt-1">
+                            Fields marked (optional) can be skipped. Only starred fields are required.
+                        </p>
                     </div>
 
                     {isNewOwner ? (
@@ -380,7 +383,7 @@ export default function NewBusinessPage() {
 
                             <div>
                                 <label className="label">
-                                    Gender <span className="text-municipal-red">*</span>
+                                    Gender <span className="text-gray-400 font-normal">(optional)</span>
                                 </label>
                                 <select {...register('gender')} className="input-field">
                                     <option value="">Gender</option>
@@ -391,7 +394,7 @@ export default function NewBusinessPage() {
 
                             <div>
                                 <label className="label">
-                                    Marital Status <span className="text-municipal-red">*</span>
+                                    Marital Status <span className="text-gray-400 font-normal">(optional)</span>
                                 </label>
                                 <select {...register('marital_status')} className="input-field">
                                     <option value="">Marital Status</option>
