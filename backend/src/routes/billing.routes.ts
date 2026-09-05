@@ -22,6 +22,9 @@ router.post('/generate', authenticateToken, authorize(['generate_bill']), async 
             target_id: Joi.string().uuid().required(), // property_id or business_id
             customer_id: Joi.string().uuid().required(),
             bill_year: Joi.number().integer().min(2000).max(2100).optional(),
+            current_rate: Joi.number().min(0).optional(),
+            arrears: Joi.number().min(0).optional(),
+            rebate: Joi.number().min(0).optional(),
         });
 
         const { error, value } = schema.validate(req.body);
@@ -33,9 +36,13 @@ router.post('/generate', authenticateToken, authorize(['generate_bill']), async 
             });
         }
 
-        const { bill_type, target_id, customer_id, bill_year } = value;
+        const { bill_type, target_id, customer_id, bill_year, current_rate, arrears, rebate } = value;
 
-        const bill = await generateBill(bill_type, target_id, customer_id, bill_year);
+        const bill = await generateBill(bill_type, target_id, customer_id, bill_year, {
+            current_rate,
+            arrears,
+            rebate,
+        });
 
         await logAction(
             req.user!.id,
@@ -63,7 +70,8 @@ router.post('/generate', authenticateToken, authorize(['generate_bill']), async 
 
 /**
  * PUT /api/bills/:id/amounts
- * Request amount change — never applies directly (Super Admin approval required).
+ * Super Admin (approve_amount_changes) applies immediately.
+ * Others submit a change request for approval.
  */
 router.put('/:id/amounts', async (req: AuthRequest, res: Response) => {
     try {
@@ -91,6 +99,79 @@ router.put('/:id/amounts', async (req: AuthRequest, res: Response) => {
         }
 
         const { reason, ...proposed } = value;
+
+        // Super Admin can apply bill amount changes immediately so amounts don't stay at 0
+        if (perms.includes('approve_amount_changes') || perms.includes('manage_users')) {
+            const billResult = await pool.query('SELECT * FROM bills WHERE id = $1', [req.params.id]);
+            if (billResult.rows.length === 0) {
+                return res.status(404).json({ success: false, error: 'Bill not found' });
+            }
+            const bill = billResult.rows[0];
+            const current_rate =
+                proposed.current_rate !== undefined ? Number(proposed.current_rate) : Number(bill.current_rate);
+            const arrears = proposed.arrears !== undefined ? Number(proposed.arrears) : Number(bill.arrears);
+            const rebate = proposed.rebate !== undefined ? Number(proposed.rebate) : Number(bill.rebate);
+            const total_amount =
+                proposed.total_amount !== undefined
+                    ? Number(proposed.total_amount)
+                    : current_rate + arrears - rebate;
+            const amount_paid = Number(bill.amount_paid || 0);
+            const amount_due = Math.max(total_amount - amount_paid, 0);
+            let payment_status = 'UNPAID';
+            if (amount_due <= 0) payment_status = 'PAID';
+            else if (amount_paid > 0) payment_status = 'PARTIAL';
+
+            const updated = await pool.query(
+                `UPDATE bills SET
+                    current_rate = $1,
+                    arrears = $2,
+                    rebate = $3,
+                    total_amount = $4,
+                    amount_due = $5,
+                    payment_status = $6,
+                    updated_at = NOW()
+                 WHERE id = $7
+                 RETURNING *`,
+                [current_rate, arrears, rebate, total_amount, amount_due, payment_status, req.params.id]
+            );
+
+            // Keep assessed amount in sync on the related property/business
+            if (bill.property_id) {
+                await pool.query(`UPDATE properties SET assessed_amount = $1, updated_at = NOW() WHERE id = $2`, [
+                    current_rate,
+                    bill.property_id,
+                ]);
+            }
+            if (bill.business_id) {
+                await pool.query(`UPDATE businesses SET assessed_amount = $1, updated_at = NOW() WHERE id = $2`, [
+                    current_rate,
+                    bill.business_id,
+                ]);
+            }
+
+            await logAction(
+                req.user!.id,
+                'BILL_AMOUNT_UPDATED',
+                'bills',
+                req.params.id,
+                {
+                    current_rate: bill.current_rate,
+                    arrears: bill.arrears,
+                    rebate: bill.rebate,
+                    total_amount: bill.total_amount,
+                },
+                { current_rate, arrears, rebate, total_amount, reason: reason || 'Direct admin update' },
+                getAuditContext(req)
+            );
+
+            return res.json({
+                success: true,
+                message: 'Bill amount updated successfully',
+                data: updated.rows[0],
+                applied: true,
+            });
+        }
+
         const request = await createAmountChangeRequest({
             entityType: 'BILL',
             entityId: req.params.id,
@@ -104,6 +185,7 @@ router.put('/:id/amounts', async (req: AuthRequest, res: Response) => {
             success: true,
             message: 'Amount change submitted for Super Admin approval',
             data: request,
+            applied: false,
         });
     } catch (error: any) {
         console.error('Error requesting bill amount change:', error);

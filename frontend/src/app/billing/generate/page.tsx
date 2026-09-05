@@ -47,6 +47,9 @@ function GenerateBillContent() {
 
     const [showPreview, setShowPreview] = useState(false);
     const [previewData, setPreviewData] = useState<any>(null);
+    const [billAmount, setBillAmount] = useState<string>('');
+    const [arrearsAmount, setArrearsAmount] = useState<string>('');
+    const [rebateAmount, setRebateAmount] = useState<string>('0');
 
     const watchBillType = watch('bill_type');
     const watchCustomerId = watch('customer_id');
@@ -153,6 +156,15 @@ function GenerateBillContent() {
                 target_details: data.bill_type === 'PROPERTY' ? target.classification_name : target.category_name,
                 calculation: calculation.data
             });
+            const calc = calculation.data || {};
+            // Prefer assessed amount from property/business when present
+            const preferred =
+                (data.bill_type === 'PROPERTY'
+                    ? target?.assessed_amount
+                    : target?.assessed_amount) ?? calc.current_rate ?? 0;
+            setBillAmount(String(preferred ?? calc.current_rate ?? ''));
+            setArrearsAmount(String(calc.arrears ?? 0));
+            setRebateAmount(String(calc.rebate ?? 0));
             setShowPreview(true);
         } catch (err: any) {
             setError(err.response?.data?.error || 'Failed to fetch bill calculation');
@@ -166,7 +178,10 @@ function GenerateBillContent() {
                 bill_type: data.bill_type === 'PROPERTY' ? 'PROPERTY_RATE' : 'BOP',
                 target_id: data.bill_type === 'PROPERTY' ? data.property_id : data.business_id,
                 customer_id: data.customer_id,
-                bill_year: parseInt(data.billing_year as any)
+                bill_year: parseInt(data.billing_year as any),
+                current_rate: billAmount !== '' ? parseFloat(billAmount) : undefined,
+                arrears: arrearsAmount !== '' ? parseFloat(arrearsAmount) : undefined,
+                rebate: rebateAmount !== '' ? parseFloat(rebateAmount) : undefined,
             };
 
             const result = await generateBill(apiData);
@@ -423,23 +438,53 @@ function GenerateBillContent() {
                                     <span className="text-xs bg-municipal-red/10 text-municipal-red px-2 py-0.5 rounded-full font-bold">GHS</span>
                                 </div>
                                 <div className="p-4 space-y-3">
-                                    <div className="flex justify-between items-center text-sm">
-                                        <span className="text-gray-500">Current Rate:</span>
-                                        <span className="font-bold text-gray-900">{Number(previewData.calculation.current_rate).toLocaleString('en-GH', { minimumFractionDigits: 2 })}</span>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Current Rate / Bill Amount</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            className="input-field mt-1"
+                                            value={billAmount}
+                                            onChange={(e) => setBillAmount(e.target.value)}
+                                        />
                                     </div>
-                                    <div className="flex justify-between items-center text-sm">
-                                        <span className="text-gray-500">Previous Arrears:</span>
-                                        <span className="font-bold text-red-600">{Number(previewData.calculation.arrears).toLocaleString('en-GH', { minimumFractionDigits: 2 })}</span>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Previous Arrears</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            className="input-field mt-1"
+                                            value={arrearsAmount}
+                                            onChange={(e) => setArrearsAmount(e.target.value)}
+                                        />
                                     </div>
-                                    <div className="flex justify-between items-center text-sm">
-                                        <span className="text-gray-500">Rebate/Discount:</span>
-                                        <span className="font-bold text-green-600">({Number(previewData.calculation.rebate).toLocaleString('en-GH', { minimumFractionDigits: 2 })})</span>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Rebate / Discount</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            className="input-field mt-1"
+                                            value={rebateAmount}
+                                            onChange={(e) => setRebateAmount(e.target.value)}
+                                        />
                                     </div>
                                     <div className="h-px bg-gray-100 my-2"></div>
                                     <div className="flex justify-between items-center font-bold text-lg">
                                         <span className="text-gray-900">Total Due:</span>
-                                        <span className="text-municipal-red">GHS {Number(previewData.calculation.total_amount).toLocaleString('en-GH', { minimumFractionDigits: 2 })}</span>
+                                        <span className="text-municipal-red">
+                                            GHS {(
+                                                (parseFloat(billAmount) || 0) +
+                                                (parseFloat(arrearsAmount) || 0) -
+                                                (parseFloat(rebateAmount) || 0)
+                                            ).toLocaleString('en-GH', { minimumFractionDigits: 2 })}
+                                        </span>
                                     </div>
+                                    <p className="text-[11px] text-gray-500">
+                                        Edit the amount above before generating — this is what will appear on the bill.
+                                    </p>
                                 </div>
                             </div>
 

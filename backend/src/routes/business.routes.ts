@@ -28,15 +28,16 @@ const businessSchema = Joi.object({
     property_id: Joi.string().uuid().optional().allow('', null),
     street_name: Joi.string().optional().allow(''),
     gps_address: Joi.string().optional().allow('').max(50),
-    latitude: Joi.number().precision(8).min(-90).max(90).optional().allow(null),
-    longitude: Joi.number().precision(8).min(-180).max(180).optional().allow(null),
+    latitude: Joi.number().precision(8).min(-90).max(90).optional().allow(null, ''),
+    longitude: Joi.number().precision(8).min(-180).max(180).optional().allow(null, ''),
     town: Joi.string().optional().allow(''),
     physical_location: Joi.string().optional().allow(''),
     landmark: Joi.string().optional().allow(''),
-    electoral_area_id: Joi.number().integer().optional().allow(null),
-    local_area_id: Joi.number().integer().optional().allow(null),
+    electoral_area_id: Joi.number().integer().optional().allow(null, ''),
+    local_area_id: Joi.number().integer().optional().allow(null, ''),
     year_registered: Joi.number().integer().min(2000).max(2100).optional(),
-    fee_item_id: Joi.number().integer().optional().allow(null),
+    fee_item_id: Joi.number().integer().optional().allow(null, ''),
+    assessed_amount: Joi.number().min(0).optional().allow(null, ''),
 });
 
 /**
@@ -80,10 +81,15 @@ router.post('/', authorize(['register_business']), async (req: AuthRequest, res:
             local_area_id,
             year_registered,
             fee_item_id,
+            assessed_amount,
         } = value;
 
         const currentYear = new Date().getFullYear();
         const regYear = year_registered || currentYear;
+        const assessed =
+            assessed_amount === '' || assessed_amount === undefined || assessed_amount === null
+                ? null
+                : Number(assessed_amount);
 
         const result = await pool.query(
             `INSERT INTO businesses (
@@ -92,8 +98,8 @@ router.post('/', authorize(['register_business']), async (req: AuthRequest, res:
                 business_category_class, business_email, description,
                 account_number, division_number, block_number,
                 property_id, street_name, gps_address, latitude, longitude, town, physical_location,
-                landmark, electoral_area_id, local_area_id, year_registered, fee_item_id
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
+                landmark, electoral_area_id, local_area_id, year_registered, fee_item_id, assessed_amount
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
             RETURNING *`,
             [
                 business_name,
@@ -121,6 +127,7 @@ router.post('/', authorize(['register_business']), async (req: AuthRequest, res:
                 local_area_id || null,
                 regYear,
                 fee_item_id || null,
+                Number.isFinite(assessed as number) ? assessed : null,
             ]
         );
 
@@ -338,14 +345,14 @@ router.put('/:id', authorize(['edit_business']), async (req: AuthRequest, res: R
             block_number: Joi.string().optional().allow(''),
             street_name: Joi.string().optional().allow(''),
             gps_address: Joi.string().optional().allow('').max(50),
-            latitude: Joi.number().precision(8).min(-90).max(90).optional().allow(null),
-            longitude: Joi.number().precision(8).min(-180).max(180).optional().allow(null),
+            latitude: Joi.number().precision(8).min(-90).max(90).optional().allow(null, ''),
+            longitude: Joi.number().precision(8).min(-180).max(180).optional().allow(null, ''),
             town: Joi.string().optional().allow(''),
             physical_location: Joi.string().optional().allow(''),
             landmark: Joi.string().optional().allow(''),
-            electoral_area_id: Joi.number().integer().optional().allow(null),
-            local_area_id: Joi.number().integer().optional().allow(null),
-            fee_item_id: Joi.number().integer().optional().allow(null),
+            electoral_area_id: Joi.number().integer().optional().allow(null, ''),
+            local_area_id: Joi.number().integer().optional().allow(null, ''),
+            fee_item_id: Joi.number().integer().optional().allow(null, ''),
             status: Joi.string().valid('ACTIVE', 'INACTIVE', 'CLOSED').optional(),
         });
 

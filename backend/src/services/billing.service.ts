@@ -41,59 +41,71 @@ export const calculatePropertyBill = async (
     let current_rate: number;
     let rateDescription = '';
 
-    // Try to use configured fee schedule rates
-    const activeSchedule = await pool.query(
-        `SELECT id FROM fee_schedules WHERE year = $1 AND status = 'ACTIVE'`,
-        [billYear]
-    );
+    // Prefer assessed amount set at registration / by admin
+    const assessedAmount = parseFloat(property.assessed_amount);
+    if (!isNaN(assessedAmount) && assessedAmount > 0) {
+        current_rate = assessedAmount;
+        rateDescription = 'Assessed property rate (from registration)';
+    } else {
+        // Try to use configured fee schedule rates
+        const activeSchedule = await pool.query(
+            `SELECT id FROM fee_schedules WHERE year = $1 AND status = 'ACTIVE'`,
+            [billYear]
+        );
 
-    if (activeSchedule.rows.length > 0) {
-        let zone = null;
+        if (activeSchedule.rows.length > 0) {
+            let zone = null;
 
-        // First, check if property has a specific rate zone assigned
-        if (property.property_rate_zone_id) {
-            const zoneResult = await pool.query(
-                'SELECT * FROM property_rate_zones WHERE id = $1',
-                [property.property_rate_zone_id]
-            );
-            if (zoneResult.rows.length > 0) zone = zoneResult.rows[0];
-        }
+            // First, check if property has a specific rate zone assigned
+            if (property.property_rate_zone_id) {
+                const zoneResult = await pool.query(
+                    'SELECT * FROM property_rate_zones WHERE id = $1',
+                    [property.property_rate_zone_id]
+                );
+                if (zoneResult.rows.length > 0) zone = zoneResult.rows[0];
+            }
 
-        // Otherwise, match by classification type
-        if (!zone && property.classification_name) {
-            const zoneTypeMap: Record<string, string> = {
-                'Residential': 'RESIDENTIAL',
-                'Commercial': 'COMMERCIAL',
-                'Industrial': 'INDUSTRIAL',
-            };
-            const zoneType = zoneTypeMap[property.classification_name] || 'RESIDENTIAL';
+            // Otherwise, match by classification type
+            if (!zone && property.classification_name) {
+                const zoneTypeMap: Record<string, string> = {
+                    'Residential': 'RESIDENTIAL',
+                    'Commercial': 'COMMERCIAL',
+                    'Industrial': 'INDUSTRIAL',
+                };
+                const zoneType = zoneTypeMap[property.classification_name] || 'RESIDENTIAL';
 
-            const zoneResult = await pool.query(
-                `SELECT * FROM property_rate_zones
-                 WHERE fee_schedule_id = $1 AND zone_type = $2
-                 ORDER BY zone_class ASC LIMIT 1`,
-                [activeSchedule.rows[0].id, zoneType]
-            );
-            if (zoneResult.rows.length > 0) zone = zoneResult.rows[0];
-        }
+                const zoneResult = await pool.query(
+                    `SELECT * FROM property_rate_zones
+                     WHERE fee_schedule_id = $1 AND zone_type = $2
+                     ORDER BY zone_class ASC LIMIT 1`,
+                    [activeSchedule.rows[0].id, zoneType]
+                );
+                if (zoneResult.rows.length > 0) zone = zoneResult.rows[0];
+            }
 
-        if (zone) {
-            const rateImpost = parseFloat(zone.rate_impost_min);
-            const minimumRate = parseFloat(zone.minimum_rate_min);
-            const calculatedRate = rateImpost * propertySize;
-            current_rate = Math.max(calculatedRate, minimumRate);
-            rateDescription = `${zone.zone_name} - Rate Impost: ${rateImpost}`;
+            if (zone) {
+                const rateImpost = parseFloat(zone.rate_impost_min);
+                const minimumRate = parseFloat(zone.minimum_rate_min);
+                // Prefer zone minimum when size is missing/default — impost*default size often understates
+                const calculatedRate = rateImpost * propertySize;
+                current_rate = Math.max(calculatedRate, minimumRate || 0);
+                // If impost is tiny/zero but a minimum exists, use the minimum as the bill amount
+                if ((!current_rate || current_rate <= 0) && minimumRate > 0) {
+                    current_rate = minimumRate;
+                }
+                rateDescription = `${zone.zone_name} - Rate Impost: ${rateImpost}`;
+            } else {
+                // Fallback to legacy
+                const baseRate = parseFloat(property.base_rate) || 0;
+                current_rate = baseRate * propertySize;
+                rateDescription = `Legacy Rate: ${baseRate}`;
+            }
         } else {
-            // Fallback to legacy
+            // No active schedule - use legacy calculation
             const baseRate = parseFloat(property.base_rate) || 0;
             current_rate = baseRate * propertySize;
             rateDescription = `Legacy Rate: ${baseRate}`;
         }
-    } else {
-        // No active schedule - use legacy calculation
-        const baseRate = parseFloat(property.base_rate) || 0;
-        current_rate = baseRate * propertySize;
-        rateDescription = `Legacy Rate: ${baseRate}`;
     }
 
     // Check for arrears (previous unpaid bills not already rolled into another bill)
@@ -165,38 +177,44 @@ export const calculateBusinessBill = async (
     let current_rate: number;
     let feeDescription = '';
 
-    // Try to use configured fee schedule rates
-    if (business.fee_item_id) {
-        const activeSchedule = await pool.query(
-            `SELECT id FROM fee_schedules WHERE year = $1 AND status = 'ACTIVE'`,
-            [billYear]
+    const assessedAmount = parseFloat(business.assessed_amount);
+    if (!isNaN(assessedAmount) && assessedAmount > 0) {
+        current_rate = assessedAmount;
+        feeDescription = 'Assessed BOP fee (from registration)';
+    } else if (business.fee_item_id) {
+        // Look up fee item by id first (do not require matching schedule year)
+        const feeItemResult = await pool.query(
+            'SELECT * FROM business_fee_items WHERE id = $1',
+            [business.fee_item_id]
         );
 
-        if (activeSchedule.rows.length > 0) {
-            const feeItemResult = await pool.query(
-                'SELECT * FROM business_fee_items WHERE id = $1 AND fee_schedule_id = $2',
-                [business.fee_item_id, activeSchedule.rows[0].id]
-            );
+        if (feeItemResult.rows.length > 0) {
+            const feeItem = feeItemResult.rows[0];
+            const catClass = (business.business_category_class || 'Category A')
+                .replace('Category ', '')
+                .toLowerCase()
+                .trim();
+            const feeColumn = `cat_${catClass}_fee`;
+            const configuredFee = parseFloat(feeItem[feeColumn]);
 
-            if (feeItemResult.rows.length > 0) {
-                const feeItem = feeItemResult.rows[0];
-                // Determine which category fee to use based on business_category_class
-                const catClass = (business.business_category_class || 'Category A')
-                    .replace('Category ', '').toLowerCase().trim();
-                const feeColumn = `cat_${catClass}_fee`;
-                const configuredFee = parseFloat(feeItem[feeColumn]);
-
-                if (!isNaN(configuredFee) && configuredFee > 0) {
-                    current_rate = configuredFee;
-                    feeDescription = `${feeItem.description} - ${business.business_category_class || 'Category A'}`;
-                } else {
-                    // Try cat_a_fee as default
-                    current_rate = parseFloat(feeItem.cat_a_fee) || parseFloat(business.base_fee) || 0;
-                    feeDescription = `${feeItem.description} - Category A (default)`;
-                }
+            if (!isNaN(configuredFee) && configuredFee > 0) {
+                current_rate = configuredFee;
+                feeDescription = `${feeItem.description} - ${business.business_category_class || 'Category A'}`;
             } else {
-                current_rate = parseFloat(business.base_fee) || 0;
-                feeDescription = `Legacy: ${business.category_name}`;
+                // Fall through known category fee columns
+                const fallbackFees = [
+                    feeItem.cat_a_fee,
+                    feeItem.cat_b_fee,
+                    feeItem.cat_c_fee,
+                    feeItem.cat_d_fee,
+                    feeItem.cat_e_fee,
+                    feeItem.cat_f_fee,
+                    business.base_fee,
+                ]
+                    .map((v: any) => parseFloat(v))
+                    .filter((n: number) => !isNaN(n) && n > 0);
+                current_rate = fallbackFees[0] || 0;
+                feeDescription = `${feeItem.description} - fee schedule amount`;
             }
         } else {
             current_rate = parseFloat(business.base_fee) || 0;
@@ -259,7 +277,8 @@ export const generateBill = async (
     billType: 'PROPERTY_RATE' | 'BOP',
     targetId: string,
     customerId: string,
-    billYear?: number
+    billYear?: number,
+    amountOverride?: { current_rate?: number; arrears?: number; rebate?: number }
 ): Promise<any> => {
     const currentYear = new Date().getFullYear();
     const year = billYear || currentYear;
@@ -277,6 +296,44 @@ export const generateBill = async (
         calculation = await calculateBusinessBill(targetId, year);
         businessId = targetId;
         billPeriodDescription = `${year} Business Operating Permit`;
+    }
+
+    // Optional explicit amounts from the officer at generation time
+    if (amountOverride) {
+        if (amountOverride.current_rate !== undefined && Number.isFinite(Number(amountOverride.current_rate))) {
+            calculation.current_rate = Number(amountOverride.current_rate);
+        }
+        if (amountOverride.arrears !== undefined && Number.isFinite(Number(amountOverride.arrears))) {
+            calculation.arrears = Number(amountOverride.arrears);
+        }
+        if (amountOverride.rebate !== undefined && Number.isFinite(Number(amountOverride.rebate))) {
+            calculation.rebate = Number(amountOverride.rebate);
+        }
+        calculation.total_amount = calculation.current_rate + calculation.arrears - calculation.rebate;
+        calculation.amount_due = calculation.total_amount;
+        if (calculation.bill_details?.items?.[0]) {
+            calculation.bill_details.items[0].current_rate = calculation.current_rate.toFixed(2);
+            calculation.bill_details.items[0].arrears = calculation.arrears.toFixed(2);
+            calculation.bill_details.items[0].rebate = calculation.rebate.toFixed(2);
+            calculation.bill_details.items[0].total = calculation.current_rate.toFixed(2);
+            calculation.bill_details.items[0].rate_info =
+                calculation.bill_details.items[0].rate_info || 'Manual amount at generation';
+        }
+
+        // Persist assessed amount back onto the property/business for future bills
+        if (amountOverride.current_rate !== undefined && Number(amountOverride.current_rate) >= 0) {
+            if (billType === 'PROPERTY_RATE') {
+                await pool.query(
+                    `UPDATE properties SET assessed_amount = $1, updated_at = NOW() WHERE id = $2`,
+                    [Number(amountOverride.current_rate), targetId]
+                );
+            } else {
+                await pool.query(
+                    `UPDATE businesses SET assessed_amount = $1, updated_at = NOW() WHERE id = $2`,
+                    [Number(amountOverride.current_rate), targetId]
+                );
+            }
+        }
     }
 
     // Check if bill already exists for this period

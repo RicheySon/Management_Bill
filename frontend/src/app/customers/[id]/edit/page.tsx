@@ -12,6 +12,12 @@ import dynamic from 'next/dynamic';
 const toNullableId = (v: any) =>
     (v === '' || v === undefined || v === null || Number.isNaN(Number(v)) ? null : Number(v));
 
+const toOptionalNumber = (v: any) => {
+    if (v === '' || v === undefined || v === null) return null;
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) ? n : null;
+};
+
 const MapSelector = dynamic(() => import('@/components/MapSelector'), {
     ssr: false,
     loading: () => <div className="h-[400px] w-full bg-gray-100 animate-pulse rounded-lg flex items-center justify-center text-gray-500">Loading Map...</div>
@@ -135,22 +141,25 @@ export default function EditCustomerPage() {
     }, [id, setValue]);
 
     useEffect(() => {
-        if (!selectedElectoralArea) {
+        const eaId = toNullableId(selectedElectoralArea);
+        if (!eaId) {
             setLocalAreas([]);
             return;
         }
-        const areaId = Number(selectedElectoralArea);
-        if (Number.isNaN(areaId)) {
-            setLocalAreas([]);
-            return;
-        }
-        fetchLocalAreas(areaId).then(areas => {
+        let cancelled = false;
+        fetchLocalAreas(eaId).then(areas => {
+            if (cancelled) return;
             setLocalAreas(Array.isArray(areas) ? areas : []);
-            if (prevElectoralAreaRef.current !== null && prevElectoralAreaRef.current !== areaId) {
-                setValue('local_area_id', undefined);
+            if (prevElectoralAreaRef.current !== null && prevElectoralAreaRef.current !== eaId) {
+                setValue('local_area_id', undefined as any);
             }
-            prevElectoralAreaRef.current = areaId;
-        }).catch(() => setLocalAreas([]));
+            prevElectoralAreaRef.current = eaId;
+        }).catch(() => {
+            if (!cancelled) setLocalAreas([]);
+        });
+        return () => {
+            cancelled = true;
+        };
     }, [selectedElectoralArea, setValue]);
 
     const onSubmit = async (data: CustomerForm) => {
@@ -158,6 +167,8 @@ export default function EditCustomerPage() {
         try {
             await updateCustomer(id as string, {
                 ...data,
+                latitude: toOptionalNumber(data.latitude),
+                longitude: toOptionalNumber(data.longitude),
                 electoral_area_id: toNullableId(data.electoral_area_id) as any,
                 local_area_id: toNullableId(data.local_area_id) as any,
             });
@@ -345,7 +356,7 @@ export default function EditCustomerPage() {
                         </div>
 
                         <div>
-                            <label className="label">Electoral Area</label>
+                            <label className="label">Electoral Area <span className="text-gray-400 font-normal">(optional)</span></label>
                             <select {...register('electoral_area_id')} className="input-field">
                                 <option value="">Select Electoral Area</option>
                                 {electoralAreas.map((area: any) => (
@@ -355,13 +366,26 @@ export default function EditCustomerPage() {
                         </div>
 
                         <div>
-                            <label className="label">Local Area / Community</label>
-                            <select {...register('local_area_id')} className="input-field" disabled={!selectedElectoralArea}>
-                                <option value="">Select Local Area</option>
+                            <label className="label">Local Area / Community <span className="text-gray-400 font-normal">(optional)</span></label>
+                            <select {...register('local_area_id')} className="input-field">
+                                <option value="">
+                                    {!toNullableId(selectedElectoralArea)
+                                        ? 'Select electoral area first'
+                                        : localAreas.length === 0
+                                          ? 'No communities for this area yet'
+                                          : 'Select Local Area'}
+                                </option>
                                 {localAreas.map((area: any) => (
                                     <option key={area.id} value={area.id}>{area.name}</option>
                                 ))}
                             </select>
+                            {!toNullableId(selectedElectoralArea) ? (
+                                <p className="text-xs text-gray-500 mt-1">Choose an electoral area above to load communities.</p>
+                            ) : localAreas.length === 0 ? (
+                                <p className="text-xs text-amber-700 mt-1">
+                                    No communities linked yet. An admin can add them under Administration → Areas & Communities.
+                                </p>
+                            ) : null}
                         </div>
 
                         <div className="md:col-span-2">

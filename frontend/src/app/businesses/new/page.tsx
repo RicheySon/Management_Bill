@@ -22,6 +22,12 @@ import CustomerSearchSelect from '@/components/CustomerSearchSelect';
 const toNullableId = (v: any) =>
     (v === '' || v === undefined || v === null || Number.isNaN(Number(v)) ? null : Number(v));
 
+const toOptionalNumber = (v: any) => {
+    if (v === '' || v === undefined || v === null) return null;
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) ? n : null;
+};
+
 const MapSelector = dynamic(() => import('@/components/MapSelector'), {
     ssr: false,
     loading: () => <div className="h-[400px] w-full bg-gray-100 animate-pulse rounded-lg flex items-center justify-center text-gray-500">Loading Map...</div>
@@ -93,6 +99,7 @@ export default function NewBusinessPage() {
     const [feeItems, setFeeItems] = useState<any[]>([]);
     const [selectedFeeItemId, setSelectedFeeItemId] = useState<string>('');
     const [selectedFeeAmount, setSelectedFeeAmount] = useState<string>('');
+    const [assessedAmount, setAssessedAmount] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const [businessNumber, setBusinessNumber] = useState<string | null>(null);
@@ -190,15 +197,24 @@ export default function NewBusinessPage() {
     }, []);
 
     useEffect(() => {
-        if (!selectedElectoralArea) {
+        const eaId = toNullableId(selectedElectoralArea);
+        if (!eaId) {
             setLocalAreas([]);
-            setValue('local_area_id', undefined);
+            setValue('local_area_id', undefined as any);
             return;
         }
-        fetchLocalAreas(Number(selectedElectoralArea))
-            .then((areas) => setLocalAreas(areas || []))
-            .catch(() => setLocalAreas([]));
-        setValue('local_area_id', undefined);
+        let cancelled = false;
+        fetchLocalAreas(eaId)
+            .then((areas) => {
+                if (!cancelled) setLocalAreas(areas || []);
+            })
+            .catch(() => {
+                if (!cancelled) setLocalAreas([]);
+            });
+        setValue('local_area_id', undefined as any);
+        return () => {
+            cancelled = true;
+        };
     }, [selectedElectoralArea, setValue]);
 
     const onSubmit = async (data: BusinessForm) => {
@@ -244,14 +260,15 @@ export default function NewBusinessPage() {
                 division_number: data.division_number,
                 block_number: data.block_number,
                 gps_address: data.gps_address,
-                latitude: data.latitude,
-                longitude: data.longitude,
+                latitude: toOptionalNumber(data.latitude),
+                longitude: toOptionalNumber(data.longitude),
                 town: data.town,
                 street_name: data.street_name,
                 landmark: data.landmark,
                 electoral_area_id: toNullableId(data.electoral_area_id),
                 local_area_id: toNullableId(data.local_area_id),
                 fee_item_id: selectedFeeItemId ? parseInt(selectedFeeItemId) : null,
+                assessed_amount: toOptionalNumber(assessedAmount),
             });
 
             setBusinessNumber(result.data.business_number);
@@ -543,10 +560,10 @@ export default function NewBusinessPage() {
 
                         <div>
                             <label className="label">
-                                Business Category Class <span className="text-municipal-red">*</span>
+                                Business Category Class <span className="text-gray-400 font-normal">(optional)</span>
                             </label>
                             <select
-                                {...register('business_category_class', { required: 'Please select a category class' })}
+                                {...register('business_category_class')}
                                 className="input-field"
                             >
                                 <option value="">Select category</option>
@@ -555,16 +572,13 @@ export default function NewBusinessPage() {
                                 <option value="Category C">Category C</option>
                                 <option value="Category D">Category D</option>
                             </select>
-                            {errors.business_category_class && (
-                                <p className="text-red-500 text-sm mt-1">{errors.business_category_class.message}</p>
-                            )}
                         </div>
 
                         {/* Fee Schedule Item (from configured fee schedule) */}
                         {feeItems.length > 0 && (
                             <div className="md:col-span-2">
                                 <label className="label">
-                                    Fee Schedule Item (Configured Rate)
+                                    Fee Schedule Item (Configured Rate) <span className="text-gray-400 font-normal">(optional)</span>
                                 </label>
                                 <select
                                     className="input-field"
@@ -574,8 +588,20 @@ export default function NewBusinessPage() {
                                         if (e.target.value) {
                                             const item = feeItems.find((fi: any) => fi.id === parseInt(e.target.value));
                                             if (item) {
-                                                const fee = item.cat_a_fee || item.cat_b_fee || item.cat_c_fee || 0;
-                                                setSelectedFeeAmount(fee ? `GHS ${Number(fee).toLocaleString('en-GH', { minimumFractionDigits: 2 })}` : '');
+                                                const classVal = watch('business_category_class') || 'Category A';
+                                                const letter = classVal.replace('Category ', '').toLowerCase();
+                                                const fee =
+                                                    item[`cat_${letter}_fee`] ||
+                                                    item.cat_a_fee ||
+                                                    item.cat_b_fee ||
+                                                    item.cat_c_fee ||
+                                                    0;
+                                                setSelectedFeeAmount(
+                                                    fee
+                                                        ? `GHS ${Number(fee).toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
+                                                        : ''
+                                                );
+                                                if (fee) setAssessedAmount(String(fee));
                                             }
                                         } else {
                                             setSelectedFeeAmount('');
@@ -597,6 +623,25 @@ export default function NewBusinessPage() {
                                 )}
                             </div>
                         )}
+
+                        <div className="md:col-span-2">
+                            <label className="label">
+                                Bill Amount (GHS) <span className="text-municipal-red">*</span>
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                className="input-field"
+                                placeholder="e.g. 500"
+                                value={assessedAmount}
+                                onChange={(e) => setAssessedAmount(e.target.value)}
+                                required
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                                This amount is saved with the business and used when generating the bill.
+                            </p>
+                        </div>
 
                         <div>
                             <label className="label">Business Email</label>
@@ -798,9 +843,9 @@ export default function NewBusinessPage() {
                         </div>
 
                         <div>
-                            <label className="label">Electoral Area</label>
-                            <select {...register('electoral_area_id', { valueAsNumber: true })} className="input-field">
-                                <option value="">Electoral area</option>
+                            <label className="label">Electoral Area <span className="text-gray-400 font-normal">(optional)</span></label>
+                            <select {...register('electoral_area_id')} className="input-field">
+                                <option value="">Select Electoral Area</option>
                                 {electoralAreas.map((area: any) => (
                                     <option key={area.id} value={area.id}>
                                         {area.name}
@@ -810,19 +855,28 @@ export default function NewBusinessPage() {
                         </div>
 
                         <div>
-                            <label className="label">Local Area / Community</label>
-                            <select
-                                {...register('local_area_id', { valueAsNumber: true })}
-                                className="input-field"
-                                disabled={!selectedElectoralArea}
-                            >
-                                <option value="">Select Local Area</option>
+                            <label className="label">Local Area / Community <span className="text-gray-400 font-normal">(optional)</span></label>
+                            <select {...register('local_area_id')} className="input-field">
+                                <option value="">
+                                    {!toNullableId(selectedElectoralArea)
+                                        ? 'Select electoral area first'
+                                        : localAreas.length === 0
+                                          ? 'No communities for this area yet'
+                                          : 'Select Local Area'}
+                                </option>
                                 {localAreas.map((area: any) => (
                                     <option key={area.id} value={area.id}>
                                         {area.name}
                                     </option>
                                 ))}
                             </select>
+                            {!toNullableId(selectedElectoralArea) ? (
+                                <p className="text-xs text-gray-500 mt-1">Choose an electoral area above to load communities.</p>
+                            ) : localAreas.length === 0 ? (
+                                <p className="text-xs text-amber-700 mt-1">
+                                    No communities linked yet. An admin can add them under Administration → Areas & Communities.
+                                </p>
+                            ) : null}
                         </div>
                     </div>
                 </div>

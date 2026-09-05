@@ -312,6 +312,7 @@ CREATE TABLE properties (
     population_density VARCHAR(50),
     property_size DECIMAL(10, 2), -- in square meters
     property_rate_zone_id INTEGER, -- FK added after property_rate_zones exists
+    assessed_amount DECIMAL(12, 2), -- annual bill amount set at registration
     year_registered INTEGER NOT NULL,
     status VARCHAR(20) DEFAULT 'ACTIVE', -- ACTIVE, INACTIVE, DEMOLISHED
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -352,6 +353,7 @@ CREATE TABLE businesses (
     electoral_area_id INTEGER REFERENCES electoral_areas(id),
     local_area_id INTEGER REFERENCES local_areas(id),
     fee_item_id INTEGER, -- FK added after business_fee_items exists
+    assessed_amount DECIMAL(12, 2), -- annual BOP fee set at registration
     year_registered INTEGER NOT NULL,
     status VARCHAR(20) DEFAULT 'ACTIVE', -- ACTIVE, INACTIVE, CLOSED
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

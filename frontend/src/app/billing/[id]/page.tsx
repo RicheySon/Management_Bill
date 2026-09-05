@@ -110,7 +110,12 @@ export default function BillDetailPage() {
                 rebate: parseFloat(amountForm.rebate),
                 reason: amountForm.reason,
             });
-            setAmountMsg(res.message || 'Submitted for Super Admin approval');
+            if (res.applied) {
+                setAmountMsg(res.message || 'Bill amount updated successfully');
+                await loadBill();
+            } else {
+                setAmountMsg(res.message || 'Submitted for Super Admin approval');
+            }
         } catch (err: any) {
             setError(err.response?.data?.error || 'Failed to submit amount change');
         }
@@ -303,7 +308,8 @@ export default function BillDetailPage() {
                                 Edit Amounts (incl. Arrears)
                             </h3>
                             <p className="text-sm text-gray-500 mb-4">
-                                Edit current rate, <strong>arrears</strong>, and rebate. Changes go to Super Admin for approval before they take effect.
+                                Edit current rate, <strong>arrears</strong>, and rebate.
+                                Super Admins apply changes immediately; other roles send them for approval.
                             </p>
                             {amountMsg && (
                                 <div className="bg-amber-50 text-amber-800 p-3 rounded-lg text-sm mb-4 border border-amber-200">
