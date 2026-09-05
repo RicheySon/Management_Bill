@@ -1,7 +1,18 @@
 import { Router, Response } from 'express';
 import pool from '../config/database';
 import { authenticateToken, authorize, AuthRequest, getCollectorAreaFilter } from '../middlewares/auth.middleware';
+import { generateBill } from '../services/billing.service';
 import Joi from 'joi';
+
+const outstandingStatuses = new Set(['UNPAID', 'PARTIAL', 'OVERDUE']);
+
+function summarizeBills(bills: any[]) {
+    const total_outstanding = bills
+        .filter((b) => outstandingStatuses.has(b.payment_status))
+        .reduce((sum, b) => sum + (parseFloat(b.amount_due) || 0), 0);
+    const total_paid = bills.reduce((sum, b) => sum + (parseFloat(b.amount_paid) || 0), 0);
+    return { total_outstanding, total_paid };
+}
 
 const router = Router();
 
@@ -131,6 +142,24 @@ router.post('/', authorize(['register_business']), async (req: AuthRequest, res:
             ]
         );
 
+        const businessId = result.rows[0].id;
+        let initialBill: any = null;
+
+        // Auto-issue registration-year BOP bill when an assessed amount was provided
+        if (Number.isFinite(assessed as number) && (assessed as number) > 0) {
+            try {
+                initialBill = await generateBill(
+                    'BOP',
+                    businessId,
+                    customer_id,
+                    regYear,
+                    { current_rate: assessed as number, arrears: 0, rebate: 0 }
+                );
+            } catch (billError: any) {
+                console.error('Auto bill generation failed after business registration:', billError);
+            }
+        }
+
         const businessWithDetails = await pool.query(
             `SELECT b.*,
                 c.full_name as owner_name,
@@ -147,13 +176,19 @@ router.post('/', authorize(['register_business']), async (req: AuthRequest, res:
             LEFT JOIN electoral_areas ea ON b.electoral_area_id = ea.id
             LEFT JOIN local_areas la ON b.local_area_id = la.id
             WHERE b.id = $1`,
-            [result.rows[0].id]
+            [businessId]
         );
+
+        const businessNumber = businessWithDetails.rows[0].business_number;
+        const message = initialBill
+            ? `Business registered successfully. BOP Number: ${businessNumber}. ${regYear} bill ${initialBill.bill_number} issued for GHS ${Number(initialBill.total_amount).toFixed(2)}.`
+            : `Business registered successfully. BOP Number: ${businessNumber}`;
 
         res.status(201).json({
             success: true,
             data: businessWithDetails.rows[0],
-            message: `Business registered successfully. BOP Number: ${businessWithDetails.rows[0].business_number}`,
+            bill: initialBill,
+            message,
         });
     } catch (error: any) {
         console.error('Error creating business:', error);
@@ -206,11 +241,18 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
             [id]
         );
 
+        const bills = billsResult.rows;
+        const { total_outstanding, total_paid } = summarizeBills(bills);
+
         res.json({
             success: true,
             data: {
-                business: result.rows[0],
-                bills: billsResult.rows,
+                business: {
+                    ...result.rows[0],
+                    total_outstanding,
+                    total_paid,
+                },
+                bills,
             },
         });
     } catch (error: any) {

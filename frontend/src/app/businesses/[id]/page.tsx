@@ -67,6 +67,24 @@ export default function BusinessDetailPage() {
         );
     }
 
+    const bills = business.bills || [];
+    const outstandingFromBills = bills
+        .filter((b: any) => ['UNPAID', 'PARTIAL', 'OVERDUE'].includes(b.payment_status))
+        .reduce((sum: number, b: any) => sum + (parseFloat(b.amount_due) || 0), 0);
+    const paidFromBills = bills.reduce(
+        (sum: number, b: any) => sum + (parseFloat(b.amount_paid) || 0),
+        0
+    );
+    const totalOutstanding =
+        business.total_outstanding !== undefined && business.total_outstanding !== null
+            ? parseFloat(business.total_outstanding)
+            : outstandingFromBills;
+    const totalPaid =
+        business.total_paid !== undefined && business.total_paid !== null
+            ? parseFloat(business.total_paid)
+            : paidFromBills;
+    const assessedAmount = parseFloat(business.assessed_amount);
+
     return (
         <div className="max-w-6xl mx-auto space-y-8">
             {/* Header */}
@@ -143,6 +161,14 @@ export default function BusinessDetailPage() {
                                 <span className="text-gray-500 flex items-center"><Calendar className="w-3.5 h-3.5 mr-1.5" /> Reg. Year</span>
                                 <span className="font-semibold text-gray-900">{business.year_registered}</span>
                             </div>
+                            <div className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
+                                <span className="text-gray-500">Annual BOP Amount</span>
+                                <span className="font-semibold text-gray-900">
+                                    {!isNaN(assessedAmount) && assessedAmount > 0
+                                        ? `GHS ${assessedAmount.toFixed(2)}`
+                                        : '—'}
+                                </span>
+                            </div>
                             <div>
                                 <p className="text-xs text-gray-400 font-bold uppercase mb-2">Activities</p>
                                 <div className="bg-gray-50 p-3 rounded-lg text-sm text-gray-700 leading-relaxed border border-gray-100">
@@ -174,11 +200,11 @@ export default function BusinessDetailPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="card border-l-4 border-l-municipal-red">
                             <p className="text-xs text-gray-400 font-bold uppercase mb-1">Total Outstanding</p>
-                            <h4 className="text-3xl font-black text-gray-900">GHS {parseFloat(business.total_outstanding || 0).toFixed(2)}</h4>
+                            <h4 className="text-3xl font-black text-gray-900">GHS {totalOutstanding.toFixed(2)}</h4>
                         </div>
                         <div className="card border-l-4 border-l-green-500">
                             <p className="text-xs text-gray-400 font-bold uppercase mb-1">Total Paid (All Time)</p>
-                            <h4 className="text-3xl font-black text-gray-900">GHS {parseFloat(business.total_paid || 0).toFixed(2)}</h4>
+                            <h4 className="text-3xl font-black text-gray-900">GHS {totalPaid.toFixed(2)}</h4>
                         </div>
                     </div>
 
@@ -191,9 +217,9 @@ export default function BusinessDetailPage() {
                             </h2>
                         </div>
 
-                        {business.bills && business.bills.length > 0 ? (
+                        {bills.length > 0 ? (
                             <div className="space-y-4">
-                                {business.bills.map((bill: any) => (
+                                {bills.map((bill: any) => (
                                     <div key={bill.id} className="flex items-center justify-between p-5 border rounded-xl hover:shadow-sm transition-all bg-white">
                                         <div className="flex items-center space-x-4">
                                             <div className="w-10 h-10 rounded-lg bg-red-50 text-municipal-red flex items-center justify-center">
@@ -222,7 +248,20 @@ export default function BusinessDetailPage() {
                         ) : (
                             <div className="text-center py-10 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
                                 <ShoppingBag className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                                <p className="text-gray-500 font-medium">No permit history found for this business.</p>
+                                <p className="text-gray-500 font-medium mb-1">No permit history found for this business.</p>
+                                {!isNaN(assessedAmount) && assessedAmount > 0 && (
+                                    <p className="text-sm text-gray-500 mb-4">
+                                        Annual amount on file:{' '}
+                                        <span className="font-semibold text-gray-800">GHS {assessedAmount.toFixed(2)}</span>
+                                    </p>
+                                )}
+                                <Link
+                                    href={`/billing/generate?business_id=${id}`}
+                                    className="btn-primary inline-flex items-center space-x-2"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    <span>Issue BOP Bill</span>
+                                </Link>
                             </div>
                         )}
                     </div>
