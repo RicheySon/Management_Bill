@@ -35,7 +35,14 @@ export default function CustomerSearchSelect({
     const [loading, setLoading] = useState(false);
     const [selected, setSelected] = useState<CustomerOption | null>(null);
 
+    // Only search while no customer is selected — hides leftover name list after pick
     useEffect(() => {
+        if (selected) {
+            setCustomers([]);
+            setLoading(false);
+            return;
+        }
+
         let cancelled = false;
         const timer = setTimeout(async () => {
             setLoading(true);
@@ -57,7 +64,7 @@ export default function CustomerSearchSelect({
             cancelled = true;
             clearTimeout(timer);
         };
-    }, [query]);
+    }, [query, selected]);
 
     useEffect(() => {
         if (!value) {
@@ -74,6 +81,20 @@ export default function CustomerSearchSelect({
         if (!query.trim()) return 'Type a name or phone to search (shows first 25).';
         return `${customers.length} result${customers.length === 1 ? '' : 's'}`;
     }, [loading, query, customers.length]);
+
+    const clearSelection = () => {
+        setSelected(null);
+        setQuery('');
+        setCustomers([]);
+        onChange('', null);
+    };
+
+    const pickCustomer = (customer: CustomerOption) => {
+        setSelected(customer);
+        setQuery('');
+        setCustomers([]);
+        onChange(customer.id, customer);
+    };
 
     return (
         <div className="space-y-3">
@@ -95,11 +116,7 @@ export default function CustomerSearchSelect({
                     <button
                         type="button"
                         className="text-gray-500 hover:text-red-600"
-                        onClick={() => {
-                            setSelected(null);
-                            setQuery('');
-                            onChange('', null);
-                        }}
+                        onClick={clearSelection}
                         title="Clear selection"
                     >
                         <X className="w-4 h-4" />
@@ -107,39 +124,39 @@ export default function CustomerSearchSelect({
                 </div>
             )}
 
-            <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                    type="search"
-                    className="input-field pl-10"
-                    placeholder="Search by name or phone…"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                />
-            </div>
-            <p className="text-xs text-gray-500">{helper}</p>
+            {/* Hide search + name list once a customer is chosen */}
+            {!selected && (
+                <>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                            type="search"
+                            className="input-field pl-10"
+                            placeholder="Search by name or phone"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                        />
+                    </div>
+                    <p className="text-xs text-gray-500">{helper}</p>
 
-            <div className="max-h-56 overflow-y-auto rounded-lg border border-gray-200 divide-y bg-white">
-                {customers.map((customer) => (
-                    <button
-                        key={customer.id}
-                        type="button"
-                        onClick={() => {
-                            setSelected(customer);
-                            onChange(customer.id, customer);
-                        }}
-                        className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${
-                            value === customer.id ? 'bg-red-50' : ''
-                        }`}
-                    >
-                        <p className="font-medium text-gray-900">{customer.full_name}</p>
-                        <p className="text-xs text-gray-500">{customer.phone_number}</p>
-                    </button>
-                ))}
-                {!loading && customers.length === 0 && (
-                    <p className="px-4 py-6 text-sm text-gray-500 text-center">No customers to show.</p>
-                )}
-            </div>
+                    <div className="max-h-56 overflow-y-auto rounded-lg border border-gray-200 divide-y bg-white">
+                        {customers.map((customer) => (
+                            <button
+                                key={customer.id}
+                                type="button"
+                                onClick={() => pickCustomer(customer)}
+                                className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors"
+                            >
+                                <p className="font-medium text-gray-900">{customer.full_name}</p>
+                                <p className="text-xs text-gray-500">{customer.phone_number}</p>
+                            </button>
+                        ))}
+                        {!loading && customers.length === 0 && (
+                            <p className="px-4 py-6 text-sm text-gray-500 text-center">No customers to show.</p>
+                        )}
+                    </div>
+                </>
+            )}
             {error && <p className="text-red-500 text-sm">{error}</p>}
         </div>
     );
