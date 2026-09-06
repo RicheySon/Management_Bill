@@ -147,7 +147,8 @@ INSERT INTO roles (name, description) VALUES
 ('Data Entry', 'Registration/Capturing only'),
 ('Supervisor', 'Review and approval access'),
 ('Auditor', 'Read-only access'),
-('Revenue Collector', 'Field data collection and registration');
+('Revenue Collector', 'Field data collection and registration'),
+('Approver', 'Approve privileged print/delete action requests');
 
 -- Insert Granular Permissions
 INSERT INTO permissions (code, description) VALUES
@@ -189,14 +190,14 @@ WHERE r.name = 'Admin' AND p.code IN (
     'approve_privileged_actions'
 );
 
--- Map Permissions to Revenue Officer
+-- Map Permissions to Revenue Officer (view/register/bill/pay + request print; no delete/edit)
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p 
 WHERE r.name = 'Revenue Officer' AND p.code IN (
     'create_customer', 'view_customer',
     'register_property', 'register_business',
     'generate_bill', 'record_payment', 'view_reports',
-    'request_print', 'request_delete'
+    'request_print'
 );
 
 -- Map Permissions to Cashier
@@ -236,7 +237,14 @@ WHERE r.name = 'Revenue Collector' AND p.code IN (
     'create_customer', 'view_customer',
     'register_property',
     'register_business',
-    'request_print', 'request_delete'
+    'request_print'
+);
+
+-- Map Permissions to Approver (additive approval rule)
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r, permissions p
+WHERE r.name = 'Approver' AND p.code IN (
+    'approve_privileged_actions', 'view_customer'
 );
 
 -- Seed Initial Super Admin (Password: admin123)

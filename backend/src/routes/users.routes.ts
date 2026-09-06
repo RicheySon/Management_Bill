@@ -30,10 +30,14 @@ router.get('/', authenticateToken, authorize(['manage_users']), async (req: Auth
     }
 });
 
-// Get all roles (for dropdown)
+// Get all roles (for dropdown) — exclude additive-only roles from primary pickers
 router.get('/roles', authenticateToken, authorize(['manage_users']), async (req: AuthRequest, res: Response) => {
     try {
-        const result = await pool.query('SELECT * FROM roles ORDER BY name');
+        const result = await pool.query(
+            `SELECT * FROM roles
+             WHERE name NOT IN ('Approver')
+             ORDER BY name`
+        );
         res.json({
             success: true,
             data: result.rows
@@ -52,7 +56,8 @@ router.post('/', authenticateToken, authorize(['manage_users']), async (req: Aut
         email: Joi.string().email().required(),
         password: Joi.string().min(6).required(),
         role_id: Joi.number().integer().required(),
-        electoral_areas: Joi.array().items(Joi.number().integer()).optional()
+        electoral_areas: Joi.array().items(Joi.number().integer()).optional(),
+        can_approve: Joi.boolean().optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -84,24 +89,7 @@ router.post('/', authenticateToken, authorize(['manage_users']), async (req: Aut
         );
         const newUser = userResult.rows[0];
 
-        // Assign role
-        await client.query(
-            `INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)`,
-            [newUser.id, value.role_id]
-        );
-
-        // Supervisor is also linked to Data Entry role
-        const roleInfo = await client.query('SELECT name FROM roles WHERE id = $1', [value.role_id]);
-        if (roleInfo.rows[0]?.name === 'Supervisor') {
-            const dataEntry = await client.query(`SELECT id FROM roles WHERE name = 'Data Entry'`);
-            if (dataEntry.rows[0]) {
-                await client.query(
-                    `INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)
-                     ON CONFLICT DO NOTHING`,
-                    [newUser.id, dataEntry.rows[0].id]
-                );
-            }
-        }
+        await syncUserRole(client, newUser.id, value.role_id, Boolean(value.can_approve));
 
         // Assign electoral areas if provided
         if (value.electoral_areas && value.electoral_areas.length > 0) {
@@ -119,7 +107,12 @@ router.post('/', authenticateToken, authorize(['manage_users']), async (req: Aut
             'system_users',
             newUser.id,
             null,
-            { email: newUser.email, full_name: newUser.full_name, role_id: value.role_id },
+            {
+                email: newUser.email,
+                full_name: newUser.full_name,
+                role_id: value.role_id,
+                can_approve: Boolean(value.can_approve),
+            },
             getAuditContext(req)
         );
 
@@ -150,7 +143,7 @@ const isSuperAdminUser = async (userId: string) => {
     return result.rows.length > 0;
 };
 
-const syncUserRole = async (client: any, userId: string, roleId: number) => {
+const syncUserRole = async (client: any, userId: string, roleId: number, canApprove = false) => {
     await client.query('DELETE FROM user_roles WHERE user_id = $1', [userId]);
     await client.query(
         `INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)`,
@@ -158,13 +151,31 @@ const syncUserRole = async (client: any, userId: string, roleId: number) => {
     );
 
     const roleInfo = await client.query('SELECT name FROM roles WHERE id = $1', [roleId]);
-    if (roleInfo.rows[0]?.name === 'Supervisor') {
+    const primaryName = roleInfo.rows[0]?.name as string | undefined;
+
+    if (primaryName === 'Supervisor') {
         const dataEntry = await client.query(`SELECT id FROM roles WHERE name = 'Data Entry'`);
         if (dataEntry.rows[0]) {
             await client.query(
                 `INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)
                  ON CONFLICT DO NOTHING`,
                 [userId, dataEntry.rows[0].id]
+            );
+        }
+    }
+
+    // Additive Approver rule — skip when primary role already includes approval
+    const alreadyApproves =
+        primaryName === 'Super Admin' ||
+        primaryName === 'Admin' ||
+        primaryName === 'Approver';
+    if (canApprove && !alreadyApproves) {
+        const approver = await client.query(`SELECT id FROM roles WHERE name = 'Approver'`);
+        if (approver.rows[0]) {
+            await client.query(
+                `INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)
+                 ON CONFLICT DO NOTHING`,
+                [userId, approver.rows[0].id]
             );
         }
     }
@@ -193,6 +204,7 @@ router.get('/:id', authenticateToken, authorize(['manage_users']), async (req: A
                          WHERE ur.user_id = u.id
                          ORDER BY CASE WHEN r.name = 'Super Admin' THEN 0
                                        WHEN r.name = 'Supervisor' THEN 1
+                                       WHEN r.name = 'Approver' THEN 99
                                        ELSE 2 END
                          LIMIT 1),
                         (SELECT ur2.role_id FROM user_roles ur2 WHERE ur2.user_id = u.id LIMIT 1)
@@ -202,7 +214,21 @@ router.get('/:id', authenticateToken, authorize(['manage_users']), async (req: A
                         (SELECT array_agg(uea.electoral_area_id ORDER BY uea.electoral_area_id)
                          FROM user_electoral_areas uea WHERE uea.user_id = u.id),
                         '{}'
-                    ) AS electoral_areas
+                    ) AS electoral_areas,
+                    EXISTS (
+                        SELECT 1 FROM user_roles ur_a
+                        JOIN roles r_a ON r_a.id = ur_a.role_id
+                        WHERE ur_a.user_id = u.id
+                          AND (
+                              r_a.name = 'Approver'
+                              OR EXISTS (
+                                  SELECT 1 FROM role_permissions rp
+                                  JOIN permissions p ON p.id = rp.permission_id
+                                  WHERE rp.role_id = r_a.id
+                                    AND p.code = 'approve_privileged_actions'
+                              )
+                          )
+                    ) AS can_approve
              FROM system_users u
              LEFT JOIN user_roles ur ON u.id = ur.user_id
              LEFT JOIN roles r ON ur.role_id = r.id
@@ -230,6 +256,7 @@ router.put('/:id', authenticateToken, authorize(['manage_users']), async (req: A
         role_id: Joi.number().integer().required(),
         electoral_areas: Joi.array().items(Joi.number().integer()).optional(),
         status: Joi.string().valid('ACTIVE', 'INACTIVE').optional(),
+        can_approve: Joi.boolean().optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -283,7 +310,7 @@ router.put('/:id', authenticateToken, authorize(['manage_users']), async (req: A
         );
 
         if (!targetIsSuperAdmin) {
-            await syncUserRole(client, id, value.role_id);
+            await syncUserRole(client, id, value.role_id, Boolean(value.can_approve));
         }
         await syncElectoralAreas(client, id, value.electoral_areas || []);
 
@@ -299,6 +326,7 @@ router.put('/:id', authenticateToken, authorize(['manage_users']), async (req: A
                 role_id: value.role_id,
                 status: nextStatus,
                 electoral_areas: value.electoral_areas || [],
+                can_approve: Boolean(value.can_approve),
             },
             getAuditContext(req)
         );

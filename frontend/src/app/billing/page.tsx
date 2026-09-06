@@ -13,7 +13,7 @@ import { useAuth } from '@/context/AuthContext';
 import {
     FileText, Search, Printer,
     CreditCard, Plus, CheckCircle2, AlertCircle, Clock, Trash, Pencil,
-    FileDown, Send
+    FileDown, Send, Eye
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -32,9 +32,18 @@ export default function BillingPage() {
 
     const canGenerate = hasPermission('generate_bill');
     const canPrintDirect = hasPermission('print_bill') || hasPermission('bulk_print') || hasPermission('manage_users');
+    // Direct delete only — Cashiers / Revenue Officers must not see a delete icon
     const canDeleteDirect = hasPermission('delete_bill');
     const canRequestPrint = hasPermission('request_print');
-    const canRequestDelete = hasPermission('request_delete');
+    const canEditLinked =
+        hasPermission('edit_customer') ||
+        hasPermission('edit_property') ||
+        hasPermission('edit_business');
+    const canViewBill =
+        hasPermission('view_customer') ||
+        hasPermission('record_payment') ||
+        canGenerate ||
+        canDeleteDirect;
 
     const loadData = async () => {
         setLoading(true);
@@ -235,7 +244,7 @@ export default function BillingPage() {
                                                 </button>
                                             ) : null}
 
-                                            {canGenerate && (
+                                            {canEditLinked && (
                                                 <Link
                                                     href={
                                                         bill.bill_type === 'PROPERTY_RATE'
@@ -251,17 +260,21 @@ export default function BillingPage() {
                                                 </Link>
                                             )}
 
-                                            {(hasPermission('record_payment') || canGenerate) && (
+                                            {canViewBill && (
                                                 <Link
                                                     href={`/billing/${bill.id}`}
                                                     className="inline-flex items-center p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
-                                                    title="View & Pay"
+                                                    title={hasPermission('record_payment') ? 'View & Pay' : 'View bill'}
                                                 >
-                                                    <CreditCard className="w-5 h-5" />
+                                                    {hasPermission('record_payment') ? (
+                                                        <CreditCard className="w-5 h-5" />
+                                                    ) : (
+                                                        <Eye className="w-5 h-5" />
+                                                    )}
                                                 </Link>
                                             )}
 
-                                            {canDeleteDirect ? (
+                                            {canDeleteDirect && (
                                                 <button
                                                     onClick={() => handleDelete(bill.id)}
                                                     className="inline-flex items-center p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
@@ -269,15 +282,7 @@ export default function BillingPage() {
                                                 >
                                                     <Trash className="w-5 h-5" />
                                                 </button>
-                                            ) : canRequestDelete ? (
-                                                <button
-                                                    onClick={() => handleRequest(bill.id, 'DELETE_BILL')}
-                                                    className="inline-flex items-center p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                                    title="Request delete approval"
-                                                >
-                                                    <Trash className="w-5 h-5" />
-                                                </button>
-                                            ) : null}
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
