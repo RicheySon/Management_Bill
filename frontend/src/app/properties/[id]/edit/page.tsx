@@ -16,6 +16,7 @@ import {
     formatGeoAddress,
 } from '@/lib/api-client';
 import { toCoord } from '@/lib/geo';
+import DropdownSelect from '@/components/DropdownSelect';
 import { ArrowLeft, Save, Navigation, Map as MapIcon, X, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -352,22 +353,30 @@ export default function EditPropertyPage() {
 
                         <div>
                             <label className="label">Gender <span className="text-municipal-red">*</span></label>
-                            <select {...register('gender')} className="input-field">
-                                <option value="">Gender</option>
-                                <option value="Male">Male</option>
-                                <option value="Female">Female</option>
-                            </select>
+                            <DropdownSelect
+                                value={watch('gender') || ''}
+                                onChange={(v) => setValue('gender', v as any, { shouldValidate: true })}
+                                placeholder="Gender"
+                                options={[
+                                { value: 'Male', label: 'Male' },
+                                { value: 'Female', label: 'Female' }
+                                ]}
+                            />
                         </div>
 
                         <div>
                             <label className="label">Marital Status <span className="text-municipal-red">*</span></label>
-                            <select {...register('marital_status')} className="input-field">
-                                <option value="">Marital Status</option>
-                                <option value="Single">Single</option>
-                                <option value="Married">Married</option>
-                                <option value="Divorced">Divorced</option>
-                                <option value="Widowed">Widowed</option>
-                            </select>
+                            <DropdownSelect
+                                value={watch('marital_status') || ''}
+                                onChange={(v) => setValue('marital_status', v as any, { shouldValidate: true })}
+                                placeholder="Marital Status"
+                                options={[
+                                { value: 'Single', label: 'Single' },
+                                { value: 'Married', label: 'Married' },
+                                { value: 'Divorced', label: 'Divorced' },
+                                { value: 'Widowed', label: 'Widowed' }
+                                ]}
+                            />
                         </div>
 
                         <div>
@@ -398,88 +407,110 @@ export default function EditPropertyPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
                             <label className="label">Property Use</label>
-                            <select {...register('property_use')} className="input-field">
-                                <option value="">Select option</option>
-                                <option value="Residential">Residential</option>
-                                <option value="Commercial">Commercial</option>
-                                <option value="Mixed Use">Mixed Use</option>
-                                <option value="Industrial">Industrial</option>
-                                <option value="Agricultural">Agricultural</option>
-                                <option value="Institutional">Institutional</option>
-                            </select>
+                            <DropdownSelect
+                                value={watch('property_use') || ''}
+                                onChange={(v) => setValue('property_use', v as any, { shouldValidate: true })}
+                                placeholder="Select option"
+                                options={[
+                                { value: 'Residential', label: 'Residential' },
+                                { value: 'Commercial', label: 'Commercial' },
+                                { value: 'Mixed Use', label: 'Mixed Use' },
+                                { value: 'Industrial', label: 'Industrial' },
+                                { value: 'Agricultural', label: 'Agricultural' },
+                                { value: 'Institutional', label: 'Institutional' }
+                                ]}
+                            />
                         </div>
 
                         <div>
                             <label className="label">Property Class <span className="text-municipal-red">*</span></label>
-                            <select {...register('classification_id', { required: 'Please select property class' })} className="input-field">
-                                <option value="">Select option</option>
-                                {classifications.map((c: any) => (
-                                    <option key={c.id} value={c.id}>{c.name}</option>
-                                ))}
-                            </select>
+                            <DropdownSelect
+                                value={watch('classification_id') ?? ''}
+                                onChange={(v) => setValue('classification_id', (v === '' ? undefined : Number(v)) as any, { shouldValidate: true })}
+                                placeholder="Select option"
+                                options={classifications.map((c: any) => ({ value: String(c.id), label: c.name }))}
+                            />
+                            <input type="hidden" {...register('classification_id', { required: 'Please select property class' })} />
                             {errors.classification_id && <p className="text-red-500 text-sm mt-1">{errors.classification_id.message}</p>}
                         </div>
 
                         <div>
                             <label className="label">Rating Zone (Fee Schedule)</label>
-                            <select className="input-field" value={selectedRateZoneId} onChange={(e) => setSelectedRateZoneId(e.target.value)}>
-                                <option value="">Select rating zone (optional)</option>
-                                {rateZones.map((zone: any) => (
-                                    <option key={zone.id} value={zone.id}>
-                                        {zone.zone_name} ({zone.zone_type}) - Min: GHS {Number(zone.minimum_rate_min).toLocaleString()}
-                                    </option>
-                                ))}
-                            </select>
+                            <DropdownSelect
+                                value={selectedRateZoneId}
+                                onChange={(v) => setSelectedRateZoneId(v)}
+                                placeholder="Select rating zone"
+                                options={rateZones.map((zone: any) => ({
+                                    value: String(zone.id),
+                                    label: `${zone.zone_name} (${zone.zone_type}) - Min: GHS ${Number(zone.minimum_rate_min).toLocaleString()}`,
+                                }))}
+                            />
                         </div>
 
                         <div>
                             <label className="label">Building Type</label>
-                            <select {...register('building_type')} className="input-field">
-                                <option value="">Select option</option>
-                                <option value="Bungalow">Bungalow</option>
-                                <option value="Story Building">Story Building</option>
-                                <option value="Flat/Apartment">Flat/Apartment</option>
-                                <option value="Compound House">Compound House</option>
-                                <option value="Semi-detached">Semi-detached</option>
-                                <option value="Detached">Detached</option>
-                                <option value="Kiosk/Container">Kiosk/Container</option>
-                                <option value="Temporary Structure">Temporary Structure</option>
-                            </select>
+                            <DropdownSelect
+                                value={watch('building_type') || ''}
+                                onChange={(v) => setValue('building_type', v as any, { shouldValidate: true })}
+                                placeholder="Select option"
+                                options={[
+                                { value: 'Bungalow', label: 'Bungalow' },
+                                { value: 'Story Building', label: 'Story Building' },
+                                { value: 'Flat/Apartment', label: 'Flat/Apartment' },
+                                { value: 'Compound House', label: 'Compound House' },
+                                { value: 'Semi-detached', label: 'Semi-detached' },
+                                { value: 'Detached', label: 'Detached' },
+                                { value: 'Kiosk/Container', label: 'Kiosk/Container' },
+                                { value: 'Temporary Structure', label: 'Temporary Structure' }
+                                ]}
+                            />
                         </div>
 
                         <div>
                             <label className="label">No of Storeys</label>
-                            <select {...register('no_of_storeys')} className="input-field">
-                                <option value="">Select option</option>
-                                <option value="1">1</option>
-                                <option value="2">2</option>
-                                <option value="3">3</option>
-                                <option value="4">4</option>
-                                <option value="5">5+</option>
-                            </select>
+                            <DropdownSelect
+                                value={watch('no_of_storeys') || ''}
+                                onChange={(v) => setValue('no_of_storeys', v as any, { shouldValidate: true })}
+                                placeholder="Select option"
+                                options={[
+                                { value: '1', label: '1' },
+                                { value: '2', label: '2' },
+                                { value: '3', label: '3' },
+                                { value: '4', label: '4' },
+                                { value: '5', label: '5+' }
+                                ]}
+                            />
                         </div>
 
                         <div>
                             <label className="label">Ownership of Property</label>
-                            <select {...register('ownership')} className="input-field">
-                                <option value="">Select option</option>
-                                <option value="Owner Occupied">Owner Occupied</option>
-                                <option value="Rented">Rented</option>
-                                <option value="Family Property">Family Property</option>
-                                <option value="Government">Government</option>
-                                <option value="Leased">Leased</option>
-                            </select>
+                            <DropdownSelect
+                                value={watch('ownership') || ''}
+                                onChange={(v) => setValue('ownership', v as any, { shouldValidate: true })}
+                                placeholder="Select option"
+                                options={[
+                                { value: 'Owner Occupied', label: 'Owner Occupied' },
+                                { value: 'Rented', label: 'Rented' },
+                                { value: 'Family Property', label: 'Family Property' },
+                                { value: 'Government', label: 'Government' },
+                                { value: 'Leased', label: 'Leased' }
+                                ]}
+                            />
                         </div>
 
                         <div>
                             <label className="label">Building Permit Status</label>
-                            <select {...register('building_permit_status')} className="input-field">
-                                <option value="">Select option</option>
-                                <option value="Approved">Approved</option>
-                                <option value="Pending">Pending</option>
-                                <option value="None">None</option>
-                                <option value="Expired">Expired</option>
-                            </select>
+                            <DropdownSelect
+                                value={watch('building_permit_status') || ''}
+                                onChange={(v) => setValue('building_permit_status', v as any, { shouldValidate: true })}
+                                placeholder="Select option"
+                                options={[
+                                { value: 'Approved', label: 'Approved' },
+                                { value: 'Pending', label: 'Pending' },
+                                { value: 'None', label: 'None' },
+                                { value: 'Expired', label: 'Expired' }
+                                ]}
+                            />
                         </div>
 
                         <div>
@@ -499,51 +530,67 @@ export default function EditPropertyPage() {
 
                         <div>
                             <label className="label">Source of Water</label>
-                            <select {...register('source_of_water')} className="input-field">
-                                <option value="">Select option</option>
-                                <option value="Ghana water">Ghana water</option>
-                                <option value="Borehole">Borehole</option>
-                                <option value="Well">Well</option>
-                                <option value="Tanker">Tanker</option>
-                                <option value="Sachet/Bottled">Sachet/Bottled</option>
-                                <option value="River/Stream">River/Stream</option>
-                            </select>
+                            <DropdownSelect
+                                value={watch('source_of_water') || ''}
+                                onChange={(v) => setValue('source_of_water', v as any, { shouldValidate: true })}
+                                placeholder="Select option"
+                                options={[
+                                { value: 'Ghana water', label: 'Ghana water' },
+                                { value: 'Borehole', label: 'Borehole' },
+                                { value: 'Well', label: 'Well' },
+                                { value: 'Tanker', label: 'Tanker' },
+                                { value: 'Sachet/Bottled', label: 'Sachet/Bottled' },
+                                { value: 'River/Stream', label: 'River/Stream' }
+                                ]}
+                            />
                         </div>
 
                         <div>
                             <label className="label">Sanitation Facility Available</label>
-                            <select {...register('sanitation_facility')} className="input-field">
-                                <option value="">Select option</option>
-                                <option value="WC">WC (Water Closet)</option>
-                                <option value="KVIP">KVIP</option>
-                                <option value="Pit Latrine">Pit Latrine</option>
-                                <option value="Public Toilet">Public Toilet</option>
-                                <option value="None">None</option>
-                            </select>
+                            <DropdownSelect
+                                value={watch('sanitation_facility') || ''}
+                                onChange={(v) => setValue('sanitation_facility', v as any, { shouldValidate: true })}
+                                placeholder="Select option"
+                                options={[
+                                { value: 'WC', label: 'WC (Water Closet)' },
+                                { value: 'KVIP', label: 'KVIP' },
+                                { value: 'Pit Latrine', label: 'Pit Latrine' },
+                                { value: 'Public Toilet', label: 'Public Toilet' },
+                                { value: 'None', label: 'None' }
+                                ]}
+                            />
                         </div>
 
                         <div>
                             <label className="label">Solid Waste Disposal Method</label>
-                            <select {...register('solid_waste_disposal')} className="input-field">
-                                <option value="">Select option</option>
-                                <option value="Collected">Collected</option>
-                                <option value="Public Container">Public Container</option>
-                                <option value="Dumped">Dumped</option>
-                                <option value="Burned">Burned</option>
-                                <option value="Buried">Buried</option>
-                            </select>
+                            <DropdownSelect
+                                value={watch('solid_waste_disposal') || ''}
+                                onChange={(v) => setValue('solid_waste_disposal', v as any, { shouldValidate: true })}
+                                placeholder="Select option"
+                                options={[
+                                { value: 'Collected', label: 'Collected' },
+                                { value: 'Public Container', label: 'Public Container' },
+                                { value: 'Dumped', label: 'Dumped' },
+                                { value: 'Burned', label: 'Burned' },
+                                { value: 'Buried', label: 'Buried' }
+                                ]}
+                            />
                         </div>
 
                         <div>
                             <label className="label">Liquid Waste Disposal Method</label>
-                            <select {...register('liquid_waste_disposal')} className="input-field">
-                                <option value="">Select option</option>
-                                <option value="Sewer">Sewer</option>
-                                <option value="Septic Tank">Septic Tank</option>
-                                <option value="Open Drain">Open Drain</option>
-                                <option value="Soakaway">Soakaway</option>
-                                <option value="None">None</option>
-                            </select>
+                            <DropdownSelect
+                                value={watch('liquid_waste_disposal') || ''}
+                                onChange={(v) => setValue('liquid_waste_disposal', v as any, { shouldValidate: true })}
+                                placeholder="Select option"
+                                options={[
+                                { value: 'Sewer', label: 'Sewer' },
+                                { value: 'Septic Tank', label: 'Septic Tank' },
+                                { value: 'Open Drain', label: 'Open Drain' },
+                                { value: 'Soakaway', label: 'Soakaway' },
+                                { value: 'None', label: 'None' }
+                                ]}
+                            />
                         </div>
 
                         <div>
@@ -666,28 +713,22 @@ export default function EditPropertyPage() {
 
                         <div>
                             <label className="label">Electoral Area <span className="text-gray-400 font-normal">(optional)</span></label>
-                            <select {...register('electoral_area_id')} className="input-field">
-                                <option value="">Select Electoral Area</option>
-                                {electoralAreas.map((area: any) => (
-                                    <option key={area.id} value={area.id}>{area.name}</option>
-                                ))}
-                            </select>
+                            <DropdownSelect
+                                value={watch('electoral_area_id') ?? ''}
+                                onChange={(v) => setValue('electoral_area_id', (v === '' ? undefined : Number(v)) as any, { shouldValidate: true })}
+                                placeholder="Select Electoral Area"
+                                options={electoralAreas.map((area: any) => ({ value: String(area.id), label: area.name }))}
+                            />
                         </div>
 
                         <div>
                             <label className="label">Local Area / Community <span className="text-gray-400 font-normal">(optional)</span></label>
-                            <select {...register('local_area_id')} className="input-field">
-                                <option value="">
-                                    {!toNullableId(selectedElectoralArea)
-                                        ? 'Select electoral area first'
-                                        : localAreas.length === 0
-                                          ? 'No communities for this area yet'
-                                          : 'Select Local Area'}
-                                </option>
-                                {localAreas.map((area: any) => (
-                                    <option key={area.id} value={area.id}>{area.name}</option>
-                                ))}
-                            </select>
+                            <DropdownSelect
+                                value={watch('local_area_id') ?? ''}
+                                onChange={(v) => setValue('local_area_id', (v === '' ? undefined : Number(v)) as any, { shouldValidate: true })}
+                                placeholder="Select Local Area"
+                                options={localAreas.map((area: any) => ({ value: String(area.id), label: area.name }))}
+                            />
                             {!toNullableId(selectedElectoralArea) ? (
                                 <p className="text-xs text-gray-500 mt-1">Choose an electoral area above to load communities.</p>
                             ) : localAreas.length === 0 ? (
@@ -699,12 +740,16 @@ export default function EditPropertyPage() {
 
                         <div>
                             <label className="label">Population Density of Location</label>
-                            <select {...register('population_density')} className="input-field">
-                                <option value="">Select option</option>
-                                <option value="High">High</option>
-                                <option value="Medium">Medium</option>
-                                <option value="Low">Low</option>
-                            </select>
+                            <DropdownSelect
+                                value={watch('population_density') || ''}
+                                onChange={(v) => setValue('population_density', v as any, { shouldValidate: true })}
+                                placeholder="Select option"
+                                options={[
+                                { value: 'High', label: 'High' },
+                                { value: 'Medium', label: 'Medium' },
+                                { value: 'Low', label: 'Low' }
+                                ]}
+                            />
                         </div>
                     </div>
                 </div>
