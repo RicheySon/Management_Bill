@@ -18,6 +18,7 @@ import { ArrowLeft, Save, UserPlus, UserCheck, Navigation, MapPin, Map as MapIco
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import CustomerSearchSelect from '@/components/CustomerSearchSelect';
+import DropdownSelect from '@/components/DropdownSelect';
 
 const toNullableId = (v: any) =>
     (v === '' || v === undefined || v === null || Number.isNaN(Number(v)) ? null : Number(v));
@@ -385,24 +386,32 @@ export default function NewBusinessPage() {
                                 <label className="label">
                                     Gender <span className="text-gray-400 font-normal">(optional)</span>
                                 </label>
-                                <select {...register('gender')} className="input-field">
-                                    <option value="">Gender</option>
-                                    <option value="Male">Male</option>
-                                    <option value="Female">Female</option>
-                                </select>
+                                <DropdownSelect
+                                value={watch('gender') || ''}
+                                onChange={(v) => setValue('gender', v as any, { shouldValidate: true })}
+                                placeholder="Gender"
+                                options={[
+                                { value: 'Male', label: 'Male' },
+                                { value: 'Female', label: 'Female' }
+                                ]}
+                            />
                             </div>
 
                             <div>
                                 <label className="label">
                                     Marital Status <span className="text-gray-400 font-normal">(optional)</span>
                                 </label>
-                                <select {...register('marital_status')} className="input-field">
-                                    <option value="">Marital Status</option>
-                                    <option value="Single">Single</option>
-                                    <option value="Married">Married</option>
-                                    <option value="Divorced">Divorced</option>
-                                    <option value="Widowed">Widowed</option>
-                                </select>
+                                <DropdownSelect
+                                value={watch('marital_status') || ''}
+                                onChange={(v) => setValue('marital_status', v as any, { shouldValidate: true })}
+                                placeholder="Marital Status"
+                                options={[
+                                { value: 'Single', label: 'Single' },
+                                { value: 'Married', label: 'Married' },
+                                { value: 'Divorced', label: 'Divorced' },
+                                { value: 'Widowed', label: 'Widowed' }
+                                ]}
+                            />
                             </div>
 
                             <div>
@@ -538,17 +547,12 @@ export default function NewBusinessPage() {
                             <label className="label">
                                 Business Type (Main) <span className="text-municipal-red">*</span>
                             </label>
-                            <select
-                                {...register('business_type_main')}
-                                className="input-field"
-                            >
-                                <option value="">Select business type</option>
-                                {BUSINESS_TYPE_MAIN_OPTIONS.map((type) => (
-                                    <option key={type} value={type}>
-                                        {type}
-                                    </option>
-                                ))}
-                            </select>
+                            <DropdownSelect
+                                value={watch('business_type_main') || ''}
+                                onChange={(v) => setValue('business_type_main', v as any, { shouldValidate: true })}
+                                placeholder="Select business type"
+                                options={BUSINESS_TYPE_MAIN_OPTIONS.map((type) => ({ value: type, label: type }))}
+                            />
                         </div>
 
                         <div>
@@ -565,16 +569,17 @@ export default function NewBusinessPage() {
                             <label className="label">
                                 Business Category Class <span className="text-gray-400 font-normal">(optional)</span>
                             </label>
-                            <select
-                                {...register('business_category_class')}
-                                className="input-field"
-                            >
-                                <option value="">Select category</option>
-                                <option value="Category A">Category A</option>
-                                <option value="Category B">Category B</option>
-                                <option value="Category C">Category C</option>
-                                <option value="Category D">Category D</option>
-                            </select>
+                            <DropdownSelect
+                                value={watch('business_category_class') || ''}
+                                onChange={(v) => setValue('business_category_class', v as any, { shouldValidate: true })}
+                                placeholder="Select category"
+                                options={[
+                                    { value: 'Category A', label: 'Category A' },
+                                    { value: 'Category B', label: 'Category B' },
+                                    { value: 'Category C', label: 'Category C' },
+                                    { value: 'Category D', label: 'Category D' },
+                                ]}
+                            />
                         </div>
 
                         {/* Fee Schedule Item (from configured fee schedule) */}
@@ -583,13 +588,12 @@ export default function NewBusinessPage() {
                                 <label className="label">
                                     Fee Schedule Item (Configured Rate) <span className="text-gray-400 font-normal">(optional)</span>
                                 </label>
-                                <select
-                                    className="input-field"
+                                <DropdownSelect
                                     value={selectedFeeItemId}
-                                    onChange={(e) => {
-                                        setSelectedFeeItemId(e.target.value);
-                                        if (e.target.value) {
-                                            const item = feeItems.find((fi: any) => fi.id === parseInt(e.target.value));
+                                    onChange={(v) => {
+                                        setSelectedFeeItemId(v);
+                                        if (v) {
+                                            const item = feeItems.find((fi: any) => fi.id === parseInt(v));
                                             if (item) {
                                                 const classVal = watch('business_category_class') || 'Category A';
                                                 const letter = classVal.replace('Category ', '').toLowerCase();
@@ -610,17 +614,15 @@ export default function NewBusinessPage() {
                                             setSelectedFeeAmount('');
                                         }
                                     }}
-                                >
-                                    <option value="">Select from fee schedule (optional)</option>
-                                    {feeItems.filter((fi: any) => !fi.is_group_header).map((item: any) => (
-                                        <option key={item.id} value={item.id}>
-                                            {item.main_item_number}. {item.description}
-                                            {item.cat_a_fee ? ` - CAT A: GHS ${Number(item.cat_a_fee).toFixed(2)}` : ''}
-                                            {item.cat_b_fee ? ` | CAT B: GHS ${Number(item.cat_b_fee).toFixed(2)}` : ''}
-                                            {item.cat_c_fee ? ` | CAT C: GHS ${Number(item.cat_c_fee).toFixed(2)}` : ''}
-                                        </option>
-                                    ))}
-                                </select>
+                                    placeholder="Select from fee schedule"
+                                    options={feeItems.filter((fi: any) => !fi.is_group_header).map((item: any) => ({
+                                        value: String(item.id),
+                                        label: `${item.main_item_number}. ${item.description}`
+                                            + (item.cat_a_fee ? ` - CAT A: GHS ${Number(item.cat_a_fee).toFixed(2)}` : '')
+                                            + (item.cat_b_fee ? ` | CAT B: GHS ${Number(item.cat_b_fee).toFixed(2)}` : '')
+                                            + (item.cat_c_fee ? ` | CAT C: GHS ${Number(item.cat_c_fee).toFixed(2)}` : ''),
+                                    }))}
+                                />
                                 {selectedFeeAmount && (
                                     <p className="text-sm text-green-700 font-medium mt-1">Selected fee: {selectedFeeAmount}</p>
                                 )}
@@ -847,32 +849,22 @@ export default function NewBusinessPage() {
 
                         <div>
                             <label className="label">Electoral Area <span className="text-gray-400 font-normal">(optional)</span></label>
-                            <select {...register('electoral_area_id')} className="input-field">
-                                <option value="">Select Electoral Area</option>
-                                {electoralAreas.map((area: any) => (
-                                    <option key={area.id} value={area.id}>
-                                        {area.name}
-                                    </option>
-                                ))}
-                            </select>
+                            <DropdownSelect
+                                value={watch('electoral_area_id') ?? ''}
+                                onChange={(v) => setValue('electoral_area_id', (v === '' ? undefined : Number(v)) as any, { shouldValidate: true })}
+                                placeholder="Select Electoral Area"
+                                options={electoralAreas.map((area: any) => ({ value: String(area.id), label: area.name }))}
+                            />
                         </div>
 
                         <div>
                             <label className="label">Local Area / Community <span className="text-gray-400 font-normal">(optional)</span></label>
-                            <select {...register('local_area_id')} className="input-field">
-                                <option value="">
-                                    {!toNullableId(selectedElectoralArea)
-                                        ? 'Select electoral area first'
-                                        : localAreas.length === 0
-                                          ? 'No communities for this area yet'
-                                          : 'Select Local Area'}
-                                </option>
-                                {localAreas.map((area: any) => (
-                                    <option key={area.id} value={area.id}>
-                                        {area.name}
-                                    </option>
-                                ))}
-                            </select>
+                            <DropdownSelect
+                                value={watch('local_area_id') ?? ''}
+                                onChange={(v) => setValue('local_area_id', (v === '' ? undefined : Number(v)) as any, { shouldValidate: true })}
+                                placeholder="Select Local Area"
+                                options={localAreas.map((area: any) => ({ value: String(area.id), label: area.name }))}
+                            />
                             {!toNullableId(selectedElectoralArea) ? (
                                 <p className="text-xs text-gray-500 mt-1">Choose an electoral area above to load communities.</p>
                             ) : localAreas.length === 0 ? (
