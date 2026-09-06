@@ -507,11 +507,11 @@ export default function NewBusinessPage() {
                 </div>
 
                 {/* ============================================= */}
-                {/* SECTION: Property Information (Business Details) */}
+                {/* SECTION: Business Information */}
                 {/* ============================================= */}
                 <div className="card">
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 mb-6">
-                        <h2 className="text-municipal-teal font-bold text-lg text-center">Property Information</h2>
+                        <h2 className="text-municipal-teal font-bold text-lg text-center">Business Information</h2>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

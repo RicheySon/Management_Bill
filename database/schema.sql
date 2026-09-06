@@ -37,11 +37,12 @@ CREATE TABLE property_classifications (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Insert default property classifications
+-- Insert default property classifications (class tiers, not use types)
 INSERT INTO property_classifications (name, description, base_rate) VALUES
-('Residential', 'Residential properties for living purposes', 8.00),
-('Commercial', 'Commercial properties for business use', 12.00),
-('Industrial', 'Industrial properties for manufacturing/production', 15.00);
+('1st Class', 'First class properties', 12.00),
+('2nd Class', 'Second class properties', 10.00),
+('3rd Class', 'Third class properties', 8.00),
+('4th Class', 'Fourth class properties', 6.00);
 
 -- Business Categories
 CREATE TABLE business_categories (
