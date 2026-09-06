@@ -13,11 +13,45 @@ jest.mock('../config/database', () => {
 });
 
 import pool from '../config/database';
-import { calculatePropertyBill, generateBill, recordPayment } from './billing.service';
+import {
+    calculatePropertyBill,
+    generateBill,
+    recordPayment,
+    feeAmountForPropertyClass,
+    feeAmountForBusinessCategory,
+} from './billing.service';
 
 describe('billing.service smoke', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+    });
+
+    it('feeAmountForPropertyClass maps 1st–3rd class to CAT columns', () => {
+        const zone = {
+            zone_name: '1Room',
+            cat_a_fee: 300,
+            cat_b_fee: 200,
+            cat_c_fee: 100,
+            rate_impost_min: 0,
+            minimum_rate_min: 300,
+        };
+        expect(feeAmountForPropertyClass(zone, '1st Class')).toBe(300);
+        expect(feeAmountForPropertyClass(zone, '2nd Class')).toBe(200);
+        expect(feeAmountForPropertyClass(zone, '3rd Class')).toBe(100);
+    });
+
+    it('feeAmountForBusinessCategory maps Category A–D to CAT columns', () => {
+        const item = {
+            description: 'Veterinary Clinics',
+            cat_a_fee: 500,
+            cat_b_fee: 400,
+            cat_c_fee: 300,
+            cat_d_fee: 100,
+        };
+        expect(feeAmountForBusinessCategory(item, 'Category A')).toBe(500);
+        expect(feeAmountForBusinessCategory(item, 'Category B')).toBe(400);
+        expect(feeAmountForBusinessCategory(item, 'Category C')).toBe(300);
+        expect(feeAmountForBusinessCategory(item, 'Category D')).toBe(100);
     });
 
     it('calculatePropertyBill uses legacy rate and excludes rolled arrears', async () => {
@@ -43,6 +77,42 @@ describe('billing.service smoke', () => {
         expect(calc.arrears).toBe(50);
         expect(calc.total_amount).toBe(250);
         expect(calc.prior_bill_ids).toContain('bill-old');
+    });
+
+    it('calculatePropertyBill uses class fee from assigned zone when no assessed amount', async () => {
+        (pool.query as jest.Mock)
+            .mockResolvedValueOnce({
+                rows: [
+                    {
+                        id: 'prop-2',
+                        property_size: 50,
+                        base_rate: 1,
+                        classification_name: '1st Class',
+                        property_rate_zone_id: 9,
+                        assessed_amount: null,
+                    },
+                ],
+            })
+            .mockResolvedValueOnce({ rows: [{ id: 1 }] })
+            .mockResolvedValueOnce({
+                rows: [
+                    {
+                        id: 9,
+                        zone_name: '1Room',
+                        cat_a_fee: 300,
+                        cat_b_fee: 200,
+                        cat_c_fee: 100,
+                        rate_impost_min: 0,
+                        minimum_rate_min: 300,
+                    },
+                ],
+            })
+            .mockResolvedValueOnce({
+                rows: [{ total_arrears: '0', prior_bill_ids: [] }],
+            });
+
+        const calc = await calculatePropertyBill('prop-2', 2026);
+        expect(calc.current_rate).toBe(300);
     });
 
     it('generateBill inserts bill and rolls prior bills', async () => {

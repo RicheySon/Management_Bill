@@ -437,7 +437,7 @@ export default function EditPropertyPage() {
                                 placeholder="Select rating zone"
                                 options={rateZones.map((zone: any) => ({
                                     value: String(zone.id),
-                                    label: `${zone.zone_name} (${zone.zone_type}) - Min: GHS ${Number(zone.minimum_rate_min).toLocaleString()}`,
+                                    label: `${zone.zone_name} (${zone.zone_type}) — 1st: GHS ${Number(zone.cat_a_fee || zone.minimum_rate_min || 0).toLocaleString()}`,
                                 }))}
                             />
                         </div>

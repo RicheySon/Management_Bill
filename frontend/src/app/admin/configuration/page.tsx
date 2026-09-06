@@ -371,6 +371,7 @@ function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editingZone, setEditingZone] = useState<PropertyRateZone | null>(null);
+    const [formKey, setFormKey] = useState(0);
 
     const loadZones = useCallback(async () => {
         try {
@@ -385,6 +386,18 @@ function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
     }, [scheduleId]);
 
     useEffect(() => { loadZones(); }, [loadZones]);
+
+    const openAddZone = () => {
+        setEditingZone(null);
+        setFormKey((k) => k + 1);
+        setShowForm(true);
+    };
+
+    const openEditZone = (zone: PropertyRateZone) => {
+        setEditingZone(zone);
+        setFormKey((k) => k + 1);
+        setShowForm(true);
+    };
 
     const handleSaveZone = async (data: any) => {
         try {
@@ -419,9 +432,14 @@ function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
     return (
         <div className="card">
             <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-gray-900">Property Rating Zones</h2>
+                <div>
+                    <h2 className="text-lg font-bold text-gray-900">Property Rating Zones</h2>
+                    <p className="text-xs text-gray-500 mt-1">
+                        Class fees follow fee fixing: 1st–4th Class columns (e.g. 1Room × 1st Class = bill amount).
+                    </p>
+                </div>
                 {canConfigure && (
-                    <button onClick={() => { setEditingZone(null); setShowForm(true); }} className="btn-primary flex items-center space-x-2">
+                    <button type="button" onClick={openAddZone} className="btn-primary flex items-center space-x-2">
                         <Plus className="w-4 h-4" />
                         <span>Add Zone</span>
                     </button>
@@ -430,7 +448,7 @@ function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
 
             {showForm && (
                 <PropertyZoneForm
-                    key={editingZone?.id || 'new'}
+                    key={formKey}
                     zone={editingZone}
                     onSubmit={handleSaveZone}
                     onCancel={() => { setShowForm(false); setEditingZone(null); }}
@@ -449,11 +467,12 @@ function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
                             <tr>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Property Name</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Type</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Class</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Rate Impost</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">CAT A</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">CAT B</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">CAT C</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">CAT D</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">1st</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">2nd</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">3rd</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">4th</th>
                                 {canConfigure && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>}
                             </tr>
                         </thead>
@@ -470,6 +489,7 @@ function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
                                             {zone.zone_type}
                                         </span>
                                     </td>
+                                    <td className="px-4 py-3 text-gray-700 font-medium">{zone.zone_class}</td>
                                     <td className="px-4 py-3 text-gray-600">
                                         {zone.rate_impost_min}
                                     </td>
@@ -480,10 +500,10 @@ function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
                                     {canConfigure && (
                                         <td className="px-4 py-3 text-right">
                                             <div className="flex justify-end space-x-2">
-                                                <button onClick={() => { setEditingZone(zone); setShowForm(true); }} className="p-1.5 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50">
+                                                <button type="button" onClick={() => openEditZone(zone)} className="p-1.5 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50">
                                                     <Pencil className="w-4 h-4" />
                                                 </button>
-                                                <button onClick={() => handleDeleteZone(zone.id)} className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50">
+                                                <button type="button" onClick={() => handleDeleteZone(zone.id)} className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50">
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
                                             </div>
@@ -556,7 +576,7 @@ function PropertyZoneForm({ zone, onSubmit, onCancel }: {
                     </select>
                 </div>
                 <div>
-                    <label className="label">Class</label>
+                    <label className="label">Default Class #</label>
                     <input type="number" className="input-field" value={formData.zone_class} onChange={e => handleChange('zone_class', e.target.value)} min={1} max={10} />
                 </div>
                 <div>
@@ -570,19 +590,20 @@ function PropertyZoneForm({ zone, onSubmit, onCancel }: {
                     <input type="number" step="0.000001" className="input-field" value={formData.rate_impost_min} onChange={e => handleChange('rate_impost_min', e.target.value)} required placeholder="0.0023" />
                 </div>
                 <div>
-                    <label className="label">CAT A Fee (Min) *</label>
+                    <label className="label">1st Class Fee *</label>
                     <input type="number" step="0.01" className="input-field" value={formData.cat_a_fee} onChange={e => handleChange('cat_a_fee', e.target.value)} required placeholder="300.00" />
+                    <p className="text-[10px] text-gray-500 mt-1">Fee-fixing 1st class column</p>
                 </div>
                 <div>
-                    <label className="label">CAT B Fee</label>
+                    <label className="label">2nd Class Fee</label>
                     <input type="number" step="0.01" className="input-field" value={formData.cat_b_fee} onChange={e => handleChange('cat_b_fee', e.target.value)} placeholder="200.00" />
                 </div>
                 <div>
-                    <label className="label">CAT C Fee</label>
+                    <label className="label">3rd Class Fee</label>
                     <input type="number" step="0.01" className="input-field" value={formData.cat_c_fee} onChange={e => handleChange('cat_c_fee', e.target.value)} placeholder="100.00" />
                 </div>
                 <div>
-                    <label className="label">CAT D Fee</label>
+                    <label className="label">4th Class Fee</label>
                     <input type="number" step="0.01" className="input-field" value={formData.cat_d_fee} onChange={e => handleChange('cat_d_fee', e.target.value)} placeholder="50.00" />
                 </div>
             </div>
@@ -934,15 +955,15 @@ function BusinessFeeItemForm({ item, parentItems, onSubmit, onCancel }: {
                         <input type="number" step="0.01" className="input-field" value={formData.cat_a_fee} onChange={e => handleChange('cat_a_fee', e.target.value)} placeholder="0.00" />
                     </div>
                     <div>
-                        <label className="label">CAT B Fee</label>
+                        <label className="label">2nd Class Fee</label>
                         <input type="number" step="0.01" className="input-field" value={formData.cat_b_fee} onChange={e => handleChange('cat_b_fee', e.target.value)} placeholder="0.00" />
                     </div>
                     <div>
-                        <label className="label">CAT C Fee</label>
+                        <label className="label">3rd Class Fee</label>
                         <input type="number" step="0.01" className="input-field" value={formData.cat_c_fee} onChange={e => handleChange('cat_c_fee', e.target.value)} placeholder="0.00" />
                     </div>
                     <div>
-                        <label className="label">CAT D Fee</label>
+                        <label className="label">4th Class Fee</label>
                         <input type="number" step="0.01" className="input-field" value={formData.cat_d_fee} onChange={e => handleChange('cat_d_fee', e.target.value)} placeholder="0.00" />
                     </div>
                     <div>

@@ -395,6 +395,7 @@ router.put('/:id', authorize(['edit_business']), async (req: AuthRequest, res: R
             electoral_area_id: Joi.number().integer().optional().allow(null, ''),
             local_area_id: Joi.number().integer().optional().allow(null, ''),
             fee_item_id: Joi.number().integer().optional().allow(null, ''),
+            assessed_amount: Joi.number().min(0).optional().allow(null, ''),
             status: Joi.string().valid('ACTIVE', 'INACTIVE', 'CLOSED').optional(),
         });
 
@@ -405,6 +406,15 @@ router.put('/:id', authorize(['edit_business']), async (req: AuthRequest, res: R
                 success: false,
                 error: error.details[0].message,
             });
+        }
+
+        // Normalize empty assessed_amount to null
+        if (value.assessed_amount === '' || value.assessed_amount === undefined) {
+            // leave unset if not provided
+        } else if (value.assessed_amount === null) {
+            value.assessed_amount = null;
+        } else {
+            value.assessed_amount = Number(value.assessed_amount);
         }
 
         const fields = Object.keys(value);

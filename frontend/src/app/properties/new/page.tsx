@@ -15,6 +15,7 @@ import {
     formatGeoAddress,
 } from '@/lib/api-client';
 import { toCoord } from '@/lib/geo';
+import { feeAmountForPropertyClass } from '@/lib/property-fee';
 import { ArrowLeft, Save, UserPlus, UserCheck, MapPin, Navigation, Map as MapIcon, X, Phone, Mail, User, CheckCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -82,9 +83,9 @@ export default function NewPropertyPage() {
     const router = useRouter();
     const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<PropertyForm>();
 
-    const [classifications, setClassifications] = useState([]);
-    const [electoralAreas, setElectoralAreas] = useState([]);
-    const [localAreas, setLocalAreas] = useState([]);
+    const [classifications, setClassifications] = useState<any[]>([]);
+    const [electoralAreas, setElectoralAreas] = useState<any[]>([]);
+    const [localAreas, setLocalAreas] = useState<any[]>([]);
     const [rateZones, setRateZones] = useState<any[]>([]);
     const [selectedRateZoneId, setSelectedRateZoneId] = useState<string>('');
     const [selectedRateInfo, setSelectedRateInfo] = useState<string>('');
@@ -574,7 +575,23 @@ export default function NewPropertyPage() {
                             </label>
                             <DropdownSelect
                                 value={watch('classification_id') ?? ''}
-                                onChange={(v) => setValue('classification_id', (v === '' ? undefined : Number(v)) as any, { shouldValidate: true })}
+                                onChange={(v) => {
+                                    const classId = v === '' ? undefined : Number(v);
+                                    setValue('classification_id', classId as any, { shouldValidate: true });
+                                    const cls = classifications.find((c: any) => c.id === classId);
+                                    if (selectedRateZoneId) {
+                                        const zone = rateZones.find((z: any) => z.id === parseInt(selectedRateZoneId));
+                                        if (zone && cls) {
+                                            const amount = feeAmountForPropertyClass(zone, cls.name);
+                                            if (amount > 0) {
+                                                setAssessedAmount(String(amount));
+                                                setSelectedRateInfo(
+                                                    `${zone.zone_name} × ${cls.name}: GHS ${amount.toLocaleString()}`
+                                                );
+                                            }
+                                        }
+                                    }
+                                }}
                                 placeholder="Select option"
                                 options={classifications.map((c: any) => ({ value: String(c.id), label: c.name }))}
                             />
@@ -594,16 +611,19 @@ export default function NewPropertyPage() {
                                         setSelectedRateZoneId(v);
                                         if (v) {
                                             const zone = rateZones.find((z: any) => z.id === parseInt(v));
+                                            const classId = watch('classification_id');
+                                            const cls = classifications.find((c: any) => c.id === Number(classId));
                                             if (zone) {
-                                                const rateStr = zone.rate_impost_max
-                                                    ? `${zone.rate_impost_min} - ${zone.rate_impost_max}`
-                                                    : `${zone.rate_impost_min}`;
-                                                const minStr = zone.minimum_rate_max
-                                                    ? `GHS ${Number(zone.minimum_rate_min).toLocaleString()} - ${Number(zone.minimum_rate_max).toLocaleString()}`
-                                                    : `GHS ${Number(zone.minimum_rate_min).toLocaleString()}`;
-                                                setSelectedRateInfo(`Rate Impost: ${rateStr} | Min: ${minStr}`);
-                                                if (zone.minimum_rate_min != null && zone.minimum_rate_min !== '') {
-                                                    setAssessedAmount(String(zone.minimum_rate_min));
+                                                const amount = feeAmountForPropertyClass(zone, cls?.name);
+                                                if (amount > 0) {
+                                                    setAssessedAmount(String(amount));
+                                                    setSelectedRateInfo(
+                                                        cls
+                                                            ? `${zone.zone_name} × ${cls.name}: GHS ${amount.toLocaleString()}`
+                                                            : `${zone.zone_name}: GHS ${amount.toLocaleString()} (select class for exact column)`
+                                                    );
+                                                } else {
+                                                    setSelectedRateInfo(`${zone.zone_name} — set class fees in Fee Configuration`);
                                                 }
                                             }
                                         } else {
@@ -613,7 +633,7 @@ export default function NewPropertyPage() {
                                     placeholder="Select rating zone"
                                     options={rateZones.map((zone: any) => ({
                                         value: String(zone.id),
-                                        label: `${zone.zone_name} (${zone.zone_type}) - Min: GHS ${Number(zone.minimum_rate_min).toLocaleString()}`,
+                                        label: `${zone.zone_name} (${zone.zone_type}) — 1st: GHS ${Number(zone.cat_a_fee || zone.minimum_rate_min || 0).toLocaleString()}`,
                                     }))}
                                 />
                                 {selectedRateInfo && (
@@ -637,7 +657,7 @@ export default function NewPropertyPage() {
                                 required
                             />
                             <p className="text-xs text-gray-500 mt-1">
-                                This amount is saved with the property and used when generating the bill.
+                                Auto-fills from fee fixing when you pick Property Class + Rating Zone (editable).
                             </p>
                         </div>
 

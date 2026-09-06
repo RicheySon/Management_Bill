@@ -626,6 +626,7 @@ CREATE INDEX idx_fee_schedules_year ON fee_schedules(year);
 CREATE INDEX idx_fee_schedules_status ON fee_schedules(status);
 
 -- Property Rate Zones - rating zones linked to a fee schedule
+-- zone_class + cat_*_fee map to fee-fixing 1st–4th class columns (Excel)
 CREATE TABLE property_rate_zones (
     id SERIAL PRIMARY KEY,
     fee_schedule_id INTEGER NOT NULL REFERENCES fee_schedules(id) ON DELETE CASCADE,
@@ -636,6 +637,10 @@ CREATE TABLE property_rate_zones (
     rate_impost_max DECIMAL(10,6),
     minimum_rate_min DECIMAL(10,2) NOT NULL,
     minimum_rate_max DECIMAL(10,2),
+    cat_a_fee DECIMAL(10,2), -- 1st Class fee (fee fixing)
+    cat_b_fee DECIMAL(10,2), -- 2nd Class fee
+    cat_c_fee DECIMAL(10,2), -- 3rd Class fee
+    cat_d_fee DECIMAL(10,2), -- 4th Class fee
     affected_areas TEXT,
     sort_order INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
