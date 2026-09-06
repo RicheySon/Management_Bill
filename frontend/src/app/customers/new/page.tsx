@@ -84,9 +84,6 @@ export default function NewCustomerPage() {
                         const geo = formatGeoAddress(geoData);
                         if (geo.label) setValue('physical_location', geo.label);
                         if (geo.landmark) setValue('landmark', geo.landmark);
-                        if (!watch('gps_address')) {
-                            setValue('gps_address', `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-                        }
                     }
                 } catch (err) {
                     console.error('Auto-address failed:', err);
@@ -296,8 +293,9 @@ export default function NewCustomerPage() {
                                 type="text"
                                 {...register('gps_address')}
                                 className="input-field font-mono"
-                                placeholder="GPS ADDRESS"
+                                placeholder="Type GhanaPost GPS (e.g. GN-XXXX-XXXX)"
                             />
+                            <p className="text-xs text-gray-500 mt-1">Type manually — Detect GPS / map only fill coordinates below.</p>
                         </div>
 
                         {/* Coordinates Row */}
@@ -346,9 +344,6 @@ export default function NewCustomerPage() {
                                                     const geo = formatGeoAddress(geoData);
                                                     if (geo.label) setValue('physical_location', geo.label);
                                                     if (geo.landmark) setValue('landmark', geo.landmark);
-                                                    if (!watch('gps_address')) {
-                                                        setValue('gps_address', `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-                                                    }
                                                 }
                                             } catch (err) {
                                                 console.error('Auto-address from map failed:', err);
@@ -432,6 +427,9 @@ export default function NewCustomerPage() {
                                 className="input-field"
                                 placeholder="Physical Location / Street Name"
                             />
+                            <p className="text-xs text-gray-500 mt-1">
+                                Auto-filled from the map pin when possible — edit if the suggested place name is wrong.
+                            </p>
                         </div>
 
                         <div className="md:col-span-2">

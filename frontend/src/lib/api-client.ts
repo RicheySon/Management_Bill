@@ -576,6 +576,17 @@ const GA_NORTH_BBOX = '-0.38,5.52,-0.12,5.78';
 const getMapboxToken = () =>
     process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
+/** Prefer precise place types over broad city/region hits from Mapbox reverse. */
+const pickBestGeocodeFeature = (features: any[]) => {
+    if (!Array.isArray(features) || features.length === 0) return null;
+    const priority = ['address', 'poi', 'neighborhood', 'locality', 'place'];
+    for (const type of priority) {
+        const match = features.find((f) => (f.place_type || []).includes(type));
+        if (match) return match;
+    }
+    return features[0];
+};
+
 export const reverseGeocode = async (lat: number, lon: number) => {
     const token = getMapboxToken();
     if (!token) {
@@ -589,12 +600,15 @@ export const reverseGeocode = async (lat: number, lon: number) => {
                 params: {
                     access_token: token,
                     types: 'address,poi,neighborhood,locality,place',
-                    limit: 1,
+                    limit: 5,
                     language: 'en',
+                    country: 'gh',
+                    // Prefer relevance over nearest road segment (reduces highway/route labels)
+                    reverseMode: 'score',
                 },
             }
         );
-        return response.data?.features?.[0] || null;
+        return pickBestGeocodeFeature(response.data?.features || []);
     } catch (error) {
         console.error('Reverse geocoding failed:', error);
         return null;
@@ -650,21 +664,52 @@ export const formatGeoAddress = (geoData: any): { town: string; street: string; 
             context.find((c) => String(c.id || '').startsWith(prefix))?.text || '';
 
         const placeType: string[] = geoData.place_type || [];
-        const street =
-            placeType.includes('address') || placeType.includes('poi')
-                ? geoData.text || ''
-                : ctx('address.') || '';
+        const isPoi = placeType.includes('poi');
+        const isAddress = placeType.includes('address');
+        const isNeighborhood =
+            placeType.includes('neighborhood') || placeType.includes('locality');
+
+        // Prefer house/street or POI name; avoid using broad place_name (city/region dump)
+        let street = '';
+        if (isAddress) {
+            const house = geoData.address ? String(geoData.address) : '';
+            street = [house, geoData.text].filter(Boolean).join(' ').trim();
+        } else if (isPoi) {
+            street = '';
+        } else {
+            street = ctx('address.') || '';
+        }
+
         const town =
+            (isNeighborhood ? geoData.text : '') ||
             ctx('neighborhood.') ||
             ctx('locality.') ||
             ctx('place.') ||
             ctx('district.') ||
-            (placeType.includes('neighborhood') || placeType.includes('locality') || placeType.includes('place')
-                ? geoData.text
-                : '') ||
             '';
-        const landmark = placeType.includes('poi') ? geoData.text || '' : '';
-        const label = geoData.place_name || [street, town, 'Ga North'].filter(Boolean).join(', ');
+
+        const landmark = isPoi ? geoData.text || '' : '';
+
+        // Local-focused label: landmark/street + community — not "…, Accra, Greater Accra, Ghana"
+        const labelParts = [landmark || street, town].filter(Boolean);
+        let label = labelParts.join(', ');
+        if (!label && geoData.place_name) {
+            // Fallback: strip country / region tails from Mapbox place_name
+            label = String(geoData.place_name)
+                .split(',')
+                .map((p: string) => p.trim())
+                .filter((p: string) => {
+                    const lower = p.toLowerCase();
+                    return (
+                        lower !== 'ghana' &&
+                        lower !== 'greater accra' &&
+                        lower !== 'greater accra region' &&
+                        lower !== 'accra'
+                    );
+                })
+                .slice(0, 2)
+                .join(', ');
+        }
         return { town, street, landmark, label };
     }
 
@@ -676,11 +721,10 @@ export const formatGeoAddress = (geoData: any): { town: string; street: string; 
         addr.village ||
         addr.town ||
         addr.city_district ||
-        addr.city ||
         '';
     const street = addr.road || addr.pedestrian || addr.residential || '';
     const landmark = addr.amenity || addr.shop || addr.building || '';
-    const label = [street, town, 'Ga North'].filter(Boolean).join(', ');
+    const label = [landmark || street, town].filter(Boolean).join(', ');
     return { town, street, landmark, label };
 };
 

@@ -118,9 +118,6 @@ export default function EditBusinessPage() {
                         if (geo.town) setValue('town', geo.town);
                         if (geo.street) setValue('street_name', geo.street);
                         if (geo.landmark) setValue('landmark', geo.landmark);
-                        if (!watch('gps_address')) {
-                            setValue('gps_address', `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-                        }
                     }
                 } catch (err) {
                     console.error('Auto-address failed:', err);
@@ -469,7 +466,7 @@ export default function EditBusinessPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
                             <label className="label">GPS Address</label>
-                            <input type="text" {...register('gps_address')} className="input-field" placeholder="GPS Address" />
+                            <input type="text" {...register('gps_address')} className="input-field" placeholder="Type GhanaPost GPS (manual)" />
                         </div>
 
                         <div className="md:col-span-2">
@@ -505,9 +502,6 @@ export default function EditBusinessPage() {
                                                     if (geo.town) setValue('town', geo.town);
                                                     if (geo.street) setValue('street_name', geo.street);
                                                     if (geo.landmark) setValue('landmark', geo.landmark);
-                                                    if (!watch('gps_address')) {
-                                                        setValue('gps_address', `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-                                                    }
                                                 }
                                             } catch (err) {
                                                 console.error('Auto-address from map failed:', err);

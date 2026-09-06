@@ -161,9 +161,6 @@ export default function NewBusinessPage() {
                         if (geo.town) setValue('town', geo.town);
                         if (geo.street) setValue('street_name', geo.street);
                         if (geo.landmark) setValue('landmark', geo.landmark);
-                        if (!watch('gps_address')) {
-                            setValue('gps_address', `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-                        }
                     }
                 } catch (err) {
                     console.error('Auto-address failed:', err);
@@ -720,7 +717,7 @@ export default function NewBusinessPage() {
                                 type="text"
                                 {...register('gps_address')}
                                 className="input-field"
-                                placeholder="GPS Address"
+                                placeholder="Type GhanaPost GPS (manual)"
                             />
                         </div>
 
@@ -772,9 +769,6 @@ export default function NewBusinessPage() {
                                                     if (geo.town) setValue('town', geo.town);
                                                     if (geo.street) setValue('street_name', geo.street);
                                                     if (geo.landmark) setValue('landmark', geo.landmark);
-                                                    if (!watch('gps_address')) {
-                                                        setValue('gps_address', `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-                                                    }
                                                 }
                                             } catch (err) {
                                                 console.error('Auto-address from map failed:', err);
