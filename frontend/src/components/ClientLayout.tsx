@@ -1,20 +1,50 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
     Home, Users, Building2, FileText,
     DollarSign, BarChart3, Printer, LogOut, Loader2, Shield,
-    Briefcase, ClipboardList, Settings, Menu, Database, MapPinned
+    Briefcase, ClipboardList, Settings, Menu, Database, MapPinned, Bell
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import BackButton from '@/components/BackButton';
+import { fetchPendingApprovalsCount } from '@/lib/api-client';
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
     const { user, logout, isLoading, hasPermission } = useAuth();
     const pathname = usePathname();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [pendingApprovals, setPendingApprovals] = useState(0);
+
+    const canSeeApprovals =
+        !!user &&
+        (user.permissions?.includes('approve_amount_changes') ||
+            user.permissions?.includes('approve_privileged_actions'));
+
+    const refreshPendingApprovals = useCallback(async () => {
+        if (!canSeeApprovals || !user) {
+            setPendingApprovals(0);
+            return;
+        }
+        try {
+            const counts = await fetchPendingApprovalsCount({
+                canAmount: user.permissions?.includes('approve_amount_changes'),
+                canActions: user.permissions?.includes('approve_privileged_actions'),
+            });
+            setPendingApprovals(counts.total);
+        } catch {
+            // keep last known count
+        }
+    }, [canSeeApprovals, user]);
+
+    useEffect(() => {
+        if (!user || !canSeeApprovals) return;
+        refreshPendingApprovals();
+        const id = window.setInterval(refreshPendingApprovals, 30000);
+        return () => window.clearInterval(id);
+    }, [user, canSeeApprovals, refreshPendingApprovals, pathname]);
 
     if (isLoading) {
         return (
@@ -174,9 +204,15 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                             <NavLink href="/admin/users" icon={<Shield className="w-5 h-5" />} label="User Management" onClick={() => setIsSidebarOpen(false)} />
                         }
 
-                        {(hasPermission('approve_amount_changes') || hasPermission('approve_privileged_actions')) &&
-                            <NavLink href="/admin/approvals" icon={<ClipboardList className="w-5 h-5" />} label="Approvals" onClick={() => setIsSidebarOpen(false)} />
-                        }
+                        {canSeeApprovals && (
+                            <NavLink
+                                href="/admin/approvals"
+                                icon={<ClipboardList className="w-5 h-5" />}
+                                label="Approvals"
+                                badge={pendingApprovals}
+                                onClick={() => setIsSidebarOpen(false)}
+                            />
+                        )}
 
                         {hasPermission('manage_users') &&
                             <NavLink href="/admin/areas" icon={<MapPinned className="w-5 h-5" />} label="Areas & Communities" onClick={() => setIsSidebarOpen(false)} />
@@ -222,7 +258,22 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                         <span className="text-sm font-medium hidden sm:inline-block">Municipal Revenue Management System</span>
                         <span className="text-sm font-medium sm:hidden">MRMS</span>
                     </div>
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-3 md:space-x-4">
+                        {canSeeApprovals && (
+                            <Link
+                                href="/admin/approvals"
+                                className="relative p-2 rounded-lg text-gray-500 hover:bg-red-50 hover:text-municipal-red transition-colors"
+                                title={pendingApprovals > 0 ? `${pendingApprovals} pending approval${pendingApprovals === 1 ? '' : 's'}` : 'Approvals'}
+                                aria-label="Approvals notifications"
+                            >
+                                <Bell className={`w-5 h-5 ${pendingApprovals > 0 ? 'text-municipal-red' : ''}`} />
+                                {pendingApprovals > 0 && (
+                                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-municipal-red text-white text-[10px] font-bold flex items-center justify-center leading-none shadow-sm">
+                                        {pendingApprovals > 99 ? '99+' : pendingApprovals}
+                                    </span>
+                                )}
+                            </Link>
+                        )}
                         <div className="text-right">
                             <p className="text-sm font-bold text-gray-900">{user.full_name}</p>
                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">
@@ -245,9 +296,22 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     );
 }
 
-function NavLink({ href, icon, label, onClick }: { href: string; icon: React.ReactNode; label: string; onClick?: () => void }) {
+function NavLink({
+    href,
+    icon,
+    label,
+    onClick,
+    badge,
+}: {
+    href: string;
+    icon: React.ReactNode;
+    label: string;
+    onClick?: () => void;
+    badge?: number;
+}) {
     const pathname = usePathname();
     const isActive = pathname === href || pathname.startsWith(`${href}/`);
+    const badgeLabel = badge && badge > 99 ? '99+' : badge ? String(badge) : null;
 
     return (
         <li>
@@ -262,7 +326,12 @@ function NavLink({ href, icon, label, onClick }: { href: string; icon: React.Rea
                 <div className={`transition-colors ${isActive ? 'text-municipal-red' : 'text-gray-400 group-hover:text-municipal-red'}`}>
                     {icon}
                 </div>
-                <span className="text-sm">{label}</span>
+                <span className="text-sm flex-1">{label}</span>
+                {badgeLabel && (
+                    <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-municipal-red text-white text-[10px] font-bold flex items-center justify-center">
+                        {badgeLabel}
+                    </span>
+                )}
             </Link>
         </li>
     );
