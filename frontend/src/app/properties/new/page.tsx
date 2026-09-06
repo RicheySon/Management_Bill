@@ -566,9 +566,7 @@ export default function NewPropertyPage() {
                                 { value: 'Residential', label: 'Residential' },
                                 { value: 'Commercial', label: 'Commercial' },
                                 { value: 'Mixed Use', label: 'Mixed Use' },
-                                { value: 'Industrial', label: 'Industrial' },
-                                { value: 'Agricultural', label: 'Agricultural' },
-                                { value: 'Institutional', label: 'Institutional' }
+                                { value: 'Industrial', label: 'Industrial' }
                                 ]}
                             />
                         </div>

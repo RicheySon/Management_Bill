@@ -76,7 +76,7 @@ router.get('/local-areas', async (req: Request, res: Response) => {
 router.get('/property-classifications', async (req: Request, res: Response) => {
     try {
         const result = await pool.query(
-            'SELECT * FROM property_classifications ORDER BY name'
+            'SELECT * FROM property_classifications ORDER BY id'
         );
 
         res.json({
