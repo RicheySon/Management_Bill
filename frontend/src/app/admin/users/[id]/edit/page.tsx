@@ -34,6 +34,7 @@ export default function EditUserPage() {
         email: '',
         role_id: '',
         status: 'ACTIVE',
+        can_approve: false,
     });
     const [passwordData, setPasswordData] = useState({
         password: '',
@@ -56,6 +57,7 @@ export default function EditUserPage() {
                     email: user.email || '',
                     role_id: String(user.role_id || ''),
                     status: user.status || 'ACTIVE',
+                    can_approve: Boolean(user.can_approve),
                 });
                 setSelectedAreas((user.electoral_areas || []).map((id: any) => Number(id)));
                 setIsSuperAdmin(Boolean(user.roles?.includes('Super Admin')));
@@ -70,8 +72,12 @@ export default function EditUserPage() {
     }, [userId]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        const { name, value, type } = e.target;
+        const checked = (e.target as HTMLInputElement).checked;
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value,
+        }));
     };
 
     const handleAreaToggle = (areaId: number) => {
@@ -94,6 +100,7 @@ export default function EditUserPage() {
                 role_id: Number(formData.role_id),
                 status: formData.status,
                 electoral_areas: selectedAreas,
+                can_approve: primaryAlreadyApproves || formData.can_approve,
             });
             setSuccess('User updated successfully');
             setTimeout(() => router.push('/admin/users'), 1200);
@@ -129,6 +136,8 @@ export default function EditUserPage() {
 
     const selectedRole = roles.find(r => r.id === Number(formData.role_id));
     const isRevenueCollector = selectedRole?.name === 'Revenue Collector';
+    const primaryAlreadyApproves =
+        selectedRole?.name === 'Admin' || selectedRole?.name === 'Super Admin' || isSuperAdmin;
 
     if (loading) {
         return (
@@ -240,6 +249,28 @@ export default function EditUserPage() {
                                     <option value="ACTIVE">ACTIVE</option>
                                     <option value="INACTIVE">INACTIVE</option>
                                 </select>
+                            </div>
+
+                            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                                <label className="flex items-start space-x-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        name="can_approve"
+                                        checked={primaryAlreadyApproves || formData.can_approve}
+                                        disabled={primaryAlreadyApproves}
+                                        onChange={handleChange}
+                                        className="mt-1 w-4 h-4 text-municipal-red border-gray-300 rounded focus:ring-municipal-red"
+                                    />
+                                    <span>
+                                        <span className="block text-sm font-semibold text-gray-800">
+                                            Can approve privileged actions
+                                        </span>
+                                        <span className="block text-xs text-gray-500 mt-1">
+                                            Grants the Approver rule so this user can approve print/delete requests.
+                                            {primaryAlreadyApproves ? ' Included in Admin / Super Admin.' : ''}
+                                        </span>
+                                    </span>
+                                </label>
                             </div>
 
                             {isRevenueCollector && (

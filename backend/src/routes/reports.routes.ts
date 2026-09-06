@@ -73,26 +73,46 @@ router.get('/revenue', authorize(['view_reports']), async (req: Request, res: Re
 /**
  * GET /api/reports/monthly
  * Monthly billing + payment collection report (chronological)
+ * Query: year (required), optional month | quarter (1-4) | start_month+end_month, electoral_area_id
  */
 router.get('/monthly', authorize(['view_reports']), async (req: Request, res: Response) => {
     try {
         const year = parseInt(String(req.query.year || new Date().getFullYear()), 10);
         const month = req.query.month ? parseInt(String(req.query.month), 10) : null;
+        const quarter = req.query.quarter ? parseInt(String(req.query.quarter), 10) : null;
+        let startMonth = req.query.start_month ? parseInt(String(req.query.start_month), 10) : null;
+        let endMonth = req.query.end_month ? parseInt(String(req.query.end_month), 10) : null;
         const electoralAreaId = req.query.electoral_area_id
             ? String(req.query.electoral_area_id)
             : null;
 
-        const billedParams: any[] = [year];
+        // Resolve period window within the year (1–12)
+        if (quarter && quarter >= 1 && quarter <= 4) {
+            startMonth = (quarter - 1) * 3 + 1;
+            endMonth = startMonth + 2;
+        } else if (month && month >= 1 && month <= 12) {
+            startMonth = month;
+            endMonth = month;
+        } else if (startMonth && endMonth) {
+            startMonth = Math.min(Math.max(startMonth, 1), 12);
+            endMonth = Math.min(Math.max(endMonth, 1), 12);
+            if (startMonth > endMonth) {
+                const tmp = startMonth;
+                startMonth = endMonth;
+                endMonth = tmp;
+            }
+        } else {
+            startMonth = 1;
+            endMonth = 12;
+        }
+
+        const billedParams: any[] = [year, startMonth, endMonth];
         let billedAreaJoin = '';
         let billedAreaFilter = '';
         if (electoralAreaId) {
             billedAreaJoin = ' INNER JOIN customers c ON b.customer_id = c.id';
-            billedAreaFilter = ' AND c.electoral_area_id = $2';
+            billedAreaFilter = ' AND c.electoral_area_id = $4';
             billedParams.push(electoralAreaId);
-        }
-        if (month) {
-            billedParams.push(month);
-            billedAreaFilter += ` AND EXTRACT(MONTH FROM b.issue_date) = $${billedParams.length}`;
         }
 
         const billedResult = await pool.query(
@@ -106,23 +126,20 @@ router.get('/monthly', authorize(['view_reports']), async (req: Request, res: Re
              FROM bills b
              ${billedAreaJoin}
              WHERE EXTRACT(YEAR FROM b.issue_date) = $1
+               AND EXTRACT(MONTH FROM b.issue_date) BETWEEN $2 AND $3
              ${billedAreaFilter}
              GROUP BY 1, 2
              ORDER BY 1 ASC, 2 ASC`,
             billedParams
         );
 
-        const paymentParams: any[] = [year];
+        const paymentParams: any[] = [year, startMonth, endMonth];
         let paymentAreaJoin = '';
         let paymentAreaFilter = '';
         if (electoralAreaId) {
             paymentAreaJoin = ' INNER JOIN customers c ON p.customer_id = c.id';
-            paymentAreaFilter = ' AND c.electoral_area_id = $2';
+            paymentAreaFilter = ' AND c.electoral_area_id = $4';
             paymentParams.push(electoralAreaId);
-        }
-        if (month) {
-            paymentParams.push(month);
-            paymentAreaFilter += ` AND EXTRACT(MONTH FROM p.payment_date) = $${paymentParams.length}`;
         }
 
         const paymentsResult = await pool.query(
@@ -134,6 +151,7 @@ router.get('/monthly', authorize(['view_reports']), async (req: Request, res: Re
              FROM payments p
              ${paymentAreaJoin}
              WHERE EXTRACT(YEAR FROM p.payment_date) = $1
+               AND EXTRACT(MONTH FROM p.payment_date) BETWEEN $2 AND $3
              ${paymentAreaFilter}
              GROUP BY 1, 2
              ORDER BY 1 ASC, 2 ASC`,
@@ -163,6 +181,11 @@ router.get('/monthly', authorize(['view_reports']), async (req: Request, res: Re
             }
             return byKey.get(key);
         };
+
+        // Prefill every month in the requested window so quarterly/range charts stay continuous
+        for (let m = startMonth!; m <= endMonth!; m++) {
+            ensure(year, m);
+        }
 
         for (const row of billedResult.rows) {
             const entry = ensure(row.year, row.month);
@@ -199,11 +222,25 @@ router.get('/monthly', authorize(['view_reports']), async (req: Request, res: Re
             }
         );
 
+        const quarterLabel = quarter ? `Q${quarter}` : null;
+        const periodLabel =
+            startMonth === endMonth
+                ? `${['January','February','March','April','May','June','July','August','September','October','November','December'][startMonth! - 1]} ${year}`
+                : quarter
+                  ? `${quarterLabel} ${year} (${['January','February','March','April','May','June','July','August','September','October','November','December'][startMonth! - 1]} – ${['January','February','March','April','May','June','July','August','September','October','November','December'][endMonth! - 1]})`
+                  : startMonth === 1 && endMonth === 12
+                    ? `Year ${year}`
+                    : `${['January','February','March','April','May','June','July','August','September','October','November','December'][startMonth! - 1]} – ${['January','February','March','April','May','June','July','August','September','October','November','December'][endMonth! - 1]} ${year}`;
+
         res.json({
             success: true,
             data: {
                 year,
-                month,
+                month: startMonth === endMonth ? startMonth : null,
+                quarter: quarter || null,
+                start_month: startMonth,
+                end_month: endMonth,
+                period_label: periodLabel,
                 months,
                 totals,
             },

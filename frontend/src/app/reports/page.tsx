@@ -15,15 +15,28 @@ const MONTH_NAMES = [
     'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
+const QUARTERS = [
+    { value: 1, label: 'Q1 (January – March)' },
+    { value: 2, label: 'Q2 (April – June)' },
+    { value: 3, label: 'Q3 (July – September)' },
+    { value: 4, label: 'Q4 (October – December)' },
+];
+
+type PeriodMode = 'year' | 'quarter' | 'month' | 'range';
+
 export default function ReportsPage() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'monthly' | 'defaulters'>('monthly');
     const [monthlyReport, setMonthlyReport] = useState<any>(null);
     const [defaulters, setDefaulters] = useState<any[]>([]);
     const [areas, setAreas] = useState<any[]>([]);
+    const [periodMode, setPeriodMode] = useState<PeriodMode>('year');
     const [filters, setFilters] = useState({
         year: new Date().getFullYear(),
         month: '' as number | '',
+        quarter: '' as number | '',
+        start_month: 1 as number,
+        end_month: 3 as number,
         electoral_area_id: '',
     });
 
@@ -31,7 +44,14 @@ export default function ReportsPage() {
         setLoading(true);
         try {
             const params: any = { year: filters.year };
-            if (filters.month) params.month = filters.month;
+            if (periodMode === 'month' && filters.month) {
+                params.month = filters.month;
+            } else if (periodMode === 'quarter' && filters.quarter) {
+                params.quarter = filters.quarter;
+            } else if (periodMode === 'range') {
+                params.start_month = filters.start_month;
+                params.end_month = filters.end_month;
+            }
             if (filters.electoral_area_id) params.electoral_area_id = filters.electoral_area_id;
 
             const [monthly, def, areaList] = await Promise.all([
@@ -51,7 +71,7 @@ export default function ReportsPage() {
 
     useEffect(() => {
         loadData();
-    }, [filters.year, filters.month, filters.electoral_area_id]);
+    }, [filters.year, filters.month, filters.quarter, filters.start_month, filters.end_month, filters.electoral_area_id, periodMode]);
 
     const months = monthlyReport?.months || [];
     const totals = monthlyReport?.totals || {};
@@ -77,9 +97,15 @@ export default function ReportsPage() {
         return [current - 2, current - 1, current, current + 1];
     }, []);
 
-    const reportTitle = filters.month
-        ? `${MONTH_NAMES[Number(filters.month) - 1]} ${filters.year}`
-        : `Year ${filters.year}`;
+    const reportTitle =
+        monthlyReport?.period_label ||
+        (periodMode === 'month' && filters.month
+            ? `${MONTH_NAMES[Number(filters.month) - 1]} ${filters.year}`
+            : periodMode === 'quarter' && filters.quarter
+              ? `Q${filters.quarter} ${filters.year}`
+              : periodMode === 'range'
+                ? `${MONTH_NAMES[filters.start_month - 1]} – ${MONTH_NAMES[filters.end_month - 1]} ${filters.year}`
+                : `Year ${filters.year}`);
 
     const exportCsv = () => {
         const rows: Array<Array<string | number>> =
@@ -121,10 +147,17 @@ export default function ReportsPage() {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        const monthSuffix = filters.month ? `-${String(filters.month).padStart(2, '0')}` : '';
+        const periodSuffix =
+            periodMode === 'quarter' && filters.quarter
+                ? `-Q${filters.quarter}`
+                : periodMode === 'month' && filters.month
+                  ? `-${String(filters.month).padStart(2, '0')}`
+                  : periodMode === 'range'
+                    ? `-${String(filters.start_month).padStart(2, '0')}-to-${String(filters.end_month).padStart(2, '0')}`
+                    : '';
         link.download =
             activeTab === 'monthly'
-                ? `monthly-report-${filters.year}${monthSuffix}.csv`
+                ? `collection-report-${filters.year}${periodSuffix}.csv`
                 : `defaulters-${filters.year}.csv`;
         link.click();
         URL.revokeObjectURL(url);
@@ -135,7 +168,7 @@ export default function ReportsPage() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
-                    <p className="text-gray-600 mt-1">Generate monthly and yearly collection reports</p>
+                    <p className="text-gray-600 mt-1">Generate yearly, quarterly, and month-range collection reports</p>
                 </div>
                 <div className="flex space-x-3">
                     <button onClick={exportCsv} className="btn-secondary flex items-center space-x-2">
@@ -161,25 +194,112 @@ export default function ReportsPage() {
                     </select>
                 </div>
                 <div className="flex items-center space-x-2">
-                    <Calendar className="w-4 h-4 text-gray-400" />
+                    <Filter className="w-4 h-4 text-gray-400" />
                     <select
                         className="input-field py-1"
-                        value={filters.month}
-                        onChange={(e) =>
-                            setFilters({
-                                ...filters,
-                                month: e.target.value ? parseInt(e.target.value) : '',
-                            })
-                        }
+                        value={periodMode}
+                        onChange={(e) => {
+                            const mode = e.target.value as PeriodMode;
+                            setPeriodMode(mode);
+                            if (mode === 'quarter' && !filters.quarter) {
+                                setFilters((f) => ({ ...f, quarter: 1, month: '' }));
+                            }
+                            if (mode === 'month' && !filters.month) {
+                                setFilters((f) => ({ ...f, month: 1, quarter: '' }));
+                            }
+                            if (mode === 'year') {
+                                setFilters((f) => ({ ...f, month: '', quarter: '' }));
+                            }
+                        }}
                     >
-                        <option value="">All Months</option>
-                        {MONTH_NAMES.map((name, idx) => (
-                            <option key={name} value={idx + 1}>
-                                {name}
-                            </option>
-                        ))}
+                        <option value="year">Full Year</option>
+                        <option value="quarter">Quarterly</option>
+                        <option value="month">Single Month</option>
+                        <option value="range">Month Range</option>
                     </select>
                 </div>
+                {periodMode === 'quarter' && (
+                    <div className="flex items-center space-x-2">
+                        <select
+                            className="input-field py-1"
+                            value={filters.quarter}
+                            onChange={(e) =>
+                                setFilters({
+                                    ...filters,
+                                    quarter: e.target.value ? parseInt(e.target.value) : '',
+                                })
+                            }
+                        >
+                            {QUARTERS.map((q) => (
+                                <option key={q.value} value={q.value}>
+                                    {q.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+                {periodMode === 'month' && (
+                    <div className="flex items-center space-x-2">
+                        <select
+                            className="input-field py-1"
+                            value={filters.month}
+                            onChange={(e) =>
+                                setFilters({
+                                    ...filters,
+                                    month: e.target.value ? parseInt(e.target.value) : '',
+                                })
+                            }
+                        >
+                            {MONTH_NAMES.map((name, idx) => (
+                                <option key={name} value={idx + 1}>
+                                    {name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+                {periodMode === 'range' && (
+                    <>
+                        <div className="flex items-center space-x-2">
+                            <span className="text-xs text-gray-500 font-semibold">From</span>
+                            <select
+                                className="input-field py-1"
+                                value={filters.start_month}
+                                onChange={(e) =>
+                                    setFilters({
+                                        ...filters,
+                                        start_month: parseInt(e.target.value),
+                                    })
+                                }
+                            >
+                                {MONTH_NAMES.map((name, idx) => (
+                                    <option key={name} value={idx + 1}>
+                                        {name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <span className="text-xs text-gray-500 font-semibold">To</span>
+                            <select
+                                className="input-field py-1"
+                                value={filters.end_month}
+                                onChange={(e) =>
+                                    setFilters({
+                                        ...filters,
+                                        end_month: parseInt(e.target.value),
+                                    })
+                                }
+                            >
+                                {MONTH_NAMES.map((name, idx) => (
+                                    <option key={name} value={idx + 1}>
+                                        {name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </>
+                )}
                 <div className="flex items-center space-x-2">
                     <Filter className="w-4 h-4 text-gray-400" />
                     <select
@@ -199,7 +319,7 @@ export default function ReportsPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <SummaryCard
-                    title={filters.month ? 'Month Collected' : 'Yearly Collected'}
+                    title="Period Collected"
                     value={`GHS ${totalCollected.toLocaleString()}`}
                     trend={`Billed: GHS ${totalBilled.toLocaleString()}`}
                     icon={<TrendingUp className="text-green-600" />}

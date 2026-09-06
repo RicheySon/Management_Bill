@@ -293,6 +293,9 @@ export const fetchRevenueReport = async (params?: any) => {
 export const fetchMonthlyReport = async (params?: {
     year?: number;
     month?: number | '';
+    quarter?: number | '';
+    start_month?: number | '';
+    end_month?: number | '';
     electoral_area_id?: string;
 }) => {
     const response = await apiClient.get('/reports/monthly', { params });

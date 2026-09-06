@@ -18,7 +18,8 @@ export default function NewUserPage() {
         full_name: '',
         email: '',
         password: '',
-        role_id: ''
+        role_id: '',
+        can_approve: false,
     });
     const [electoralAreas, setElectoralAreas] = useState<any[]>([]);
     const [selectedAreas, setSelectedAreas] = useState<number[]>([]);
@@ -45,8 +46,12 @@ export default function NewUserPage() {
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        const { name, value, type } = e.target;
+        const checked = (e.target as HTMLInputElement).checked;
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value,
+        }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -57,6 +62,7 @@ export default function NewUserPage() {
         try {
             const payload = {
                 ...formData,
+                can_approve: primaryAlreadyApproves || formData.can_approve,
                 electoral_areas: selectedAreas
             };
             await createUser(payload);
@@ -77,6 +83,8 @@ export default function NewUserPage() {
 
     const selectedRole = roles.find(r => r.id === Number(formData.role_id));
     const isRevenueCollector = selectedRole?.name === 'Revenue Collector';
+    const primaryAlreadyApproves =
+        selectedRole?.name === 'Admin' || selectedRole?.name === 'Super Admin';
 
     return (
         <div className="max-w-2xl mx-auto space-y-6">
@@ -177,6 +185,28 @@ export default function NewUserPage() {
                                         ))}
                                     </select>
                                 </div>
+                            </div>
+
+                            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                                <label className="flex items-start space-x-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        name="can_approve"
+                                        checked={primaryAlreadyApproves || formData.can_approve}
+                                        disabled={primaryAlreadyApproves}
+                                        onChange={handleChange}
+                                        className="mt-1 w-4 h-4 text-municipal-red border-gray-300 rounded focus:ring-municipal-red"
+                                    />
+                                    <span>
+                                        <span className="block text-sm font-semibold text-gray-800">
+                                            Can approve privileged actions
+                                        </span>
+                                        <span className="block text-xs text-gray-500 mt-1">
+                                            Grants the Approver rule so this user can approve print/delete requests.
+                                            {primaryAlreadyApproves ? ' Included in Admin / Super Admin.' : ''}
+                                        </span>
+                                    </span>
+                                </label>
                             </div>
                             
                             {isRevenueCollector && (
