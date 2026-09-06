@@ -789,6 +789,30 @@ export const fetchActionRequests = async (params?: { status?: string; limit?: nu
     return response.data.data || [];
 };
 
+/** Pending counts for admin notification bell (amount + privileged action approvals). */
+export const fetchPendingApprovalsCount = async (opts?: {
+    canAmount?: boolean;
+    canActions?: boolean;
+}): Promise<{ amounts: number; actions: number; total: number }> => {
+    const canAmount = opts?.canAmount !== false;
+    const canActions = opts?.canActions !== false;
+    const [amounts, actions] = await Promise.all([
+        canAmount
+            ? fetchAmountChanges({ status: 'PENDING', limit: 100 }).catch(() => [])
+            : Promise.resolve([]),
+        canActions
+            ? fetchActionRequests({ status: 'PENDING', limit: 100 }).catch(() => [])
+            : Promise.resolve([]),
+    ]);
+    const amountsCount = Array.isArray(amounts) ? amounts.length : 0;
+    const actionsCount = Array.isArray(actions) ? actions.length : 0;
+    return {
+        amounts: amountsCount,
+        actions: actionsCount,
+        total: amountsCount + actionsCount,
+    };
+};
+
 export const approveActionRequest = async (id: string, review_note?: string) => {
     const response = await apiClient.post(`/action-requests/${id}/approve`, { review_note });
     return response.data;
