@@ -72,12 +72,18 @@ const propertyRateZoneSchema = Joi.object({
     zone_name: Joi.string().max(100).required(),
     zone_type: Joi.string().valid('RESIDENTIAL', 'COMMERCIAL', 'INDUSTRIAL', 'MIXED_USE').required(),
     zone_class: Joi.number().integer().min(1).max(10).optional(),
-    rate_impost_min: Joi.number().positive().required(),
-    rate_impost_max: Joi.number().positive().allow(null).optional(),
-    minimum_rate_min: Joi.number().positive().required(),
-    minimum_rate_max: Joi.number().positive().allow(null).optional(),
+    // Allow 0 — unassessed room-type rows in fee fixing use flat class fees, not impost
+    rate_impost_min: Joi.number().min(0).required(),
+    rate_impost_max: Joi.number().min(0).allow(null).optional(),
+    minimum_rate_min: Joi.number().min(0).required(),
+    minimum_rate_max: Joi.number().min(0).allow(null).optional(),
+    cat_a_fee: Joi.number().min(0).allow(null).optional(),
+    cat_b_fee: Joi.number().min(0).allow(null).optional(),
+    cat_c_fee: Joi.number().min(0).allow(null).optional(),
+    cat_d_fee: Joi.number().min(0).allow(null).optional(),
     affected_areas: Joi.string().allow('', null).optional(),
     sort_order: Joi.number().integer().optional(),
+    reason: Joi.string().allow('', null).optional(),
 });
 
 const businessFeeItemSchema = Joi.object({

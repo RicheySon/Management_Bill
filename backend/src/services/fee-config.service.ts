@@ -25,6 +25,10 @@ interface PropertyRateZone {
     rate_impost_max?: number;
     minimum_rate_min: number;
     minimum_rate_max?: number;
+    cat_a_fee?: number;
+    cat_b_fee?: number;
+    cat_c_fee?: number;
+    cat_d_fee?: number;
     affected_areas?: string;
     sort_order: number;
 }
@@ -203,11 +207,32 @@ export const getPropertyRateZones = async (feeScheduleId: number): Promise<Prope
 };
 
 export const createPropertyRateZone = async (feeScheduleId: number, data: Omit<PropertyRateZone, 'id' | 'fee_schedule_id' | 'created_at' | 'updated_at'>): Promise<PropertyRateZone> => {
+    const catA = data.cat_a_fee ?? data.minimum_rate_min;
     const result = await pool.query(
-        `INSERT INTO property_rate_zones (fee_schedule_id, zone_name, zone_type, zone_class, rate_impost_min, rate_impost_max, minimum_rate_min, minimum_rate_max, affected_areas, sort_order)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `INSERT INTO property_rate_zones (
+            fee_schedule_id, zone_name, zone_type, zone_class,
+            rate_impost_min, rate_impost_max, minimum_rate_min, minimum_rate_max,
+            cat_a_fee, cat_b_fee, cat_c_fee, cat_d_fee,
+            affected_areas, sort_order
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
          RETURNING *`,
-        [feeScheduleId, data.zone_name, data.zone_type, data.zone_class || 1, data.rate_impost_min, data.rate_impost_max || null, data.minimum_rate_min, data.minimum_rate_max || null, data.affected_areas || null, data.sort_order || 0]
+        [
+            feeScheduleId,
+            data.zone_name,
+            data.zone_type,
+            data.zone_class || 1,
+            data.rate_impost_min,
+            data.rate_impost_max || null,
+            data.minimum_rate_min ?? catA ?? 0,
+            data.minimum_rate_max || null,
+            catA ?? null,
+            data.cat_b_fee ?? null,
+            data.cat_c_fee ?? null,
+            data.cat_d_fee ?? null,
+            data.affected_areas || null,
+            data.sort_order || 0,
+        ]
     );
     return result.rows[0];
 };
@@ -217,7 +242,21 @@ export const updatePropertyRateZone = async (zoneId: number, data: Partial<Prope
     const values: any[] = [];
     let paramIndex = 1;
 
-    const allowedFields = ['zone_name', 'zone_type', 'zone_class', 'rate_impost_min', 'rate_impost_max', 'minimum_rate_min', 'minimum_rate_max', 'affected_areas', 'sort_order'];
+    const allowedFields = [
+        'zone_name',
+        'zone_type',
+        'zone_class',
+        'rate_impost_min',
+        'rate_impost_max',
+        'minimum_rate_min',
+        'minimum_rate_max',
+        'cat_a_fee',
+        'cat_b_fee',
+        'cat_c_fee',
+        'cat_d_fee',
+        'affected_areas',
+        'sort_order',
+    ];
 
     for (const field of allowedFields) {
         if ((data as any)[field] !== undefined) {

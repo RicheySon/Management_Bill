@@ -15,6 +15,48 @@ interface BillCalculation {
     prior_bill_ids?: string[];
 }
 
+/** Parse "1st Class" / "2nd Class" → 1, 2, … */
+export const propertyClassNumber = (classificationName?: string | null): number | null => {
+    if (!classificationName) return null;
+    const match = String(classificationName).match(/(\d+)/);
+    if (!match) return null;
+    const n = parseInt(match[1], 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+};
+
+/**
+ * Resolve bill amount from a fee-fixing zone using property class.
+ * Fee-fixing Excel: unassessed rows use 1st/2nd/3rd(/4th) columns → cat_a/b/c/d.
+ */
+export const feeAmountForPropertyClass = (
+    zone: any,
+    classificationName?: string | null,
+    propertySize = 50
+): number => {
+    const classNum = propertyClassNumber(classificationName);
+    const catMap: Record<number, any> = {
+        1: zone.cat_a_fee,
+        2: zone.cat_b_fee,
+        3: zone.cat_c_fee,
+        4: zone.cat_d_fee,
+    };
+    if (classNum && catMap[classNum] != null && catMap[classNum] !== '') {
+        const fee = parseFloat(catMap[classNum]);
+        if (!isNaN(fee) && fee > 0) return fee;
+    }
+
+    // Prefer CAT A / minimum for unassessed flat fees when class column missing
+    const catA = parseFloat(zone.cat_a_fee);
+    if (!isNaN(catA) && catA > 0) return catA;
+
+    const rateImpost = parseFloat(zone.rate_impost_min) || 0;
+    const minimumRate = parseFloat(zone.minimum_rate_min) || 0;
+    const calculatedRate = rateImpost * propertySize;
+    let current = Math.max(calculatedRate, minimumRate || 0);
+    if ((!current || current <= 0) && minimumRate > 0) current = minimumRate;
+    return current || 0;
+};
+
 /**
  * Calculate property rate bill
  * Uses configured fee schedule rates if available, falls back to legacy base_rate * property_size
@@ -55,6 +97,8 @@ export const calculatePropertyBill = async (
 
         if (activeSchedule.rows.length > 0) {
             let zone = null;
+            const scheduleId = activeSchedule.rows[0].id;
+            const classNum = propertyClassNumber(property.classification_name);
 
             // First, check if property has a specific rate zone assigned
             if (property.property_rate_zone_id) {
@@ -65,35 +109,46 @@ export const calculatePropertyBill = async (
                 if (zoneResult.rows.length > 0) zone = zoneResult.rows[0];
             }
 
-            // Otherwise, match by classification type
-            if (!zone && property.classification_name) {
-                const zoneTypeMap: Record<string, string> = {
-                    'Residential': 'RESIDENTIAL',
-                    'Commercial': 'COMMERCIAL',
-                    'Industrial': 'INDUSTRIAL',
-                };
-                const zoneType = zoneTypeMap[property.classification_name] || 'RESIDENTIAL';
-
+            // Otherwise match by property class → zone_class (1st Class → zone_class 1)
+            if (!zone && classNum) {
                 const zoneResult = await pool.query(
                     `SELECT * FROM property_rate_zones
-                     WHERE fee_schedule_id = $1 AND zone_type = $2
-                     ORDER BY zone_class ASC LIMIT 1`,
-                    [activeSchedule.rows[0].id, zoneType]
+                     WHERE fee_schedule_id = $1 AND zone_class = $2
+                     ORDER BY sort_order ASC, id ASC
+                     LIMIT 1`,
+                    [scheduleId, classNum]
                 );
                 if (zoneResult.rows.length > 0) zone = zoneResult.rows[0];
             }
 
-            if (zone) {
-                const rateImpost = parseFloat(zone.rate_impost_min);
-                const minimumRate = parseFloat(zone.minimum_rate_min);
-                // Prefer zone minimum when size is missing/default — impost*default size often understates
-                const calculatedRate = rateImpost * propertySize;
-                current_rate = Math.max(calculatedRate, minimumRate || 0);
-                // If impost is tiny/zero but a minimum exists, use the minimum as the bill amount
-                if ((!current_rate || current_rate <= 0) && minimumRate > 0) {
-                    current_rate = minimumRate;
+            // Fallback: zone_type from property_use if present
+            if (!zone && property.property_use) {
+                const useMap: Record<string, string> = {
+                    Residential: 'RESIDENTIAL',
+                    Commercial: 'COMMERCIAL',
+                    Industrial: 'INDUSTRIAL',
+                    'Mixed Use': 'MIXED_USE',
+                };
+                const zoneType = useMap[property.property_use];
+                if (zoneType) {
+                    const zoneResult = await pool.query(
+                        `SELECT * FROM property_rate_zones
+                         WHERE fee_schedule_id = $1 AND zone_type = $2
+                         ORDER BY zone_class ASC, sort_order ASC
+                         LIMIT 1`,
+                        [scheduleId, zoneType]
+                    );
+                    if (zoneResult.rows.length > 0) zone = zoneResult.rows[0];
                 }
-                rateDescription = `${zone.zone_name} - Rate Impost: ${rateImpost}`;
+            }
+
+            if (zone) {
+                current_rate = feeAmountForPropertyClass(
+                    zone,
+                    property.classification_name,
+                    propertySize
+                );
+                rateDescription = `${zone.zone_name} — ${property.classification_name || 'class'} fee`;
             } else {
                 // Fallback to legacy
                 const baseRate = parseFloat(property.base_rate) || 0;

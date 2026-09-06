@@ -4,7 +4,16 @@ import { logAction, AuditContext } from './audit.service';
 export type AmountEntityType = 'BILL' | 'PROPERTY_RATE_ZONE' | 'BUSINESS_FEE_ITEM';
 
 const BILL_MONEY_FIELDS = ['current_rate', 'arrears', 'rebate', 'total_amount'] as const;
-const ZONE_MONEY_FIELDS = ['rate_impost_min', 'rate_impost_max', 'minimum_rate_min', 'minimum_rate_max'] as const;
+const ZONE_MONEY_FIELDS = [
+    'rate_impost_min',
+    'rate_impost_max',
+    'minimum_rate_min',
+    'minimum_rate_max',
+    'cat_a_fee',
+    'cat_b_fee',
+    'cat_c_fee',
+    'cat_d_fee',
+] as const;
 const FEE_ITEM_MONEY_FIELDS = ['cat_a_fee', 'cat_b_fee', 'cat_c_fee', 'cat_d_fee', 'cat_e_fee', 'cat_f_fee'] as const;
 
 const pickFields = (row: Record<string, any>, fields: readonly string[]) => {
@@ -237,13 +246,21 @@ export const approveAmountChange = async (
                     rate_impost_max = COALESCE($2, rate_impost_max),
                     minimum_rate_min = COALESCE($3, minimum_rate_min),
                     minimum_rate_max = COALESCE($4, minimum_rate_max),
+                    cat_a_fee = COALESCE($5, cat_a_fee),
+                    cat_b_fee = COALESCE($6, cat_b_fee),
+                    cat_c_fee = COALESCE($7, cat_c_fee),
+                    cat_d_fee = COALESCE($8, cat_d_fee),
                     updated_at = NOW()
-                 WHERE id = $5`,
+                 WHERE id = $9`,
                 [
                     newValues.rate_impost_min,
                     newValues.rate_impost_max,
                     newValues.minimum_rate_min,
                     newValues.minimum_rate_max,
+                    newValues.cat_a_fee,
+                    newValues.cat_b_fee,
+                    newValues.cat_c_fee,
+                    newValues.cat_d_fee,
                     Number(request.entity_id),
                 ]
             );
