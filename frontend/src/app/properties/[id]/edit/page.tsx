@@ -501,7 +501,7 @@ export default function EditPropertyPage() {
                             <label className="label">Source of Water</label>
                             <select {...register('source_of_water')} className="input-field">
                                 <option value="">Select option</option>
-                                <option value="Pipe-borne">Pipe-borne</option>
+                                <option value="Ghana water">Ghana water</option>
                                 <option value="Borehole">Borehole</option>
                                 <option value="Well">Well</option>
                                 <option value="Tanker">Tanker</option>
