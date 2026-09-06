@@ -15,6 +15,7 @@ import {
     formatGeoAddress,
 } from '@/lib/api-client';
 import { toCoord } from '@/lib/geo';
+import { feeAmountForBusinessCategory } from '@/lib/property-fee';
 import { ArrowLeft, Save, Navigation, Map as MapIcon, X, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -82,6 +83,8 @@ export default function EditBusinessPage() {
     const [localAreas, setLocalAreas] = useState([]);
     const [feeItems, setFeeItems] = useState<any[]>([]);
     const [selectedFeeItemId, setSelectedFeeItemId] = useState<string>('');
+    const [selectedFeeAmount, setSelectedFeeAmount] = useState<string>('');
+    const [assessedAmount, setAssessedAmount] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -157,6 +160,9 @@ export default function EditBusinessPage() {
 
                 if (b.fee_item_id) {
                     setSelectedFeeItemId(b.fee_item_id.toString());
+                }
+                if (b.assessed_amount != null && b.assessed_amount !== '') {
+                    setAssessedAmount(String(b.assessed_amount));
                 }
 
                 // Fill business owner (customer) fields
@@ -264,6 +270,7 @@ export default function EditBusinessPage() {
                 electoral_area_id: toNullableId(data.electoral_area_id),
                 local_area_id: toNullableId(data.local_area_id),
                 fee_item_id: selectedFeeItemId ? parseInt(selectedFeeItemId) : null,
+                assessed_amount: toOptionalNumber(assessedAmount),
             });
 
             setSuccess(true);
@@ -402,36 +409,90 @@ export default function EditBusinessPage() {
 
                         <div>
                             <label className="label">Business Category Class <span className="text-municipal-red">*</span></label>
-                            <select {...register('business_category_class', { required: 'Please select a category class' })} className="input-field">
+                            <select
+                                {...register('business_category_class', { required: 'Please select a category class' })}
+                                className="input-field"
+                                onChange={(e) => {
+                                    const v = e.target.value;
+                                    setValue('business_category_class', v as any, { shouldValidate: true });
+                                    if (selectedFeeItemId) {
+                                        const item = feeItems.find((fi: any) => fi.id === parseInt(selectedFeeItemId));
+                                        if (item) {
+                                            const fee = feeAmountForBusinessCategory(item, v);
+                                            if (fee > 0) {
+                                                setAssessedAmount(String(fee));
+                                                setSelectedFeeAmount(
+                                                    `${item.description} × ${v}: GHS ${Number(fee).toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
+                                                );
+                                            }
+                                        }
+                                    }
+                                }}
+                            >
                                 <option value="">Select category</option>
-                                <option value="Category A">Category A</option>
-                                <option value="Category B">Category B</option>
-                                <option value="Category C">Category C</option>
-                                <option value="Category D">Category D</option>
+                                <option value="Category A">Category A (fee-fixing CAT A)</option>
+                                <option value="Category B">Category B (fee-fixing CAT B)</option>
+                                <option value="Category C">Category C (fee-fixing CAT C)</option>
+                                <option value="Category D">Category D (fee-fixing CAT D)</option>
                             </select>
                             {errors.business_category_class && <p className="text-red-500 text-sm mt-1">{errors.business_category_class.message}</p>}
+                            <p className="text-xs text-gray-500 mt-1">Linked to fee fixing CAT A–D for the selected business type.</p>
                         </div>
 
                         {feeItems.length > 0 && (
                             <div className="md:col-span-2">
-                                <label className="label">Fee Schedule Item (Configured Rate)</label>
+                                <label className="label">Fee Schedule Item (Business Type from Fee Fixing)</label>
                                 <select className="input-field" value={selectedFeeItemId}
                                     onChange={(e) => {
-                                        setSelectedFeeItemId(e.target.value);
-                                        setValue('fee_item_id', e.target.value ? parseInt(e.target.value) : undefined);
+                                        const v = e.target.value;
+                                        setSelectedFeeItemId(v);
+                                        setValue('fee_item_id', v ? parseInt(v) : undefined);
+                                        if (v) {
+                                            const item = feeItems.find((fi: any) => fi.id === parseInt(v));
+                                            if (item) {
+                                                const classVal = watch('business_category_class') || 'Category A';
+                                                const fee = feeAmountForBusinessCategory(item, classVal);
+                                                if (fee > 0) {
+                                                    setAssessedAmount(String(fee));
+                                                    setSelectedFeeAmount(
+                                                        `${item.description} × ${classVal}: GHS ${Number(fee).toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
+                                                    );
+                                                }
+                                            }
+                                        } else {
+                                            setSelectedFeeAmount('');
+                                        }
                                     }}>
-                                    <option value="">Select from fee schedule (optional)</option>
+                                    <option value="">Select from fee schedule</option>
                                     {feeItems.filter((fi: any) => !fi.is_group_header).map((item: any) => (
                                         <option key={item.id} value={item.id}>
                                             {item.main_item_number}. {item.description}
-                                            {item.cat_a_fee ? ` - CAT A: GHS ${Number(item.cat_a_fee).toFixed(2)}` : ''}
-                                            {item.cat_b_fee ? ` | CAT B: GHS ${Number(item.cat_b_fee).toFixed(2)}` : ''}
-                                            {item.cat_c_fee ? ` | CAT C: GHS ${Number(item.cat_c_fee).toFixed(2)}` : ''}
+                                            {item.cat_a_fee ? ` — A: ${Number(item.cat_a_fee).toFixed(0)}` : ''}
+                                            {item.cat_b_fee ? ` | B: ${Number(item.cat_b_fee).toFixed(0)}` : ''}
+                                            {item.cat_c_fee ? ` | C: ${Number(item.cat_c_fee).toFixed(0)}` : ''}
+                                            {item.cat_d_fee ? ` | D: ${Number(item.cat_d_fee).toFixed(0)}` : ''}
                                         </option>
                                     ))}
                                 </select>
+                                {selectedFeeAmount && (
+                                    <p className="text-sm text-green-700 font-medium mt-1">{selectedFeeAmount}</p>
+                                )}
                             </div>
                         )}
+
+                        <div>
+                            <label className="label">Bill Amount (GHS)</label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                className="input-field"
+                                value={assessedAmount}
+                                onChange={(e) => setAssessedAmount(e.target.value)}
+                                placeholder="Bill Amount (GHS)"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Auto-fills from fee fixing Category × Fee Item.</p>
+                        </div>
 
                         <div>
                             <label className="label">Business Email</label>

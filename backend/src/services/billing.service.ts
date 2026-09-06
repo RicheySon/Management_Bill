@@ -57,6 +57,40 @@ export const feeAmountForPropertyClass = (
     return current || 0;
 };
 
+/** "Category A" / "A" / "CAT A" → a */
+export const businessCategoryLetter = (categoryClass?: string | null): string => {
+    if (!categoryClass) return 'a';
+    const raw = String(categoryClass).trim().toLowerCase();
+    const match = raw.match(/([a-f])\b/) || raw.match(/cat[_\s-]?([a-f])/);
+    if (match) return match[1];
+    const stripped = raw.replace(/^category\s*/i, '').replace(/^cat[_\s-]*/i, '').trim();
+    if (/^[a-f]$/.test(stripped)) return stripped;
+    return 'a';
+};
+
+/** BOP fee from fee-fixing item + category class (CAT A/B/C/D). */
+export const feeAmountForBusinessCategory = (
+    feeItem: any,
+    categoryClass?: string | null
+): number => {
+    if (!feeItem) return 0;
+    const letter = businessCategoryLetter(categoryClass);
+    const preferred = parseFloat(feeItem[`cat_${letter}_fee`]);
+    if (!isNaN(preferred) && preferred > 0) return preferred;
+
+    const fallbackFees = [
+        feeItem.cat_a_fee,
+        feeItem.cat_b_fee,
+        feeItem.cat_c_fee,
+        feeItem.cat_d_fee,
+        feeItem.cat_e_fee,
+        feeItem.cat_f_fee,
+    ]
+        .map((v: any) => parseFloat(v))
+        .filter((n: number) => !isNaN(n) && n > 0);
+    return fallbackFees[0] || 0;
+};
+
 /**
  * Calculate property rate bill
  * Uses configured fee schedule rates if available, falls back to legacy base_rate * property_size
@@ -245,30 +279,13 @@ export const calculateBusinessBill = async (
 
         if (feeItemResult.rows.length > 0) {
             const feeItem = feeItemResult.rows[0];
-            const catClass = (business.business_category_class || 'Category A')
-                .replace('Category ', '')
-                .toLowerCase()
-                .trim();
-            const feeColumn = `cat_${catClass}_fee`;
-            const configuredFee = parseFloat(feeItem[feeColumn]);
-
-            if (!isNaN(configuredFee) && configuredFee > 0) {
-                current_rate = configuredFee;
-                feeDescription = `${feeItem.description} - ${business.business_category_class || 'Category A'}`;
-            } else {
-                // Fall through known category fee columns
-                const fallbackFees = [
-                    feeItem.cat_a_fee,
-                    feeItem.cat_b_fee,
-                    feeItem.cat_c_fee,
-                    feeItem.cat_d_fee,
-                    feeItem.cat_e_fee,
-                    feeItem.cat_f_fee,
-                    business.base_fee,
-                ]
-                    .map((v: any) => parseFloat(v))
-                    .filter((n: number) => !isNaN(n) && n > 0);
-                current_rate = fallbackFees[0] || 0;
+            current_rate = feeAmountForBusinessCategory(
+                feeItem,
+                business.business_category_class || 'Category A'
+            );
+            feeDescription = `${feeItem.description} - ${business.business_category_class || 'Category A'}`;
+            if (!current_rate) {
+                current_rate = parseFloat(business.base_fee) || 0;
                 feeDescription = `${feeItem.description} - fee schedule amount`;
             }
         } else {

@@ -14,6 +14,7 @@ import {
     formatGeoAddress,
 } from '@/lib/api-client';
 import { toCoord } from '@/lib/geo';
+import { feeAmountForBusinessCategory } from '@/lib/property-fee';
 import { ArrowLeft, Save, UserPlus, UserCheck, Navigation, MapPin, Map as MapIcon, X, CheckCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -95,8 +96,8 @@ export default function NewBusinessPage() {
     const router = useRouter();
     const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<BusinessForm>();
 
-    const [electoralAreas, setElectoralAreas] = useState([]);
-    const [localAreas, setLocalAreas] = useState([]);
+    const [electoralAreas, setElectoralAreas] = useState<any[]>([]);
+    const [localAreas, setLocalAreas] = useState<any[]>([]);
     const [feeItems, setFeeItems] = useState<any[]>([]);
     const [selectedFeeItemId, setSelectedFeeItemId] = useState<string>('');
     const [selectedFeeAmount, setSelectedFeeAmount] = useState<string>('');
@@ -567,26 +568,43 @@ export default function NewBusinessPage() {
 
                         <div>
                             <label className="label">
-                                Business Category Class <span className="text-gray-400 font-normal">(optional)</span>
+                                Business Category Class <span className="text-municipal-red">*</span>
                             </label>
                             <DropdownSelect
                                 value={watch('business_category_class') || ''}
-                                onChange={(v) => setValue('business_category_class', v as any, { shouldValidate: true })}
+                                onChange={(v) => {
+                                    setValue('business_category_class', v as any, { shouldValidate: true });
+                                    if (selectedFeeItemId) {
+                                        const item = feeItems.find((fi: any) => fi.id === parseInt(selectedFeeItemId));
+                                        if (item) {
+                                            const fee = feeAmountForBusinessCategory(item, v);
+                                            if (fee > 0) {
+                                                setAssessedAmount(String(fee));
+                                                setSelectedFeeAmount(
+                                                    `${item.description} × ${v || 'Category A'}: GHS ${Number(fee).toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
+                                                );
+                                            }
+                                        }
+                                    }
+                                }}
                                 placeholder="Select category"
                                 options={[
-                                    { value: 'Category A', label: 'Category A' },
-                                    { value: 'Category B', label: 'Category B' },
-                                    { value: 'Category C', label: 'Category C' },
-                                    { value: 'Category D', label: 'Category D' },
+                                    { value: 'Category A', label: 'Category A (fee-fixing CAT A)' },
+                                    { value: 'Category B', label: 'Category B (fee-fixing CAT B)' },
+                                    { value: 'Category C', label: 'Category C (fee-fixing CAT C)' },
+                                    { value: 'Category D', label: 'Category D (fee-fixing CAT D)' },
                                 ]}
                             />
+                            <p className="text-xs text-gray-500 mt-1">
+                                Linked to fee fixing CAT A–D columns for the selected business type.
+                            </p>
                         </div>
 
                         {/* Fee Schedule Item (from configured fee schedule) */}
                         {feeItems.length > 0 && (
                             <div className="md:col-span-2">
                                 <label className="label">
-                                    Fee Schedule Item (Configured Rate) <span className="text-gray-400 font-normal">(optional)</span>
+                                    Fee Schedule Item (Business Type from Fee Fixing) <span className="text-municipal-red">*</span>
                                 </label>
                                 <DropdownSelect
                                     value={selectedFeeItemId}
@@ -596,19 +614,17 @@ export default function NewBusinessPage() {
                                             const item = feeItems.find((fi: any) => fi.id === parseInt(v));
                                             if (item) {
                                                 const classVal = watch('business_category_class') || 'Category A';
-                                                const letter = classVal.replace('Category ', '').toLowerCase();
-                                                const fee =
-                                                    item[`cat_${letter}_fee`] ||
-                                                    item.cat_a_fee ||
-                                                    item.cat_b_fee ||
-                                                    item.cat_c_fee ||
-                                                    0;
-                                                setSelectedFeeAmount(
-                                                    fee
-                                                        ? `GHS ${Number(fee).toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
-                                                        : ''
-                                                );
-                                                if (fee) setAssessedAmount(String(fee));
+                                                const fee = feeAmountForBusinessCategory(item, classVal);
+                                                if (fee > 0) {
+                                                    setAssessedAmount(String(fee));
+                                                    setSelectedFeeAmount(
+                                                        `${item.description} × ${classVal}: GHS ${Number(fee).toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
+                                                    );
+                                                } else {
+                                                    setSelectedFeeAmount(
+                                                        `${item.description} — no fee for ${classVal}; check Fee Configuration`
+                                                    );
+                                                }
                                             }
                                         } else {
                                             setSelectedFeeAmount('');
@@ -618,13 +634,14 @@ export default function NewBusinessPage() {
                                     options={feeItems.filter((fi: any) => !fi.is_group_header).map((item: any) => ({
                                         value: String(item.id),
                                         label: `${item.main_item_number}. ${item.description}`
-                                            + (item.cat_a_fee ? ` - CAT A: GHS ${Number(item.cat_a_fee).toFixed(2)}` : '')
-                                            + (item.cat_b_fee ? ` | CAT B: GHS ${Number(item.cat_b_fee).toFixed(2)}` : '')
-                                            + (item.cat_c_fee ? ` | CAT C: GHS ${Number(item.cat_c_fee).toFixed(2)}` : ''),
+                                            + (item.cat_a_fee ? ` — A: ${Number(item.cat_a_fee).toFixed(0)}` : '')
+                                            + (item.cat_b_fee ? ` | B: ${Number(item.cat_b_fee).toFixed(0)}` : '')
+                                            + (item.cat_c_fee ? ` | C: ${Number(item.cat_c_fee).toFixed(0)}` : '')
+                                            + (item.cat_d_fee ? ` | D: ${Number(item.cat_d_fee).toFixed(0)}` : ''),
                                     }))}
                                 />
                                 {selectedFeeAmount && (
-                                    <p className="text-sm text-green-700 font-medium mt-1">Selected fee: {selectedFeeAmount}</p>
+                                    <p className="text-sm text-green-700 font-medium mt-1">{selectedFeeAmount}</p>
                                 )}
                             </div>
                         )}
@@ -644,7 +661,7 @@ export default function NewBusinessPage() {
                                 required
                             />
                             <p className="text-xs text-gray-500 mt-1">
-                                This amount is saved with the business and used when generating the bill.
+                                Auto-fills from fee fixing when you pick Category Class + Fee Schedule Item (editable).
                             </p>
                         </div>
 

@@ -13,7 +13,13 @@ jest.mock('../config/database', () => {
 });
 
 import pool from '../config/database';
-import { calculatePropertyBill, generateBill, recordPayment, feeAmountForPropertyClass } from './billing.service';
+import {
+    calculatePropertyBill,
+    generateBill,
+    recordPayment,
+    feeAmountForPropertyClass,
+    feeAmountForBusinessCategory,
+} from './billing.service';
 
 describe('billing.service smoke', () => {
     beforeEach(() => {
@@ -32,6 +38,20 @@ describe('billing.service smoke', () => {
         expect(feeAmountForPropertyClass(zone, '1st Class')).toBe(300);
         expect(feeAmountForPropertyClass(zone, '2nd Class')).toBe(200);
         expect(feeAmountForPropertyClass(zone, '3rd Class')).toBe(100);
+    });
+
+    it('feeAmountForBusinessCategory maps Category A–D to CAT columns', () => {
+        const item = {
+            description: 'Veterinary Clinics',
+            cat_a_fee: 500,
+            cat_b_fee: 400,
+            cat_c_fee: 300,
+            cat_d_fee: 100,
+        };
+        expect(feeAmountForBusinessCategory(item, 'Category A')).toBe(500);
+        expect(feeAmountForBusinessCategory(item, 'Category B')).toBe(400);
+        expect(feeAmountForBusinessCategory(item, 'Category C')).toBe(300);
+        expect(feeAmountForBusinessCategory(item, 'Category D')).toBe(100);
     });
 
     it('calculatePropertyBill uses legacy rate and excludes rolled arrears', async () => {
