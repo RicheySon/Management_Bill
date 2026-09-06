@@ -231,11 +231,11 @@ export default function NewBusinessPage() {
                 const customerResult = await createCustomer({
                     full_name: data.full_name,
                     phone_number: data.phone_number,
-                    email: data.email,
-                    address: data.address,
-                    gender: data.gender,
-                    marital_status: data.marital_status,
-                    ghana_card_no: data.ghana_card_no,
+                    email: data.email || undefined,
+                    address: data.address || undefined,
+                    gender: data.gender || undefined,
+                    marital_status: data.marital_status || undefined,
+                    ghana_card_no: data.ghana_card_no || undefined,
                 });
                 customerId = customerResult.data.id;
             }
@@ -347,7 +347,7 @@ export default function NewBusinessPage() {
                     {isNewOwner ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div className="md:col-span-2">
-                                <label className="label">Full Name</label>
+                                <label className="label">Full Name <span className="text-municipal-red">*</span></label>
                                 <input
                                     type="text"
                                     {...register('full_name')}
@@ -372,7 +372,7 @@ export default function NewBusinessPage() {
                             </div>
 
                             <div>
-                                <label className="label">Address</label>
+                                <label className="label">Address <span className="text-gray-400 font-normal">(optional)</span></label>
                                 <input
                                     type="text"
                                     {...register('address')}
@@ -406,7 +406,7 @@ export default function NewBusinessPage() {
                             </div>
 
                             <div>
-                                <label className="label">Email</label>
+                                <label className="label">Email <span className="text-gray-400 font-normal">(optional)</span></label>
                                 <input
                                     type="email"
                                     {...register('email')}
@@ -416,7 +416,7 @@ export default function NewBusinessPage() {
                             </div>
 
                             <div>
-                                <label className="label">Ghana Card No</label>
+                                <label className="label">Ghana Card No <span className="text-gray-400 font-normal">(optional)</span></label>
                                 <input
                                     type="text"
                                     {...register('ghana_card_no')}

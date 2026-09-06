@@ -220,7 +220,7 @@ export default function NewCustomerPage() {
                         </div>
 
                         <div>
-                            <label className="label">Email (Optional)</label>
+                            <label className="label">Email <span className="text-gray-400 font-normal">(optional)</span></label>
                             <input
                                 type="email"
                                 {...register('email')}
@@ -230,7 +230,7 @@ export default function NewCustomerPage() {
                         </div>
 
                         <div>
-                            <label className="label">Gender</label>
+                            <label className="label">Gender <span className="text-gray-400 font-normal">(optional)</span></label>
                             <select {...register('gender')} className="input-field">
                                 <option value="">Select Gender</option>
                                 <option value="Male">Male</option>
@@ -239,7 +239,7 @@ export default function NewCustomerPage() {
                         </div>
 
                         <div>
-                            <label className="label">Marital Status</label>
+                            <label className="label">Marital Status <span className="text-gray-400 font-normal">(optional)</span></label>
                             <select {...register('marital_status')} className="input-field">
                                 <option value="">Select Marital Status</option>
                                 <option value="Single">Single</option>
@@ -250,7 +250,7 @@ export default function NewCustomerPage() {
                         </div>
 
                         <div>
-                            <label className="label">Ghana Card No.</label>
+                            <label className="label">Ghana Card No. <span className="text-gray-400 font-normal">(optional)</span></label>
                             <input
                                 type="text"
                                 {...register('ghana_card_no')}
@@ -260,7 +260,7 @@ export default function NewCustomerPage() {
                         </div>
 
                         <div>
-                            <label className="label">Next of Kin Name</label>
+                            <label className="label">Next of Kin Name <span className="text-gray-400 font-normal">(optional)</span></label>
                             <input
                                 type="text"
                                 {...register('next_of_kin_name')}
@@ -270,7 +270,7 @@ export default function NewCustomerPage() {
                         </div>
 
                         <div>
-                            <label className="label">Next of Kin Contact</label>
+                            <label className="label">Next of Kin Contact <span className="text-gray-400 font-normal">(optional)</span></label>
                             <div className="flex">
                                 <span className="inline-flex items-center px-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg text-sm text-gray-600">+233</span>
                                 <input
