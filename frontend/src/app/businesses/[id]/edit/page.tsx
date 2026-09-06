@@ -317,20 +317,20 @@ export default function EditBusinessPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="md:col-span-2">
                             <label className="label">Full Name</label>
-                            <input type="text" {...register('full_name')} className="input-field" placeholder="Full name" />
+                            <input type="text" {...register('full_name')} className="input-field" placeholder="Full Name" />
                         </div>
 
                         <div>
                             <label className="label">Phone Number <span className="text-municipal-red">*</span></label>
                             <div className="flex">
                                 <span className="inline-flex items-center px-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg text-sm text-gray-600">+233</span>
-                                <input type="tel" {...register('phone_number')} className="input-field rounded-l-none" placeholder="245678901" />
+                                <input type="tel" {...register('phone_number')} className="input-field rounded-l-none" placeholder="Phone Number" />
                             </div>
                         </div>
 
                         <div>
                             <label className="label">Address</label>
-                            <input type="text" {...register('address')} className="input-field" placeholder="Enter address" />
+                            <input type="text" {...register('address')} className="input-field" placeholder="Address" />
                         </div>
 
                         <div>
@@ -360,7 +360,7 @@ export default function EditBusinessPage() {
 
                         <div>
                             <label className="label">Ghana Card No</label>
-                            <input type="text" {...register('ghana_card_no')} className="input-field" placeholder="GHA-XXXXXXXXX-X" />
+                            <input type="text" {...register('ghana_card_no')} className="input-field" placeholder="Ghana Card No" />
                         </div>
                     </div>
                 </div>
@@ -373,7 +373,7 @@ export default function EditBusinessPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="md:col-span-2">
                             <label className="label">Business Name <span className="text-municipal-red">*</span></label>
-                            <input type="text" {...register('business_name', { required: 'Business name is required' })} className="input-field" placeholder="Business name" />
+                            <input type="text" {...register('business_name', { required: 'Business name is required' })} className="input-field" placeholder="Business Name" />
                             {errors.business_name && <p className="text-red-500 text-sm mt-1">{errors.business_name.message}</p>}
                         </div>
 
@@ -381,7 +381,7 @@ export default function EditBusinessPage() {
                             <label className="label">Business Contact</label>
                             <div className="flex">
                                 <span className="inline-flex items-center px-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg text-sm text-gray-600">+233</span>
-                                <input type="tel" {...register('business_contact')} className="input-field rounded-l-none" placeholder="245678901" />
+                                <input type="tel" {...register('business_contact')} className="input-field rounded-l-none" placeholder="Business Contact" />
                             </div>
                         </div>
 
@@ -397,7 +397,7 @@ export default function EditBusinessPage() {
 
                         <div>
                             <label className="label">Business Type (Sub)</label>
-                            <input type="text" {...register('business_type_sub')} className="input-field" placeholder="Sub type" />
+                            <input type="text" {...register('business_type_sub')} className="input-field" placeholder="Business Type (Sub)" />
                         </div>
 
                         <div>
@@ -435,28 +435,28 @@ export default function EditBusinessPage() {
 
                         <div>
                             <label className="label">Business Email</label>
-                            <input type="email" {...register('business_email')} className="input-field" placeholder="Business email" />
+                            <input type="email" {...register('business_email')} className="input-field" placeholder="Business Email" />
                         </div>
 
                         <div className="md:col-span-2">
                             <label className="label">Description / Business Activity <span className="text-municipal-red">*</span></label>
-                            <textarea {...register('business_activity', { required: 'Please describe business activity' })} className="input-field" rows={3} placeholder="What the business sells or does" />
+                            <textarea {...register('business_activity', { required: 'Please describe business activity' })} className="input-field" rows={3} placeholder="Description / Business Activity" />
                             {errors.business_activity && <p className="text-red-500 text-sm mt-1">{errors.business_activity.message}</p>}
                         </div>
 
                         <div>
                             <label className="label">Account Number</label>
-                            <input type="text" {...register('account_number')} className="input-field" placeholder="Account no" />
+                            <input type="text" {...register('account_number')} className="input-field" placeholder="Account Number" />
                         </div>
 
                         <div>
                             <label className="label">Division Number</label>
-                            <input type="text" {...register('division_number')} className="input-field" placeholder="Division no" />
+                            <input type="text" {...register('division_number')} className="input-field" placeholder="Division Number" />
                         </div>
 
                         <div>
                             <label className="label">Block Number</label>
-                            <input type="text" {...register('block_number')} className="input-field" placeholder="Block no" />
+                            <input type="text" {...register('block_number')} className="input-field" placeholder="Block Number" />
                         </div>
                     </div>
                 </div>
@@ -469,7 +469,7 @@ export default function EditBusinessPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
                             <label className="label">GPS Address</label>
-                            <input type="text" {...register('gps_address')} className="input-field" placeholder="GPS address" />
+                            <input type="text" {...register('gps_address')} className="input-field" placeholder="GPS Address" />
                         </div>
 
                         <div className="md:col-span-2">
@@ -528,11 +528,11 @@ export default function EditBusinessPage() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wider font-bold italic">Latitude</label>
-                                    <input type="number" step="any" {...register('latitude', { valueAsNumber: true })} className="input-field" placeholder="5.6037" />
+                                    <input type="number" step="any" {...register('latitude', { valueAsNumber: true })} className="input-field" placeholder="Latitude" />
                                 </div>
                                 <div>
                                     <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wider font-bold italic">Longitude</label>
-                                    <input type="number" step="any" {...register('longitude', { valueAsNumber: true })} className="input-field" placeholder="-0.1870" />
+                                    <input type="number" step="any" {...register('longitude', { valueAsNumber: true })} className="input-field" placeholder="Longitude" />
                                 </div>
                             </div>
                         </div>
@@ -544,7 +544,7 @@ export default function EditBusinessPage() {
 
                         <div>
                             <label className="label">Street Name</label>
-                            <input type="text" {...register('street_name')} className="input-field" placeholder="Name of street" />
+                            <input type="text" {...register('street_name')} className="input-field" placeholder="Street Name" />
                         </div>
 
                         <div>

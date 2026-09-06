@@ -366,7 +366,7 @@ export default function NewPropertyPage() {
                                     type="text"
                                     {...register('full_name', { required: 'This field is required' })}
                                     className="input-field"
-                                    placeholder="Full name"
+                                    placeholder="Full Name"
                                 />
                             </div>
 
@@ -380,7 +380,7 @@ export default function NewPropertyPage() {
                                         type="tel"
                                         {...register('phone_number', { required: 'This field is required' })}
                                         className="input-field rounded-l-none"
-                                        placeholder="245678901"
+                                        placeholder="Phone Number"
                                     />
                                 </div>
                             </div>
@@ -391,7 +391,7 @@ export default function NewPropertyPage() {
                                     type="text"
                                     {...register('address')}
                                     className="input-field"
-                                    placeholder="Enter address"
+                                    placeholder="Address"
                                 />
                             </div>
 
@@ -435,7 +435,7 @@ export default function NewPropertyPage() {
                                     type="text"
                                     {...register('next_of_kin_name')}
                                     className="input-field"
-                                    placeholder="Full name"
+                                    placeholder="Next of Kin"
                                 />
                             </div>
 
@@ -449,7 +449,7 @@ export default function NewPropertyPage() {
                                         type="tel"
                                         {...register('next_of_kin_contact')}
                                         className="input-field rounded-l-none"
-                                        placeholder="245678901"
+                                        placeholder="Next of Kin Contact"
                                     />
                                 </div>
                             </div>
@@ -631,7 +631,7 @@ export default function NewPropertyPage() {
                                 min="0"
                                 step="0.01"
                                 className="input-field"
-                                placeholder="e.g. 500"
+                                placeholder="Bill Amount (GHS)"
                                 value={assessedAmount}
                                 onChange={(e) => setAssessedAmount(e.target.value)}
                                 required
@@ -697,7 +697,7 @@ export default function NewPropertyPage() {
                                 type="text"
                                 {...register('account_number')}
                                 className="input-field"
-                                placeholder="Account no"
+                                placeholder="Account Number"
                             />
                         </div>
 
@@ -707,7 +707,7 @@ export default function NewPropertyPage() {
                                 type="text"
                                 {...register('parcel_number')}
                                 className="input-field"
-                                placeholder="Parcel no"
+                                placeholder="Parcel Number"
                             />
                         </div>
 
@@ -717,7 +717,7 @@ export default function NewPropertyPage() {
                                 type="text"
                                 {...register('house_number')}
                                 className="input-field"
-                                placeholder="House no"
+                                placeholder="House Number"
                             />
                         </div>
 
@@ -777,7 +777,7 @@ export default function NewPropertyPage() {
                                 min="0"
                                 {...register('no_of_people')}
                                 className="input-field"
-                                placeholder="Optional"
+                                placeholder="No of People"
                             />
                         </div>
 
@@ -788,7 +788,7 @@ export default function NewPropertyPage() {
                                 min="0"
                                 {...register('no_of_bedrooms')}
                                 className="input-field"
-                                placeholder="Optional"
+                                placeholder="No of Bedrooms"
                             />
                         </div>
 
@@ -799,7 +799,7 @@ export default function NewPropertyPage() {
                                 min="0"
                                 {...register('no_of_washrooms')}
                                 className="input-field"
-                                placeholder="Optional"
+                                placeholder="No of Washrooms"
                             />
                         </div>
 
@@ -810,7 +810,7 @@ export default function NewPropertyPage() {
                                 min="0"
                                 {...register('no_of_other_rooms')}
                                 className="input-field"
-                                placeholder="Optional"
+                                placeholder="No of Other Rooms"
                             />
                         </div>
 
@@ -822,7 +822,7 @@ export default function NewPropertyPage() {
                                 min="0"
                                 {...register('property_size')}
                                 className="input-field"
-                                placeholder="Optional"
+                                placeholder="Property Size (sqm)"
                             />
                         </div>
                     </div>
@@ -846,7 +846,7 @@ export default function NewPropertyPage() {
                                 type="text"
                                 {...register('gps_address')}
                                 className="input-field"
-                                placeholder="GPS address"
+                                placeholder="GPS Address"
                             />
                         </div>
 
@@ -927,7 +927,7 @@ export default function NewPropertyPage() {
                                         step="any"
                                         {...register('latitude', { valueAsNumber: true })}
                                         className="input-field"
-                                        placeholder="5.6037"
+                                        placeholder="Latitude"
                                     />
                                 </div>
                                 <div>
@@ -937,7 +937,7 @@ export default function NewPropertyPage() {
                                         step="any"
                                         {...register('longitude', { valueAsNumber: true })}
                                         className="input-field"
-                                        placeholder="-0.1870"
+                                        placeholder="Longitude"
                                     />
                                 </div>
                             </div>
@@ -959,7 +959,7 @@ export default function NewPropertyPage() {
                                 type="text"
                                 {...register('street_name')}
                                 className="input-field"
-                                placeholder="Name of street"
+                                placeholder="Street Name"
                             />
                         </div>
 

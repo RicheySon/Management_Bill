@@ -222,7 +222,7 @@ export default function EditCustomerPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="md:col-span-2">
                             <label className="label">Full Name <span className="text-municipal-red">*</span></label>
-                            <input type="text" {...register('full_name', { required: 'Full name is required' })} className="input-field" placeholder="Enter full name" />
+                            <input type="text" {...register('full_name', { required: 'Full name is required' })} className="input-field" placeholder="Full Name" />
                             {errors.full_name && <p className="text-red-500 text-sm mt-1">{errors.full_name.message}</p>}
                         </div>
 
@@ -230,14 +230,14 @@ export default function EditCustomerPage() {
                             <label className="label">Phone Number <span className="text-municipal-red">*</span></label>
                             <div className="flex">
                                 <span className="inline-flex items-center px-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg text-sm text-gray-600">+233</span>
-                                <input type="tel" {...register('phone_number', { required: 'Phone number is required' })} className="input-field rounded-l-none" placeholder="245678901" />
+                                <input type="tel" {...register('phone_number', { required: 'Phone number is required' })} className="input-field rounded-l-none" placeholder="Phone Number" />
                             </div>
                             {errors.phone_number && <p className="text-red-500 text-sm mt-1">{errors.phone_number.message}</p>}
                         </div>
 
                         <div>
                             <label className="label">Email Address</label>
-                            <input type="email" {...register('email')} className="input-field" placeholder="customer@email.com" />
+                            <input type="email" {...register('email')} className="input-field" placeholder="Email Address" />
                         </div>
 
                         <div>
@@ -262,19 +262,19 @@ export default function EditCustomerPage() {
 
                         <div>
                             <label className="label">Ghana Card No.</label>
-                            <input type="text" {...register('ghana_card_no')} className="input-field" placeholder="GHA-XXXXXXXXX-X" />
+                            <input type="text" {...register('ghana_card_no')} className="input-field" placeholder="Ghana Card No." />
                         </div>
 
                         <div>
                             <label className="label">Next of Kin Name</label>
-                            <input type="text" {...register('next_of_kin_name')} className="input-field" placeholder="Full name" />
+                            <input type="text" {...register('next_of_kin_name')} className="input-field" placeholder="Next of Kin Name" />
                         </div>
 
                         <div>
                             <label className="label">Next of Kin Contact</label>
                             <div className="flex">
                                 <span className="inline-flex items-center px-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg text-sm text-gray-600">+233</span>
-                                <input type="tel" {...register('next_of_kin_contact')} className="input-field rounded-l-none" placeholder="245678901" />
+                                <input type="tel" {...register('next_of_kin_contact')} className="input-field rounded-l-none" placeholder="Next of Kin Contact" />
                             </div>
                         </div>
                     </div>
@@ -288,7 +288,7 @@ export default function EditCustomerPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label className="label font-mono tracking-tighter">GPS ADDRESS</label>
-                            <input type="text" {...register('gps_address')} className="input-field font-mono" placeholder="GG-845-8731" />
+                            <input type="text" {...register('gps_address')} className="input-field font-mono" placeholder="GPS ADDRESS" />
                         </div>
 
                         <div className="md:col-span-2">
@@ -346,11 +346,11 @@ export default function EditCustomerPage() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wider font-bold italic">Latitude</label>
-                                    <input type="number" step="any" {...register('latitude', { valueAsNumber: true })} className="input-field" placeholder="5.6037" />
+                                    <input type="number" step="any" {...register('latitude', { valueAsNumber: true })} className="input-field" placeholder="Latitude" />
                                 </div>
                                 <div>
                                     <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wider font-bold italic">Longitude</label>
-                                    <input type="number" step="any" {...register('longitude', { valueAsNumber: true })} className="input-field" placeholder="-0.1870" />
+                                    <input type="number" step="any" {...register('longitude', { valueAsNumber: true })} className="input-field" placeholder="Longitude" />
                                 </div>
                             </div>
                         </div>
@@ -390,12 +390,12 @@ export default function EditCustomerPage() {
 
                         <div className="md:col-span-2">
                             <label className="label">Physical Location / Street Name</label>
-                            <input type="text" {...register('physical_location')} className="input-field" placeholder="NII AYI KUSHIE ST" />
+                            <input type="text" {...register('physical_location')} className="input-field" placeholder="Physical Location / Street Name" />
                         </div>
 
                         <div className="md:col-span-2">
                             <label className="label">Landmark</label>
-                            <input type="text" {...register('landmark')} className="input-field" placeholder="Near GOIL filling Station" />
+                            <input type="text" {...register('landmark')} className="input-field" placeholder="Landmark" />
                         </div>
                     </div>
                 </div>

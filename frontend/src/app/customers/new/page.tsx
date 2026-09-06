@@ -200,7 +200,7 @@ export default function NewCustomerPage() {
                                 type="text"
                                 {...register('full_name', { required: 'Full name is required' })}
                                 className="input-field"
-                                placeholder="Enter full name"
+                                placeholder="Full Name"
                             />
                             {errors.full_name && <p className="text-red-500 text-sm mt-1">{errors.full_name.message}</p>}
                         </div>
@@ -213,7 +213,7 @@ export default function NewCustomerPage() {
                                     type="tel"
                                     {...register('phone_number', { required: 'Phone number is required' })}
                                     className="input-field rounded-l-none"
-                                    placeholder="245678901"
+                                    placeholder="Phone Number"
                                 />
                             </div>
                             {errors.phone_number && <p className="text-red-500 text-sm mt-1">{errors.phone_number.message}</p>}
@@ -225,7 +225,7 @@ export default function NewCustomerPage() {
                                 type="email"
                                 {...register('email')}
                                 className="input-field"
-                                placeholder="customer@email.com"
+                                placeholder="Email"
                             />
                         </div>
 
@@ -255,7 +255,7 @@ export default function NewCustomerPage() {
                                 type="text"
                                 {...register('ghana_card_no')}
                                 className="input-field"
-                                placeholder="GHA-XXXXXXXXX-X"
+                                placeholder="Ghana Card No."
                             />
                         </div>
 
@@ -265,7 +265,7 @@ export default function NewCustomerPage() {
                                 type="text"
                                 {...register('next_of_kin_name')}
                                 className="input-field"
-                                placeholder="Full name"
+                                placeholder="Next of Kin Name"
                             />
                         </div>
 
@@ -277,7 +277,7 @@ export default function NewCustomerPage() {
                                     type="tel"
                                     {...register('next_of_kin_contact')}
                                     className="input-field rounded-l-none"
-                                    placeholder="245678901"
+                                    placeholder="Next of Kin Contact"
                                 />
                             </div>
                         </div>
@@ -296,7 +296,7 @@ export default function NewCustomerPage() {
                                 type="text"
                                 {...register('gps_address')}
                                 className="input-field font-mono"
-                                placeholder="GG-845-8731"
+                                placeholder="GPS ADDRESS"
                             />
                         </div>
 
@@ -375,7 +375,7 @@ export default function NewCustomerPage() {
                                         step="any"
                                         {...register('latitude', { valueAsNumber: true })}
                                         className="input-field"
-                                        placeholder="5.6037"
+                                        placeholder="Latitude"
                                     />
                                 </div>
                                 <div>
@@ -385,7 +385,7 @@ export default function NewCustomerPage() {
                                         step="any"
                                         {...register('longitude', { valueAsNumber: true })}
                                         className="input-field"
-                                        placeholder="-0.1870"
+                                        placeholder="Longitude"
                                     />
                                 </div>
                             </div>
@@ -430,7 +430,7 @@ export default function NewCustomerPage() {
                                 type="text"
                                 {...register('physical_location')}
                                 className="input-field"
-                                placeholder="NII AYI KUSHIE ST"
+                                placeholder="Physical Location / Street Name"
                             />
                         </div>
 
@@ -440,7 +440,7 @@ export default function NewCustomerPage() {
                                 type="text"
                                 {...register('landmark')}
                                 className="input-field"
-                                placeholder="Near GOIL filling Station"
+                                placeholder="Landmark"
                             />
                         </div>
                     </div>
