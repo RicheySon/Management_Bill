@@ -117,7 +117,7 @@ export default function NewUserPage() {
                                         name="full_name"
                                         required
                                         className="input-field pl-10"
-                                        placeholder="e.g. John Doe"
+                                        placeholder="Full Name"
                                         value={formData.full_name}
                                         onChange={handleChange}
                                     />
@@ -133,7 +133,7 @@ export default function NewUserPage() {
                                         name="email"
                                         required
                                         className="input-field pl-10"
-                                        placeholder="john.doe@ganorth.gov.gh"
+                                        placeholder="Email Address"
                                         value={formData.email}
                                         onChange={handleChange}
                                     />
@@ -150,7 +150,7 @@ export default function NewUserPage() {
                                         required
                                         minLength={6}
                                         className="input-field pl-10"
-                                        placeholder="••••••••"
+                                        placeholder="Password"
                                         value={formData.password}
                                         onChange={handleChange}
                                     />

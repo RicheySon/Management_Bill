@@ -299,7 +299,7 @@ export default function EditUserPage() {
                                         minLength={6}
                                         required
                                         className="input-field pl-10"
-                                        placeholder="Minimum 6 characters"
+                                        placeholder="New Password"
                                         value={passwordData.password}
                                         onChange={(e) => setPasswordData(prev => ({ ...prev, password: e.target.value }))}
                                     />
@@ -314,7 +314,7 @@ export default function EditUserPage() {
                                         minLength={6}
                                         required
                                         className="input-field pl-10"
-                                        placeholder="Re-enter password"
+                                        placeholder="Confirm Password"
                                         value={passwordData.confirm}
                                         onChange={(e) => setPasswordData(prev => ({ ...prev, confirm: e.target.value }))}
                                     />

@@ -352,7 +352,7 @@ export default function NewBusinessPage() {
                                     type="text"
                                     {...register('full_name')}
                                     className="input-field"
-                                    placeholder="Full name"
+                                    placeholder="Full Name"
                                 />
                             </div>
 
@@ -366,7 +366,7 @@ export default function NewBusinessPage() {
                                         type="tel"
                                         {...register('phone_number')}
                                         className="input-field rounded-l-none"
-                                        placeholder="245678901"
+                                        placeholder="Phone Number"
                                     />
                                 </div>
                             </div>
@@ -377,7 +377,7 @@ export default function NewBusinessPage() {
                                     type="text"
                                     {...register('address')}
                                     className="input-field"
-                                    placeholder="Enter address"
+                                    placeholder="Address"
                                 />
                             </div>
 
@@ -421,7 +421,7 @@ export default function NewBusinessPage() {
                                     type="text"
                                     {...register('ghana_card_no')}
                                     className="input-field"
-                                    placeholder="GHA-XXXXXXXXX-X"
+                                    placeholder="Ghana Card No"
                                 />
                             </div>
                         </div>
@@ -514,7 +514,7 @@ export default function NewBusinessPage() {
                                 type="text"
                                 {...register('business_name', { required: 'Business name is required' })}
                                 className="input-field"
-                                placeholder="Business name"
+                                placeholder="Business Name"
                             />
                             {errors.business_name && (
                                 <p className="text-red-500 text-sm mt-1">{errors.business_name.message}</p>
@@ -529,7 +529,7 @@ export default function NewBusinessPage() {
                                     type="tel"
                                     {...register('business_contact')}
                                     className="input-field rounded-l-none"
-                                    placeholder="245678901"
+                                    placeholder="Business Contact"
                                 />
                             </div>
                         </div>
@@ -557,7 +557,7 @@ export default function NewBusinessPage() {
                                 type="text"
                                 {...register('business_type_sub')}
                                 className="input-field"
-                                placeholder="Sub type"
+                                placeholder="Business Type (Sub)"
                             />
                         </div>
 
@@ -636,7 +636,7 @@ export default function NewBusinessPage() {
                                 min="0"
                                 step="0.01"
                                 className="input-field"
-                                placeholder="e.g. 500"
+                                placeholder="Bill Amount (GHS)"
                                 value={assessedAmount}
                                 onChange={(e) => setAssessedAmount(e.target.value)}
                                 required
@@ -652,7 +652,7 @@ export default function NewBusinessPage() {
                                 type="email"
                                 {...register('business_email')}
                                 className="input-field"
-                                placeholder="Business email"
+                                placeholder="Business Email"
                             />
                         </div>
 
@@ -664,7 +664,7 @@ export default function NewBusinessPage() {
                                 {...register('business_activity', { required: 'Please describe business activity' })}
                                 className="input-field"
                                 rows={3}
-                                placeholder="What the business sells or does"
+                                placeholder="Description / Business Activity"
                             />
                             {errors.business_activity && (
                                 <p className="text-red-500 text-sm mt-1">{errors.business_activity.message}</p>
@@ -677,7 +677,7 @@ export default function NewBusinessPage() {
                                 type="text"
                                 {...register('account_number')}
                                 className="input-field"
-                                placeholder="Account no"
+                                placeholder="Account Number"
                             />
                         </div>
 
@@ -687,7 +687,7 @@ export default function NewBusinessPage() {
                                 type="text"
                                 {...register('division_number')}
                                 className="input-field"
-                                placeholder="Division no"
+                                placeholder="Division Number"
                             />
                         </div>
 
@@ -697,7 +697,7 @@ export default function NewBusinessPage() {
                                 type="text"
                                 {...register('block_number')}
                                 className="input-field"
-                                placeholder="Block no"
+                                placeholder="Block Number"
                             />
                         </div>
                     </div>
@@ -718,7 +718,7 @@ export default function NewBusinessPage() {
                                 type="text"
                                 {...register('gps_address')}
                                 className="input-field"
-                                placeholder="GPS address"
+                                placeholder="GPS Address"
                             />
                         </div>
 
@@ -799,7 +799,7 @@ export default function NewBusinessPage() {
                                         step="any"
                                         {...register('latitude', { valueAsNumber: true })}
                                         className="input-field"
-                                        placeholder="5.6037"
+                                        placeholder="Latitude"
                                     />
                                 </div>
                                 <div>
@@ -809,7 +809,7 @@ export default function NewBusinessPage() {
                                         step="any"
                                         {...register('longitude', { valueAsNumber: true })}
                                         className="input-field"
-                                        placeholder="-0.1870"
+                                        placeholder="Longitude"
                                     />
                                 </div>
                             </div>
@@ -831,7 +831,7 @@ export default function NewBusinessPage() {
                                 type="text"
                                 {...register('street_name')}
                                 className="input-field"
-                                placeholder="Name of street"
+                                placeholder="Street Name"
                             />
                         </div>
 

@@ -332,7 +332,7 @@ export default function EditPropertyPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="md:col-span-2">
                             <label className="label">Full Name <span className="text-municipal-red">*</span></label>
-                            <input type="text" {...register('full_name', { required: 'Full name is required' })} className="input-field" placeholder="Full name" />
+                            <input type="text" {...register('full_name', { required: 'Full name is required' })} className="input-field" placeholder="Full Name" />
                             {errors.full_name && <p className="text-red-500 text-sm mt-1">{errors.full_name.message}</p>}
                         </div>
 
@@ -340,7 +340,7 @@ export default function EditPropertyPage() {
                             <label className="label">Phone Number <span className="text-municipal-red">*</span></label>
                             <div className="flex">
                                 <span className="inline-flex items-center px-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg text-sm text-gray-600">+233</span>
-                                <input type="tel" {...register('phone_number', { required: 'Phone is required' })} className="input-field rounded-l-none" placeholder="245678901" />
+                                <input type="tel" {...register('phone_number', { required: 'Phone is required' })} className="input-field rounded-l-none" placeholder="Phone Number" />
                             </div>
                             {errors.phone_number && <p className="text-red-500 text-sm mt-1">{errors.phone_number.message}</p>}
                         </div>
@@ -372,19 +372,19 @@ export default function EditPropertyPage() {
 
                         <div>
                             <label className="label">Ghana Card No.</label>
-                            <input type="text" {...register('ghana_card_no')} className="input-field" placeholder="GHA-XXXXXXXXX-X" />
+                            <input type="text" {...register('ghana_card_no')} className="input-field" placeholder="Ghana Card No." />
                         </div>
 
                         <div>
                             <label className="label">Next of Kin</label>
-                            <input type="text" {...register('next_of_kin_name')} className="input-field" placeholder="Full name" />
+                            <input type="text" {...register('next_of_kin_name')} className="input-field" placeholder="Next of Kin" />
                         </div>
 
                         <div>
                             <label className="label">Next of Kin Contact <span className="text-municipal-red">*</span></label>
                             <div className="flex">
                                 <span className="inline-flex items-center px-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg text-sm text-gray-600">+233</span>
-                                <input type="tel" {...register('next_of_kin_contact')} className="input-field rounded-l-none" placeholder="245678901" />
+                                <input type="tel" {...register('next_of_kin_contact')} className="input-field rounded-l-none" placeholder="Next of Kin Contact" />
                             </div>
                         </div>
                     </div>
@@ -484,17 +484,17 @@ export default function EditPropertyPage() {
 
                         <div>
                             <label className="label">Account Number</label>
-                            <input type="text" {...register('account_number')} className="input-field" placeholder="Account no" />
+                            <input type="text" {...register('account_number')} className="input-field" placeholder="Account Number" />
                         </div>
 
                         <div>
                             <label className="label">Parcel Number</label>
-                            <input type="text" {...register('parcel_number')} className="input-field" placeholder="Parcel no" />
+                            <input type="text" {...register('parcel_number')} className="input-field" placeholder="Parcel Number" />
                         </div>
 
                         <div>
                             <label className="label">House Number</label>
-                            <input type="text" {...register('house_number')} className="input-field" placeholder="House no" />
+                            <input type="text" {...register('house_number')} className="input-field" placeholder="House Number" />
                         </div>
 
                         <div>
@@ -548,27 +548,27 @@ export default function EditPropertyPage() {
 
                         <div>
                             <label className="label">No of People <span className="text-gray-400 font-normal">(optional)</span></label>
-                            <input type="number" min="0" {...register('no_of_people')} className="input-field" placeholder="Optional" />
+                            <input type="number" min="0" {...register('no_of_people')} className="input-field" placeholder="No of People" />
                         </div>
 
                         <div>
                             <label className="label">No of Bedrooms <span className="text-gray-400 font-normal">(optional)</span></label>
-                            <input type="number" min="0" {...register('no_of_bedrooms')} className="input-field" placeholder="Optional" />
+                            <input type="number" min="0" {...register('no_of_bedrooms')} className="input-field" placeholder="No of Bedrooms" />
                         </div>
 
                         <div>
                             <label className="label">No of Washrooms <span className="text-gray-400 font-normal">(optional)</span></label>
-                            <input type="number" min="0" {...register('no_of_washrooms')} className="input-field" placeholder="Optional" />
+                            <input type="number" min="0" {...register('no_of_washrooms')} className="input-field" placeholder="No of Washrooms" />
                         </div>
 
                         <div>
                             <label className="label">No of Other Rooms <span className="text-gray-400 font-normal">(optional)</span></label>
-                            <input type="number" min="0" {...register('no_of_other_rooms')} className="input-field" placeholder="Optional" />
+                            <input type="number" min="0" {...register('no_of_other_rooms')} className="input-field" placeholder="No of Other Rooms" />
                         </div>
 
                         <div>
                             <label className="label">Property Size (sqm) <span className="text-gray-400 font-normal">(optional)</span></label>
-                            <input type="number" step="0.01" min="0" {...register('property_size')} className="input-field" placeholder="Optional" />
+                            <input type="number" step="0.01" min="0" {...register('property_size')} className="input-field" placeholder="Property Size (sqm)" />
                         </div>
                     </div>
                 </div>
@@ -581,7 +581,7 @@ export default function EditPropertyPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
                             <label className="label">GPS Address</label>
-                            <input type="text" {...register('gps_address')} className="input-field" placeholder="GPS address" />
+                            <input type="text" {...register('gps_address')} className="input-field" placeholder="GPS Address" />
                         </div>
 
                         <div className="md:col-span-2">
@@ -640,11 +640,11 @@ export default function EditPropertyPage() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wider font-bold italic">Latitude</label>
-                                    <input type="number" step="any" {...register('latitude', { valueAsNumber: true })} className="input-field" placeholder="5.6037" />
+                                    <input type="number" step="any" {...register('latitude', { valueAsNumber: true })} className="input-field" placeholder="Latitude" />
                                 </div>
                                 <div>
                                     <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wider font-bold italic">Longitude</label>
-                                    <input type="number" step="any" {...register('longitude', { valueAsNumber: true })} className="input-field" placeholder="-0.1870" />
+                                    <input type="number" step="any" {...register('longitude', { valueAsNumber: true })} className="input-field" placeholder="Longitude" />
                                 </div>
                             </div>
                         </div>
@@ -656,7 +656,7 @@ export default function EditPropertyPage() {
 
                         <div>
                             <label className="label">Street Name</label>
-                            <input type="text" {...register('street_name')} className="input-field" placeholder="Name of street" />
+                            <input type="text" {...register('street_name')} className="input-field" placeholder="Street Name" />
                         </div>
 
                         <div>
