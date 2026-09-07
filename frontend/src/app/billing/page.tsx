@@ -7,13 +7,12 @@ import {
     printBillPDF,
     fetchElectoralAreas,
     deleteBill,
-    requestPrivilegedAction,
 } from '@/lib/api-client';
 import { useAuth } from '@/context/AuthContext';
 import {
     FileText, Search, Printer,
     CreditCard, Plus, CheckCircle2, AlertCircle, Clock, Trash, Pencil,
-    FileDown, Send, Eye
+    FileDown, Eye
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -34,7 +33,6 @@ export default function BillingPage() {
     const canPrintDirect = hasPermission('print_bill') || hasPermission('bulk_print') || hasPermission('manage_users');
     // Direct delete only — Cashiers / Revenue Officers must not see a delete icon
     const canDeleteDirect = hasPermission('delete_bill');
-    const canRequestPrint = hasPermission('request_print');
     const canEditLinked =
         hasPermission('edit_customer') ||
         hasPermission('edit_property') ||
@@ -43,7 +41,9 @@ export default function BillingPage() {
         hasPermission('view_customer') ||
         hasPermission('record_payment') ||
         canGenerate ||
-        canDeleteDirect;
+        canDeleteDirect ||
+        canPrintDirect;
+    const canPayBill = hasPermission('record_payment');
 
     const loadData = async () => {
         setLoading(true);
@@ -84,25 +84,6 @@ export default function BillingPage() {
         } catch (error: any) {
             console.error('Delete failed:', error);
             alert(error?.response?.data?.error || 'Failed to delete bill');
-        }
-    };
-
-    const handleRequest = async (billId: string, action_type: 'PRINT_BILL' | 'DELETE_BILL') => {
-        const reason = prompt(
-            action_type === 'PRINT_BILL'
-                ? 'Optional reason for print request:'
-                : 'Reason for delete request (recommended):'
-        );
-        if (reason === null) return;
-        try {
-            const res = await requestPrivilegedAction({
-                action_type,
-                bill_id: billId,
-                reason: reason || undefined,
-            });
-            setMessage(res.message || 'Request submitted for admin approval');
-        } catch (error: any) {
-            alert(error?.response?.data?.error || 'Failed to submit request');
         }
     };
 
@@ -217,7 +198,7 @@ export default function BillingPage() {
                                             <StatusBadge status={bill.payment_status} />
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm space-x-1">
-                                            {canPrintDirect ? (
+                                            {canPrintDirect && (
                                                 <>
                                                     <button
                                                         onClick={() => downloadBillPDF(bill.id)}
@@ -234,15 +215,7 @@ export default function BillingPage() {
                                                         <Printer className="w-5 h-5" />
                                                     </button>
                                                 </>
-                                            ) : canRequestPrint ? (
-                                                <button
-                                                    onClick={() => handleRequest(bill.id, 'PRINT_BILL')}
-                                                    className="inline-flex items-center p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
-                                                    title="Request print approval"
-                                                >
-                                                    <Send className="w-5 h-5" />
-                                                </button>
-                                            ) : null}
+                                            )}
 
                                             {canEditLinked && (
                                                 <Link
@@ -263,14 +236,20 @@ export default function BillingPage() {
                                             {canViewBill && (
                                                 <Link
                                                     href={`/billing/${bill.id}`}
-                                                    className="inline-flex items-center p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
-                                                    title={hasPermission('record_payment') ? 'View & Pay' : 'View bill'}
+                                                    className="inline-flex items-center p-2 text-gray-600 hover:text-municipal-red hover:bg-red-50 rounded-lg transition-all"
+                                                    title="View bill"
                                                 >
-                                                    {hasPermission('record_payment') ? (
-                                                        <CreditCard className="w-5 h-5" />
-                                                    ) : (
-                                                        <Eye className="w-5 h-5" />
-                                                    )}
+                                                    <Eye className="w-5 h-5" />
+                                                </Link>
+                                            )}
+
+                                            {canPayBill && (
+                                                <Link
+                                                    href={`/billing/${bill.id}`}
+                                                    className="inline-flex items-center p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
+                                                    title="Record payment"
+                                                >
+                                                    <CreditCard className="w-5 h-5" />
                                                 </Link>
                                             )}
 

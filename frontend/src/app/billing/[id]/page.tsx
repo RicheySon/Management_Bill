@@ -8,14 +8,13 @@ import {
     downloadBillPDF,
     printBillPDF,
     requestBillAmountChange,
-    requestPrivilegedAction,
 } from '@/lib/api-client';
 import { useAuth } from '@/context/AuthContext';
 import {
     ArrowLeft, Printer, CreditCard,
     User, Building2, Briefcase, Calendar,
     Wallet, CheckCircle2, AlertCircle, History,
-    FileDown, Pencil, Send
+    FileDown, Pencil
 } from 'lucide-react';
 
 import { GCR_HINT, GCR_INPUT_PATTERN, GCR_PLACEHOLDER, isValidGcr, normalizeGcr } from '@/lib/gcr';
@@ -38,7 +37,6 @@ export default function BillDetailPage() {
     const [actionMsg, setActionMsg] = useState<string | null>(null);
 
     const canPrintDirect = hasPermission('print_bill') || hasPermission('bulk_print') || hasPermission('manage_users');
-    const canRequestPrint = hasPermission('request_print');
     const canPay = hasPermission('record_payment');
 
     const loadBill = async () => {
@@ -121,19 +119,6 @@ export default function BillDetailPage() {
         }
     };
 
-    const handleRequestPrint = async () => {
-        try {
-            const res = await requestPrivilegedAction({
-                action_type: 'PRINT_BILL',
-                bill_id: bill.id,
-                reason: 'Bill hardcopy / PDF print',
-            });
-            setActionMsg(res.message);
-        } catch (err: any) {
-            setError(err.response?.data?.error || 'Failed to request print');
-        }
-    };
-
     if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-municipal-red"></div></div>;
     if (!bill) return <div className="text-center py-20 text-red-500">Bill not found</div>;
 
@@ -147,7 +132,7 @@ export default function BillDetailPage() {
                     <span>Back</span>
                 </button>
                 <div className="flex space-x-3 flex-wrap">
-                    {canPrintDirect ? (
+                    {canPrintDirect && (
                         <>
                             <button
                                 onClick={() => printBillPDF(bill.id)}
@@ -164,25 +149,7 @@ export default function BillDetailPage() {
                                 <span>Download PDF</span>
                             </button>
                         </>
-                    ) : canRequestPrint ? (
-                        <>
-                            <button
-                                onClick={handleRequestPrint}
-                                className="btn-secondary flex items-center space-x-2"
-                            >
-                                <Send className="w-4 h-4" />
-                                <span>Request Print Approval</span>
-                            </button>
-                            <button
-                                onClick={() => downloadBillPDF(bill.id).catch(() => undefined)}
-                                className="btn-secondary flex items-center space-x-2"
-                                title="Works after admin approves your print request"
-                            >
-                                <FileDown className="w-4 h-4" />
-                                <span>Print If Approved</span>
-                            </button>
-                        </>
-                    ) : null}
+                    )}
                 </div>
             </div>
 
