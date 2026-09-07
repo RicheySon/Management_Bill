@@ -76,7 +76,7 @@ const formatFee = (fee: any) => {
 // =====================================================
 
 export default function FeeConfigurationPage() {
-    const { hasPermission } = useAuth();
+    const { hasPermission, user } = useAuth();
     const [schedules, setSchedules] = useState<FeeSchedule[]>([]);
     const [selectedSchedule, setSelectedSchedule] = useState<FeeSchedule | null>(null);
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -85,6 +85,13 @@ export default function FeeConfigurationPage() {
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     const canConfigure = hasPermission('configure_rates');
+    const canApplyImmediately =
+        hasPermission('manage_users') ||
+        !!user?.roles?.includes('Super Admin') ||
+        !!user?.roles?.includes('Admin');
+    // Supervisors can edit rates (pending Admin approval); Admins apply immediately
+    const canProposeRates = canConfigure;
+    const canMutateStructure = canConfigure && canApplyImmediately;
 
     const loadSchedules = useCallback(async () => {
         try {
@@ -161,9 +168,15 @@ export default function FeeConfigurationPage() {
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">Fee Configuration</h1>
                             <p className="text-sm text-gray-500">Configure fee schedules for property rates and business licenses</p>
-                            <p className="text-xs text-green-700 mt-1">
-                                Fee amount edits apply immediately — no approval required.
-                            </p>
+                            {canApplyImmediately ? (
+                                <p className="text-xs text-green-700 mt-1">
+                                    Admin fee amount edits apply immediately.
+                                </p>
+                            ) : (
+                                <p className="text-xs text-amber-700 mt-1">
+                                    Supervisor rate/fee edits are submitted for Admin approval before they take effect.
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -213,7 +226,7 @@ export default function FeeConfigurationPage() {
                         </div>
                     )}
 
-                    {selectedSchedule && selectedSchedule.status !== 'ACTIVE' && canConfigure && (
+                    {selectedSchedule && selectedSchedule.status !== 'ACTIVE' && canMutateStructure && (
                         <div className="flex items-end">
                             <button
                                 onClick={handleActivateSchedule}
@@ -236,7 +249,7 @@ export default function FeeConfigurationPage() {
                         </div>
                     )}
 
-                    {canConfigure && (
+                    {canMutateStructure && (
                         <div className="flex items-end ml-auto">
                             <button
                                 onClick={() => setShowNewSchedule(true)}
@@ -250,7 +263,7 @@ export default function FeeConfigurationPage() {
                 </div>
 
                 {/* New Schedule Form */}
-                {showNewSchedule && (
+                {showNewSchedule && canMutateStructure && (
                     <NewScheduleForm
                         year={selectedYear}
                         onSubmit={handleCreateSchedule}
@@ -271,16 +284,19 @@ export default function FeeConfigurationPage() {
                             <Briefcase className="w-4 h-4" />
                             <span>Business Licenses</span>
                         </Tabs.Trigger>
-                        <Tabs.Trigger value="import" className="px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent hover:text-municipal-red data-[state=active]:text-municipal-red data-[state=active]:border-municipal-red transition-colors flex items-center space-x-2">
-                            <Upload className="w-4 h-4" />
-                            <span>Import Excel</span>
-                        </Tabs.Trigger>
+                        {canMutateStructure && (
+                            <Tabs.Trigger value="import" className="px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent hover:text-municipal-red data-[state=active]:text-municipal-red data-[state=active]:border-municipal-red transition-colors flex items-center space-x-2">
+                                <Upload className="w-4 h-4" />
+                                <span>Import Excel</span>
+                            </Tabs.Trigger>
+                        )}
                     </Tabs.List>
 
                     <Tabs.Content value="property-rates">
                         <PropertyRatesTab
                             scheduleId={selectedSchedule.id}
-                            canConfigure={canConfigure}
+                            canConfigure={canProposeRates}
+                            canMutateStructure={canMutateStructure}
                             showMessage={showMessage}
                         />
                     </Tabs.Content>
@@ -288,26 +304,29 @@ export default function FeeConfigurationPage() {
                     <Tabs.Content value="business-licenses">
                         <BusinessLicensesTab
                             scheduleId={selectedSchedule.id}
-                            canConfigure={canConfigure}
+                            canConfigure={canProposeRates}
+                            canMutateStructure={canMutateStructure}
                             showMessage={showMessage}
                         />
                     </Tabs.Content>
 
-                    <Tabs.Content value="import">
-                        <ImportTab
-                            scheduleId={selectedSchedule.id}
-                            canConfigure={canConfigure}
-                            showMessage={showMessage}
-                            onImportComplete={loadSchedules}
-                        />
-                    </Tabs.Content>
+                    {canMutateStructure && (
+                        <Tabs.Content value="import">
+                            <ImportTab
+                                scheduleId={selectedSchedule.id}
+                                canConfigure={canMutateStructure}
+                                showMessage={showMessage}
+                                onImportComplete={loadSchedules}
+                            />
+                        </Tabs.Content>
+                    )}
                 </Tabs.Root>
             ) : (
                 <div className="card text-center py-12">
                     <Settings className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-gray-700 mb-2">No Fee Schedule Found</h3>
                     <p className="text-gray-500 mb-4">Create a fee schedule for {selectedYear} to get started.</p>
-                    {canConfigure && (
+                    {canMutateStructure && (
                         <button onClick={() => setShowNewSchedule(true)} className="btn-primary">
                             Create Fee Schedule
                         </button>
@@ -362,9 +381,10 @@ function NewScheduleForm({ year, onSubmit, onCancel }: {
 // PROPERTY RATES TAB
 // =====================================================
 
-function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
+function PropertyRatesTab({ scheduleId, canConfigure, canMutateStructure, showMessage }: {
     scheduleId: number;
     canConfigure: boolean;
+    canMutateStructure: boolean;
     showMessage: (type: 'success' | 'error', text: string) => void;
 }) {
     const [zones, setZones] = useState<PropertyRateZone[]>([]);
@@ -402,8 +422,14 @@ function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
     const handleSaveZone = async (data: any) => {
         try {
             if (editingZone) {
-                await updatePropertyRateZone(editingZone.id, data);
-                showMessage('success', 'Property rate zone updated');
+                const res = await updatePropertyRateZone(editingZone.id, data);
+                showMessage(
+                    'success',
+                    res?.message ||
+                        (res?.pending_request
+                            ? 'Rate changes submitted for Admin approval'
+                            : 'Property rate zone updated')
+                );
             } else {
                 await createPropertyRateZone(scheduleId, data);
                 showMessage('success', 'Property rate zone added');
@@ -438,7 +464,7 @@ function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
                         Class fees follow fee fixing: Category A–D columns (e.g. 1Room × Category A = bill amount).
                     </p>
                 </div>
-                {canConfigure && (
+                {canMutateStructure && (
                     <button type="button" onClick={openAddZone} className="btn-primary flex items-center space-x-2">
                         <Plus className="w-4 h-4" />
                         <span>Add Zone</span>
@@ -450,6 +476,7 @@ function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
                 <PropertyZoneForm
                     key={formKey}
                     zone={editingZone}
+                    requiresApproval={!canMutateStructure && !!editingZone}
                     onSubmit={handleSaveZone}
                     onCancel={() => { setShowForm(false); setEditingZone(null); }}
                 />
@@ -473,7 +500,7 @@ function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
                                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Cat B</th>
                                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Cat C</th>
                                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Cat D</th>
-                                {canConfigure && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>}
+                                {(canConfigure || canMutateStructure) && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -497,15 +524,19 @@ function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
                                     <td className="px-4 py-3 text-right text-gray-600">{formatFee(zone.cat_b_fee)}</td>
                                     <td className="px-4 py-3 text-right text-gray-600">{formatFee(zone.cat_c_fee)}</td>
                                     <td className="px-4 py-3 text-right text-gray-600">{formatFee(zone.cat_d_fee)}</td>
-                                    {canConfigure && (
+                                    {(canConfigure || canMutateStructure) && (
                                         <td className="px-4 py-3 text-right">
                                             <div className="flex justify-end space-x-2">
-                                                <button type="button" onClick={() => openEditZone(zone)} className="p-1.5 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50">
-                                                    <Pencil className="w-4 h-4" />
-                                                </button>
-                                                <button type="button" onClick={() => handleDeleteZone(zone.id)} className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50">
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
+                                                {canConfigure && (
+                                                    <button type="button" onClick={() => openEditZone(zone)} className="p-1.5 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50" title="Edit rates">
+                                                        <Pencil className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                                {canMutateStructure && (
+                                                    <button type="button" onClick={() => handleDeleteZone(zone.id)} className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50" title="Delete zone">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     )}
@@ -523,8 +554,9 @@ function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
 // PROPERTY ZONE FORM
 // =====================================================
 
-function PropertyZoneForm({ zone, onSubmit, onCancel }: {
+function PropertyZoneForm({ zone, requiresApproval = false, onSubmit, onCancel }: {
     zone: PropertyRateZone | null;
+    requiresApproval?: boolean;
     onSubmit: (data: any) => void;
     onCancel: () => void;
 }) {
@@ -564,6 +596,11 @@ function PropertyZoneForm({ zone, onSubmit, onCancel }: {
     return (
         <form onSubmit={handleSubmit} className="mb-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
             <h3 className="font-semibold text-gray-900 mb-3">{zone ? 'Edit' : 'Add'} Property Rate Zone</h3>
+            {requiresApproval && (
+                <p className="mb-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    Rate/fee changes will be sent to Admin for approval before they take effect. Current fees stay active until approved.
+                </p>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                     <label className="label">Zone Name *</label>
@@ -614,7 +651,7 @@ function PropertyZoneForm({ zone, onSubmit, onCancel }: {
             <div className="flex space-x-3 mt-4">
                 <button type="submit" className="btn-primary flex items-center space-x-2">
                     <Check className="w-4 h-4" />
-                    <span>{zone ? 'Update' : 'Add'} Zone</span>
+                    <span>{requiresApproval ? 'Submit for Approval' : zone ? 'Update Zone' : 'Add Zone'}</span>
                 </button>
                 <button type="button" onClick={onCancel} className="btn-secondary flex items-center space-x-2">
                     <X className="w-4 h-4" />
@@ -629,9 +666,10 @@ function PropertyZoneForm({ zone, onSubmit, onCancel }: {
 // BUSINESS LICENSES TAB
 // =====================================================
 
-function BusinessLicensesTab({ scheduleId, canConfigure, showMessage }: {
+function BusinessLicensesTab({ scheduleId, canConfigure, canMutateStructure, showMessage }: {
     scheduleId: number;
     canConfigure: boolean;
+    canMutateStructure: boolean;
     showMessage: (type: 'success' | 'error', text: string) => void;
 }) {
     const [items, setItems] = useState<BusinessFeeItem[]>([]);
@@ -664,9 +702,19 @@ function BusinessLicensesTab({ scheduleId, canConfigure, showMessage }: {
     const handleSaveItem = async (data: any) => {
         try {
             if (editingItem) {
-                await updateBusinessFeeItem(editingItem.id, data);
-                showMessage('success', 'Business fee item updated');
+                const res = await updateBusinessFeeItem(editingItem.id, data);
+                showMessage(
+                    'success',
+                    res?.message ||
+                        (res?.pending_request
+                            ? 'Fee changes submitted for Admin approval'
+                            : 'Business fee item updated')
+                );
             } else {
+                if (!canMutateStructure) {
+                    showMessage('error', 'Only Admin can add business fee items. You can edit existing rates for approval.');
+                    return;
+                }
                 await createBusinessFeeItem(scheduleId, data);
                 showMessage('success', 'Business fee item added');
             }
@@ -679,6 +727,7 @@ function BusinessLicensesTab({ scheduleId, canConfigure, showMessage }: {
     };
 
     const handleDeleteItem = async (itemId: number) => {
+        if (!canMutateStructure) return;
         if (!confirm('Delete this business fee item?')) return;
         try {
             await deleteBusinessFeeItem(itemId);
@@ -737,7 +786,7 @@ function BusinessLicensesTab({ scheduleId, canConfigure, showMessage }: {
                             onChange={e => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    {canConfigure && (
+                    {canMutateStructure && (
                         <button onClick={() => { setEditingItem(null); setShowForm(true); }} className="btn-primary flex items-center space-x-2">
                             <Plus className="w-4 h-4" />
                             <span>Add Item</span>
@@ -751,6 +800,7 @@ function BusinessLicensesTab({ scheduleId, canConfigure, showMessage }: {
                     key={editingItem?.id || 'new'}
                     item={editingItem}
                     parentItems={parentItems}
+                    requiresApproval={!canMutateStructure && !!editingItem}
                     onSubmit={handleSaveItem}
                     onCancel={() => { setShowForm(false); setEditingItem(null); }}
                 />
@@ -776,7 +826,7 @@ function BusinessLicensesTab({ scheduleId, canConfigure, showMessage }: {
                                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">CAT D</th>
                                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">CAT E</th>
                                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">CAT F</th>
-                                {canConfigure && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>}
+                                {(canConfigure || canMutateStructure) && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -800,15 +850,19 @@ function BusinessLicensesTab({ scheduleId, canConfigure, showMessage }: {
                                         <td className="px-4 py-2 text-right text-gray-700">{formatFee(parent.cat_d_fee)}</td>
                                         <td className="px-4 py-2 text-right text-gray-700">{formatFee(parent.cat_e_fee)}</td>
                                         <td className="px-4 py-2 text-right text-gray-700">{formatFee(parent.cat_f_fee)}</td>
-                                        {canConfigure && (
+                                        {(canConfigure || canMutateStructure) && (
                                             <td className="px-4 py-2 text-right" onClick={e => e.stopPropagation()}>
                                                 <div className="flex justify-end space-x-1">
-                                                    <button onClick={() => { setEditingItem(parent); setShowForm(true); }} className="p-1 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50">
-                                                        <Pencil className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    <button onClick={() => handleDeleteItem(parent.id)} className="p-1 text-gray-400 hover:text-red-600 rounded hover:bg-red-50">
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
+                                                    {canConfigure && (
+                                                        <button onClick={() => { setEditingItem(parent); setShowForm(true); }} className="p-1 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50" title="Edit rates">
+                                                            <Pencil className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                    {canMutateStructure && (
+                                                        <button onClick={() => handleDeleteItem(parent.id)} className="p-1 text-gray-400 hover:text-red-600 rounded hover:bg-red-50" title="Delete item">
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         )}
@@ -829,15 +883,19 @@ function BusinessLicensesTab({ scheduleId, canConfigure, showMessage }: {
                                             <td className="px-4 py-2 text-right text-gray-700 font-medium">{formatFee(child.cat_d_fee)}</td>
                                             <td className="px-4 py-2 text-right text-gray-700 font-medium">{formatFee(child.cat_e_fee)}</td>
                                             <td className="px-4 py-2 text-right text-gray-700 font-medium">{formatFee(child.cat_f_fee)}</td>
-                                            {canConfigure && (
+                                            {(canConfigure || canMutateStructure) && (
                                                 <td className="px-4 py-2 text-right">
                                                     <div className="flex justify-end space-x-1">
-                                                        <button onClick={() => { setEditingItem(child); setShowForm(true); }} className="p-1 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50">
-                                                            <Pencil className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        <button onClick={() => handleDeleteItem(child.id)} className="p-1 text-gray-400 hover:text-red-600 rounded hover:bg-red-50">
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
+                                                        {canConfigure && (
+                                                            <button onClick={() => { setEditingItem(child); setShowForm(true); }} className="p-1 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50" title="Edit rates">
+                                                                <Pencil className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
+                                                        {canMutateStructure && (
+                                                            <button onClick={() => handleDeleteItem(child.id)} className="p-1 text-gray-400 hover:text-red-600 rounded hover:bg-red-50" title="Delete item">
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             )}
@@ -860,9 +918,10 @@ function BusinessLicensesTab({ scheduleId, canConfigure, showMessage }: {
 // BUSINESS FEE ITEM FORM
 // =====================================================
 
-function BusinessFeeItemForm({ item, parentItems, onSubmit, onCancel }: {
+function BusinessFeeItemForm({ item, parentItems, requiresApproval = false, onSubmit, onCancel }: {
     item: BusinessFeeItem | null;
     parentItems: BusinessFeeItem[];
+    requiresApproval?: boolean;
     onSubmit: (data: any) => void;
     onCancel: () => void;
 }) {
@@ -906,6 +965,11 @@ function BusinessFeeItemForm({ item, parentItems, onSubmit, onCancel }: {
     return (
         <form onSubmit={handleSubmit} className="mb-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
             <h3 className="font-semibold text-gray-900 mb-3">{item ? 'Edit' : 'Add'} Business Fee Item</h3>
+            {requiresApproval && (
+                <p className="mb-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    Fee amount changes will be sent to Admin for approval before they take effect. Current fees stay active until approved.
+                </p>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                     <label className="label">Main Item # *</label>
@@ -979,7 +1043,7 @@ function BusinessFeeItemForm({ item, parentItems, onSubmit, onCancel }: {
             <div className="flex space-x-3 mt-4">
                 <button type="submit" className="btn-primary flex items-center space-x-2">
                     <Check className="w-4 h-4" />
-                    <span>{item ? 'Update' : 'Add'} Item</span>
+                    <span>{requiresApproval ? 'Submit for Approval' : item ? 'Update Item' : 'Add Item'}</span>
                 </button>
                 <button type="button" onClick={onCancel} className="btn-secondary flex items-center space-x-2">
                     <X className="w-4 h-4" />

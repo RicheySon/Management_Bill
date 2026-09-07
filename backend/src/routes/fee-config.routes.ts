@@ -21,8 +21,25 @@ import {
     parseExcelFeeSchedule,
     importFeeScheduleFromExcel,
 } from '../services/fee-config.service';
+import {
+    createAmountChangeRequest,
+    splitMoneyFields,
+    ZONE_MONEY,
+    FEE_ITEM_MONEY,
+} from '../services/amount-change.service';
+import { getAuditContext } from '../services/audit.service';
+import pool from '../config/database';
 
 const router = Router();
+
+/** Admin / Super Admin apply fee money immediately; Supervisors require approval. */
+const canApplyFeeChangesImmediately = (req: AuthRequest): boolean => {
+    const roles = req.user?.roles || [];
+    const perms = req.user?.permissions || [];
+    if (perms.includes('manage_users')) return true;
+    if (roles.includes('Super Admin') || roles.includes('Admin')) return true;
+    return false;
+};
 
 // File upload config (memory storage for Excel parsing)
 const upload = multer({
@@ -153,6 +170,12 @@ router.get('/schedules/:id', async (req: AuthRequest, res: Response) => {
  */
 router.post('/schedules', authorize(['configure_rates']), async (req: AuthRequest, res: Response) => {
     try {
+        if (!canApplyFeeChangesImmediately(req)) {
+            return res.status(403).json({
+                success: false,
+                error: 'Only Admin can create fee schedules. Supervisors may propose rate edits on existing zones for Admin approval.',
+            });
+        }
         const { error, value } = feeScheduleSchema.validate(req.body);
         if (error) {
             return res.status(400).json({ success: false, error: error.details[0].message });
@@ -192,6 +215,12 @@ router.put('/schedules/:id', authorize(['configure_rates']), async (req: AuthReq
  */
 router.put('/schedules/:id/activate', authorize(['configure_rates']), async (req: AuthRequest, res: Response) => {
     try {
+        if (!canApplyFeeChangesImmediately(req)) {
+            return res.status(403).json({
+                success: false,
+                error: 'Only Admin can activate fee schedules.',
+            });
+        }
         const schedule = await activateFeeSchedule(parseInt(req.params.id));
         res.json({ success: true, data: schedule, message: 'Fee schedule activated successfully' });
     } catch (error: any) {
@@ -222,6 +251,12 @@ router.get('/schedules/:id/property-zones', async (req: AuthRequest, res: Respon
  */
 router.post('/schedules/:id/property-zones', authorize(['configure_rates']), async (req: AuthRequest, res: Response) => {
     try {
+        if (!canApplyFeeChangesImmediately(req)) {
+            return res.status(403).json({
+                success: false,
+                error: 'Only Admin can add zones. Supervisors may edit existing zone rates for Admin approval.',
+            });
+        }
         const { error, value } = propertyRateZoneSchema.validate(req.body);
         if (error) {
             return res.status(400).json({ success: false, error: error.details[0].message });
@@ -237,7 +272,8 @@ router.post('/schedules/:id/property-zones', authorize(['configure_rates']), asy
 
 /**
  * PUT /api/fee-config/property-zones/:zoneId
- * Admin/Supervisor fee edits apply immediately (no approval gate).
+ * Admin: money fields apply immediately.
+ * Supervisor: metadata applies immediately; money fields go to Admin approval.
  */
 router.put('/property-zones/:zoneId', authorize(['configure_rates']), async (req: AuthRequest, res: Response) => {
     try {
@@ -246,12 +282,46 @@ router.put('/property-zones/:zoneId', authorize(['configure_rates']), async (req
             return res.status(400).json({ success: false, error: error.details[0].message });
         }
 
-        const zone = await updatePropertyRateZone(parseInt(req.params.zoneId), value);
+        if (canApplyFeeChangesImmediately(req)) {
+            const zone = await updatePropertyRateZone(parseInt(req.params.zoneId), value);
+            return res.json({
+                success: true,
+                data: zone,
+                message: 'Property rate zone updated successfully',
+            });
+        }
+
+        const { money, metadata } = splitMoneyFields(value, ZONE_MONEY);
+        let pendingRequest = null;
+
+        if (Object.keys(metadata).length > 0) {
+            await updatePropertyRateZone(parseInt(req.params.zoneId), metadata);
+        }
+
+        if (Object.keys(money).length > 0) {
+            try {
+                pendingRequest = await createAmountChangeRequest({
+                    entityType: 'PROPERTY_RATE_ZONE',
+                    entityId: String(req.params.zoneId),
+                    proposedValues: money,
+                    reason: req.body.reason || 'Supervisor fee zone rate update',
+                    requestedBy: req.user!.id,
+                    auditCtx: getAuditContext(req),
+                });
+            } catch (e: any) {
+                if (!String(e.message || '').includes('No money field changes')) throw e;
+            }
+        }
+
+        const zoneResult = await pool.query('SELECT * FROM property_rate_zones WHERE id = $1', [req.params.zoneId]);
 
         res.json({
             success: true,
-            data: zone,
-            message: 'Property rate zone updated successfully',
+            data: zoneResult.rows[0],
+            pending_request: pendingRequest,
+            message: pendingRequest
+                ? 'Metadata saved. Rate/fee changes submitted for Admin approval.'
+                : 'Property rate zone updated successfully',
         });
     } catch (error: any) {
         console.error('Error updating property rate zone:', error);
@@ -264,6 +334,12 @@ router.put('/property-zones/:zoneId', authorize(['configure_rates']), async (req
  */
 router.delete('/property-zones/:zoneId', authorize(['configure_rates']), async (req: AuthRequest, res: Response) => {
     try {
+        if (!canApplyFeeChangesImmediately(req)) {
+            return res.status(403).json({
+                success: false,
+                error: 'Only Admin can delete property rate zones.',
+            });
+        }
         await deletePropertyRateZone(parseInt(req.params.zoneId));
         res.json({ success: true, message: 'Property rate zone deleted successfully' });
     } catch (error: any) {
@@ -294,6 +370,12 @@ router.get('/schedules/:id/business-items', async (req: AuthRequest, res: Respon
  */
 router.post('/schedules/:id/business-items', authorize(['configure_rates']), async (req: AuthRequest, res: Response) => {
     try {
+        if (!canApplyFeeChangesImmediately(req)) {
+            return res.status(403).json({
+                success: false,
+                error: 'Only Admin can add business fee items. Supervisors may edit existing item rates for Admin approval.',
+            });
+        }
         const { error, value } = businessFeeItemSchema.validate(req.body);
         if (error) {
             return res.status(400).json({ success: false, error: error.details[0].message });
@@ -309,7 +391,8 @@ router.post('/schedules/:id/business-items', authorize(['configure_rates']), asy
 
 /**
  * PUT /api/fee-config/business-items/:itemId
- * Admin/Supervisor fee edits apply immediately (no approval gate).
+ * Admin: money fields apply immediately.
+ * Supervisor: metadata applies immediately; money fields go to Admin approval.
  */
 router.put('/business-items/:itemId', authorize(['configure_rates']), async (req: AuthRequest, res: Response) => {
     try {
@@ -318,12 +401,46 @@ router.put('/business-items/:itemId', authorize(['configure_rates']), async (req
             return res.status(400).json({ success: false, error: error.details[0].message });
         }
 
-        const item = await updateBusinessFeeItem(parseInt(req.params.itemId), value);
+        if (canApplyFeeChangesImmediately(req)) {
+            const item = await updateBusinessFeeItem(parseInt(req.params.itemId), value);
+            return res.json({
+                success: true,
+                data: item,
+                message: 'Business fee item updated successfully',
+            });
+        }
+
+        const { money, metadata } = splitMoneyFields(value, FEE_ITEM_MONEY);
+        let pendingRequest = null;
+
+        if (Object.keys(metadata).length > 0) {
+            await updateBusinessFeeItem(parseInt(req.params.itemId), metadata);
+        }
+
+        if (Object.keys(money).length > 0) {
+            try {
+                pendingRequest = await createAmountChangeRequest({
+                    entityType: 'BUSINESS_FEE_ITEM',
+                    entityId: String(req.params.itemId),
+                    proposedValues: money,
+                    reason: req.body.reason || 'Supervisor business fee item rate update',
+                    requestedBy: req.user!.id,
+                    auditCtx: getAuditContext(req),
+                });
+            } catch (e: any) {
+                if (!String(e.message || '').includes('No money field changes')) throw e;
+            }
+        }
+
+        const itemResult = await pool.query('SELECT * FROM business_fee_items WHERE id = $1', [req.params.itemId]);
 
         res.json({
             success: true,
-            data: item,
-            message: 'Business fee item updated successfully',
+            data: itemResult.rows[0],
+            pending_request: pendingRequest,
+            message: pendingRequest
+                ? 'Metadata saved. Fee amount changes submitted for Admin approval.'
+                : 'Business fee item updated successfully',
         });
     } catch (error: any) {
         console.error('Error updating business fee item:', error);
@@ -336,6 +453,12 @@ router.put('/business-items/:itemId', authorize(['configure_rates']), async (req
  */
 router.delete('/business-items/:itemId', authorize(['configure_rates']), async (req: AuthRequest, res: Response) => {
     try {
+        if (!canApplyFeeChangesImmediately(req)) {
+            return res.status(403).json({
+                success: false,
+                error: 'Only Admin can delete business fee items.',
+            });
+        }
         await deleteBusinessFeeItem(parseInt(req.params.itemId));
         res.json({ success: true, message: 'Business fee item deleted successfully' });
     } catch (error: any) {
@@ -354,6 +477,12 @@ router.delete('/business-items/:itemId', authorize(['configure_rates']), async (
  */
 router.post('/schedules/:id/import/preview', authorize(['configure_rates']), upload.single('file'), async (req: AuthRequest, res: Response) => {
     try {
+        if (!canApplyFeeChangesImmediately(req)) {
+            return res.status(403).json({
+                success: false,
+                error: 'Only Admin can import fee schedules.',
+            });
+        }
         if (!req.file) {
             return res.status(400).json({ success: false, error: 'No file uploaded' });
         }
@@ -384,6 +513,12 @@ router.post('/schedules/:id/import/preview', authorize(['configure_rates']), upl
  */
 router.post('/schedules/:id/import/commit', authorize(['configure_rates']), async (req: AuthRequest, res: Response) => {
     try {
+        if (!canApplyFeeChangesImmediately(req)) {
+            return res.status(403).json({
+                success: false,
+                error: 'Only Admin can import fee schedules.',
+            });
+        }
         const { propertyZones, businessItems } = req.body;
 
         if (!propertyZones && !businessItems) {
