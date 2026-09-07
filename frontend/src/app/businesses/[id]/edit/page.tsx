@@ -405,9 +405,9 @@ export default function EditBusinessPage() {
                         </div>
 
                         <div>
-                            <label className="label">Business Category Class <span className="text-municipal-red">*</span></label>
+                            <label className="label">Business Category <span className="text-municipal-red">*</span></label>
                             <select
-                                {...register('business_category_class', { required: 'Please select a category class' })}
+                                {...register('business_category_class', { required: 'Please select a category' })}
                                 className="input-field"
                                 onChange={(e) => {
                                     const v = e.target.value;
@@ -421,16 +421,21 @@ export default function EditBusinessPage() {
                                                 setSelectedFeeAmount(
                                                     `${item.description} × ${v}: GHS ${Number(fee).toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
                                                 );
+                                            } else {
+                                                setAssessedAmount('');
+                                                setSelectedFeeAmount(
+                                                    `${item.description} × ${v || 'category'} — no fee set for this category`
+                                                );
                                             }
                                         }
                                     }
                                 }}
                             >
-                                <option value="">Select category</option>
-                                <option value="Category A">Category A (fee-fixing CAT A)</option>
-                                <option value="Category B">Category B (fee-fixing CAT B)</option>
-                                <option value="Category C">Category C (fee-fixing CAT C)</option>
-                                <option value="Category D">Category D (fee-fixing CAT D)</option>
+                                <option value="">Select Category A–D</option>
+                                <option value="Category A">Category A</option>
+                                <option value="Category B">Category B</option>
+                                <option value="Category C">Category C</option>
+                                <option value="Category D">Category D</option>
                             </select>
                             {errors.business_category_class && <p className="text-red-500 text-sm mt-1">{errors.business_category_class.message}</p>}
                             <p className="text-xs text-gray-500 mt-1">Linked to fee fixing CAT A–D for the selected business type.</p>
@@ -438,7 +443,9 @@ export default function EditBusinessPage() {
 
                         {feeItems.length > 0 && (
                             <div className="md:col-span-2">
-                                <label className="label">Fee Schedule Item (Business Type from Fee Fixing)</label>
+                                <label className="label">
+                                    Fee Item <span className="text-gray-400 font-normal">(business type name)</span>
+                                </label>
                                 <select className="input-field" value={selectedFeeItemId}
                                     onChange={(e) => {
                                         const v = e.target.value;
@@ -446,13 +453,22 @@ export default function EditBusinessPage() {
                                         setValue('fee_item_id', v ? parseInt(v) : undefined);
                                         if (v) {
                                             const item = feeItems.find((fi: any) => fi.id === parseInt(v));
+                                            const classVal = watch('business_category_class');
                                             if (item) {
-                                                const classVal = watch('business_category_class') || 'Category A';
                                                 const fee = feeAmountForBusinessCategory(item, classVal);
                                                 if (fee > 0) {
                                                     setAssessedAmount(String(fee));
                                                     setSelectedFeeAmount(
-                                                        `${item.description} × ${classVal}: GHS ${Number(fee).toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
+                                                        classVal
+                                                            ? `${item.description} × ${classVal}: GHS ${Number(fee).toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
+                                                            : `${item.description} — select Category A–D for the bill amount`
+                                                    );
+                                                } else {
+                                                    setAssessedAmount('');
+                                                    setSelectedFeeAmount(
+                                                        classVal
+                                                            ? `${item.description} × ${classVal} — no fee set for this category`
+                                                            : `${item.description} — select Category A–D for the bill amount`
                                                     );
                                                 }
                                             }
@@ -460,14 +476,10 @@ export default function EditBusinessPage() {
                                             setSelectedFeeAmount('');
                                         }
                                     }}>
-                                    <option value="">Select from fee schedule</option>
+                                    <option value="">Select business type</option>
                                     {feeItems.filter((fi: any) => !fi.is_group_header).map((item: any) => (
                                         <option key={item.id} value={item.id}>
-                                            {item.main_item_number}. {item.description}
-                                            {item.cat_a_fee ? ` — A: ${Number(item.cat_a_fee).toFixed(0)}` : ''}
-                                            {item.cat_b_fee ? ` | B: ${Number(item.cat_b_fee).toFixed(0)}` : ''}
-                                            {item.cat_c_fee ? ` | C: ${Number(item.cat_c_fee).toFixed(0)}` : ''}
-                                            {item.cat_d_fee ? ` | D: ${Number(item.cat_d_fee).toFixed(0)}` : ''}
+                                            {item.description}
                                         </option>
                                     ))}
                                 </select>
@@ -488,7 +500,9 @@ export default function EditBusinessPage() {
                                 onChange={(e) => setAssessedAmount(e.target.value)}
                                 placeholder="Bill Amount (GHS)"
                             />
-                            <p className="text-xs text-gray-500 mt-1">Auto-fills from fee fixing Category × Fee Item.</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                                Auto-fills from fee fixing when you pick Category A–D + Fee Item (editable).
+                            </p>
                         </div>
 
                         <div>
