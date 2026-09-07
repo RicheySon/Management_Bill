@@ -1,5 +1,6 @@
 import pool from '../config/database';
 import { logAction, AuditContext } from './audit.service';
+import { BASIC_RATE_GHC, billTotal } from './billing.service';
 
 export type AmountEntityType = 'BILL' | 'PROPERTY_RATE_ZONE' | 'BUSINESS_FEE_ITEM';
 
@@ -63,10 +64,12 @@ export const createAmountChangeRequest = async (params: {
                 proposedValues.rebate !== undefined) &&
             proposedValues.total_amount === undefined
         ) {
-            newValues.total_amount =
-                Number(newValues.current_rate || 0) +
-                Number(newValues.arrears || 0) -
-                Number(newValues.rebate || 0);
+            newValues.total_amount = billTotal(
+                Number(newValues.current_rate || 0),
+                Number(newValues.arrears || 0),
+                Number(newValues.rebate || 0),
+                BASIC_RATE_GHC
+            );
         }
         // Keep amount_due consistent with remaining unpaid portion of new total
         const amountPaid = Number(bill.amount_paid || 0);

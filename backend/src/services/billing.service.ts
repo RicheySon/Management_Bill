@@ -5,8 +5,12 @@ import pool from '../config/database';
  * Handles rate calculation and bill generation logic
  */
 
+/** Annual basic rate (GHS) attached to every property and BOP bill. */
+export const BASIC_RATE_GHC = 8;
+
 interface BillCalculation {
     current_rate: number;
+    basic_rate: number;
     arrears: number;
     rebate: number;
     total_amount: number;
@@ -14,6 +18,18 @@ interface BillCalculation {
     bill_details: any;
     prior_bill_ids?: string[];
 }
+
+export const billTotal = (current_rate: number, arrears: number, rebate: number, basicRate = BASIC_RATE_GHC) =>
+    Number(current_rate || 0) + Number(basicRate || 0) + Number(arrears || 0) - Number(rebate || 0);
+
+/** Normalize GCR: digits-only input becomes YY/####### for mobile keyboards without "/". */
+export const normalizeGcrNumber = (value: string): string => {
+    const digits = String(value || '').replace(/\D/g, '').slice(0, 9);
+    if (digits.length <= 2) return digits;
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+};
+
+export const isValidGcrNumber = (value: string): boolean => /^\d{2}\/\d{7}$/.test(normalizeGcrNumber(value));
 
 const LETTER_TO_CLASS: Record<string, number> = { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6 };
 
@@ -239,16 +255,19 @@ export const calculatePropertyBill = async (
     const arrears = parseFloat(arrearsResult.rows[0].total_arrears);
     const priorBillIds: string[] = arrearsResult.rows[0].prior_bill_ids || [];
     const rebate = 0;
-    const total_amount = current_rate + arrears - rebate;
+    const basic_rate = BASIC_RATE_GHC;
+    const total_amount = billTotal(current_rate, arrears, rebate, basic_rate);
     const amount_due = total_amount;
 
     const bill_details = {
         bill_type: 'PROPERTY_RATE',
+        basic_rate,
         items: [
             {
                 description: `Property Rate - ${property.classification_name || 'Standard'}`,
                 rate_info: rateDescription,
                 current_rate: current_rate.toFixed(2),
+                basic_rate: basic_rate.toFixed(2),
                 area: propertySize.toFixed(2),
                 arrears: arrears.toFixed(2),
                 rebate: rebate.toFixed(2),
@@ -259,6 +278,7 @@ export const calculatePropertyBill = async (
 
     return {
         current_rate,
+        basic_rate,
         arrears,
         rebate,
         total_amount,
@@ -340,15 +360,18 @@ export const calculateBusinessBill = async (
     const arrears = parseFloat(arrearsResult.rows[0].total_arrears);
     const priorBillIds: string[] = arrearsResult.rows[0].prior_bill_ids || [];
     const rebate = 0;
-    const total_amount = current_rate + arrears - rebate;
+    const basic_rate = BASIC_RATE_GHC;
+    const total_amount = billTotal(current_rate, arrears, rebate, basic_rate);
     const amount_due = total_amount;
 
     const bill_details = {
         bill_type: 'BOP',
+        basic_rate,
         items: [
             {
                 description: feeDescription || `BOP Fee - ${business.category_name}`,
                 current_rate: current_rate.toFixed(2),
+                basic_rate: basic_rate.toFixed(2),
                 area: '0.00',
                 arrears: arrears.toFixed(2),
                 rebate: rebate.toFixed(2),
@@ -360,6 +383,7 @@ export const calculateBusinessBill = async (
 
     return {
         current_rate,
+        basic_rate,
         arrears,
         rebate,
         total_amount,
@@ -408,10 +432,20 @@ export const generateBill = async (
         if (amountOverride.rebate !== undefined && Number.isFinite(Number(amountOverride.rebate))) {
             calculation.rebate = Number(amountOverride.rebate);
         }
-        calculation.total_amount = calculation.current_rate + calculation.arrears - calculation.rebate;
+        calculation.basic_rate = BASIC_RATE_GHC;
+        calculation.total_amount = billTotal(
+            calculation.current_rate,
+            calculation.arrears,
+            calculation.rebate,
+            calculation.basic_rate
+        );
         calculation.amount_due = calculation.total_amount;
+        if (calculation.bill_details) {
+            calculation.bill_details.basic_rate = calculation.basic_rate;
+        }
         if (calculation.bill_details?.items?.[0]) {
             calculation.bill_details.items[0].current_rate = calculation.current_rate.toFixed(2);
+            calculation.bill_details.items[0].basic_rate = calculation.basic_rate.toFixed(2);
             calculation.bill_details.items[0].arrears = calculation.arrears.toFixed(2);
             calculation.bill_details.items[0].rebate = calculation.rebate.toFixed(2);
             calculation.bill_details.items[0].total = calculation.current_rate.toFixed(2);
@@ -544,11 +578,21 @@ export const recordPayment = async (
             throw new Error(`Payment amount exceeds outstanding balance of GHS ${outstanding.toFixed(2)}`);
         }
 
-        // GCR format: YY/####### (e.g. 25/1234567)
-        const gcr = String(gcrNumber || '').trim();
-        if (!/^\d{2}\/\d{7}$/.test(gcr)) {
+        // GCR format: YY/####### — auto-insert slash for mobile digit-only entry
+        const gcr = normalizeGcrNumber(gcrNumber);
+        if (!isValidGcrNumber(gcr)) {
             throw new Error(
-                'Invalid GCR format. Use 00/0000000 (2 digits, slash, 7 digits), e.g. 25/1234567'
+                'Invalid GCR format. Enter 9 digits (2 + 7); slash is added automatically, e.g. 251234567 → 25/1234567'
+            );
+        }
+
+        const existingGcr = await client.query(
+            `SELECT id, receipt_number FROM payments WHERE gcr_number = $1 LIMIT 1`,
+            [gcr]
+        );
+        if (existingGcr.rows.length > 0) {
+            throw new Error(
+                `GCR ${gcr} is already used on receipt ${existingGcr.rows[0].receipt_number}. Each GCR can only be used once.`
             );
         }
 
@@ -602,6 +646,10 @@ export const recordPayment = async (
 };
 
 export default {
+    BASIC_RATE_GHC,
+    billTotal,
+    normalizeGcrNumber,
+    isValidGcrNumber,
     calculatePropertyBill,
     calculateBusinessBill,
     generateBill,

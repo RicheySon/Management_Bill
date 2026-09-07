@@ -490,19 +490,24 @@ function GenerateBillContent() {
                                             onChange={(e) => setRebateAmount(e.target.value)}
                                         />
                                     </div>
+                                    <div className="flex justify-between text-sm text-gray-600">
+                                        <span>Basic Rate (annual)</span>
+                                        <span>GHS 8.00</span>
+                                    </div>
                                     <div className="h-px bg-gray-100 my-2"></div>
                                     <div className="flex justify-between items-center font-bold text-lg">
                                         <span className="text-gray-900">Total Due:</span>
                                         <span className="text-municipal-red">
                                             GHS {(
                                                 (parseFloat(billAmount) || 0) +
+                                                8 +
                                                 (parseFloat(arrearsAmount) || 0) -
                                                 (parseFloat(rebateAmount) || 0)
                                             ).toLocaleString('en-GH', { minimumFractionDigits: 2 })}
                                         </span>
                                     </div>
                                     <p className="text-[11px] text-gray-500">
-                                        Edit the amount above before generating — this is what will appear on the bill.
+                                        Total includes the fixed GHS 8.00 annual basic rate on every bill.
                                     </p>
                                 </div>
                             </div>

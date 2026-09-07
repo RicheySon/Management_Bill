@@ -17,7 +17,7 @@ import {
     FileDown, Pencil
 } from 'lucide-react';
 
-import { GCR_HINT, GCR_INPUT_PATTERN, GCR_PLACEHOLDER, isValidGcr, normalizeGcr } from '@/lib/gcr';
+import { GCR_HINT, GCR_PLACEHOLDER, formatGcrInput, isValidGcr, normalizeGcr } from '@/lib/gcr';
 
 export default function BillDetailPage() {
     const { id } = useParams();
@@ -43,6 +43,15 @@ export default function BillDetailPage() {
         try {
             const data = await fetchBill(id as string);
             const billRow = data.bill ?? data;
+            let details = billRow.bill_details;
+            if (typeof details === 'string') {
+                try {
+                    details = JSON.parse(details);
+                } catch {
+                    details = null;
+                }
+            }
+            billRow.bill_details = details;
             const paymentRows = data.payments ?? [];
             setBill(billRow);
             setPayments(paymentRows);
@@ -216,6 +225,17 @@ export default function BillDetailPage() {
                                     <span>GHS {parseFloat(bill.current_rate || 0).toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between text-gray-600">
+                                    <span>Basic Rate (annual)</span>
+                                    <span>
+                                        GHS{' '}
+                                        {parseFloat(
+                                            bill.bill_details?.basic_rate ??
+                                                bill.basic_rate ??
+                                                8
+                                        ).toFixed(2)}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between text-gray-600">
                                     <span>Arrears</span>
                                     <span>GHS {parseFloat(bill.arrears || 0).toFixed(2)}</span>
                                 </div>
@@ -331,12 +351,13 @@ export default function BillDetailPage() {
                                         placeholder="Why is this change needed?"
                                     />
                                 </div>
-                                <div className="md:col-span-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm flex justify-between items-center">
-                                    <span className="font-medium text-gray-600">Estimated total</span>
+                                    <div className="md:col-span-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm flex justify-between items-center">
+                                    <span className="font-medium text-gray-600">Estimated total (incl. GHS 8 basic rate)</span>
                                     <span className="font-bold text-gray-900">
                                         GHS{' '}
                                         {(
                                             (parseFloat(amountForm.current_rate) || 0) +
+                                            8 +
                                             (parseFloat(amountForm.arrears) || 0) -
                                             (parseFloat(amountForm.rebate) || 0)
                                         ).toFixed(2)}
@@ -412,15 +433,16 @@ export default function BillDetailPage() {
                                     <label className="label">General Counterfoil Receipt (GCR) Number</label>
                                     <input
                                         type="text"
-                                        className="input-field font-mono"
+                                        className="input-field font-mono tracking-wider"
                                         placeholder={GCR_PLACEHOLDER}
                                         value={gcrNumber}
-                                        onChange={(e) => setGcrNumber(e.target.value.replace(/[^\d/]/g, '').slice(0, 10))}
+                                        onChange={(e) => setGcrNumber(formatGcrInput(e.target.value))}
                                         disabled={balance <= 0}
                                         minLength={10}
                                         maxLength={10}
-                                        pattern={GCR_INPUT_PATTERN}
                                         inputMode="numeric"
+                                        autoComplete="off"
+                                        enterKeyHint="done"
                                         required
                                     />
                                     <p className="text-[11px] text-gray-500 mt-1 leading-snug">{GCR_HINT}</p>

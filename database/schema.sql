@@ -439,6 +439,8 @@ CREATE TABLE payments (
 );
 
 CREATE INDEX idx_payments_receipt ON payments(receipt_number);
+CREATE UNIQUE INDEX idx_payments_gcr_number_unique ON payments (gcr_number)
+    WHERE gcr_number IS NOT NULL AND TRIM(gcr_number) <> '' AND UPPER(TRIM(gcr_number)) <> 'N/A';
 CREATE INDEX idx_payments_bill ON payments(bill_id);
 CREATE INDEX idx_payments_customer ON payments(customer_id);
 CREATE INDEX idx_payments_date ON payments(payment_date);
