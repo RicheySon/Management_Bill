@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import Joi from 'joi';
-import { generateBill, recordPayment } from '../services/billing.service';
+import { generateBill, recordPayment, normalizeGcrNumber, isValidGcrNumber, billTotal, BASIC_RATE_GHC } from '../services/billing.service';
 import { authenticateToken, authorize, AuthRequest, getCollectorAreaFilter } from '../middlewares/auth.middleware';
 import pool from '../config/database';
 import { createAmountChangeRequest } from '../services/amount-change.service';
@@ -114,7 +114,7 @@ router.put('/:id/amounts', async (req: AuthRequest, res: Response) => {
             const total_amount =
                 proposed.total_amount !== undefined
                     ? Number(proposed.total_amount)
-                    : current_rate + arrears - rebate;
+                    : billTotal(current_rate, arrears, rebate, BASIC_RATE_GHC);
             const amount_paid = Number(bill.amount_paid || 0);
             const amount_due = Math.max(total_amount - amount_paid, 0);
             let payment_status = 'UNPAID';
@@ -508,12 +508,16 @@ router.post('/:id/payment', authenticateToken, authorize(['record_payment']), as
             customer_id: Joi.string().uuid().required(),
             amount: Joi.number().positive().required(),
             payment_method: Joi.string().required(),
-            gcr_number: Joi.string().trim().required()
-                .pattern(/^\d{2}\/\d{7}$/)
-                .messages({
-                    'string.pattern.base':
-                        'GCR must be in format 00/0000000 (2 digits, slash, 7 digits). Example: 25/1234567',
-                }),
+            gcr_number: Joi.string().trim().required().custom((value, helpers) => {
+                const normalized = normalizeGcrNumber(value);
+                if (!isValidGcrNumber(normalized)) {
+                    return helpers.error('any.invalid');
+                }
+                return normalized;
+            }).messages({
+                'any.invalid':
+                    'GCR must be 9 digits (slash added automatically). Example: 251234567 → 25/1234567',
+            }),
             payment_reference: Joi.string().optional().allow(''),
         });
 

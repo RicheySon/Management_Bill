@@ -80,7 +80,8 @@ describe('billing.service smoke', () => {
         const calc = await calculatePropertyBill('prop-1', 2026);
         expect(calc.current_rate).toBe(200);
         expect(calc.arrears).toBe(50);
-        expect(calc.total_amount).toBe(250);
+        expect(calc.basic_rate).toBe(8);
+        expect(calc.total_amount).toBe(258); // 200 + 8 basic + 50 arrears
         expect(calc.prior_bill_ids).toContain('bill-old');
     });
 
@@ -182,6 +183,7 @@ describe('billing.service smoke', () => {
                         },
                     ],
                 })
+                .mockResolvedValueOnce({ rows: [] }) // no duplicate GCR
                 .mockResolvedValueOnce({ rows: [{ receipt_number: 'GN-RCT-2026-000001' }] })
                 .mockResolvedValueOnce({
                     rows: [{ id: 'pay-1', receipt_number: 'GN-RCT-2026-000001', amount: 100 }],
