@@ -15,7 +15,7 @@ import {
     formatGeoAddress,
 } from '@/lib/api-client';
 import { toCoord } from '@/lib/geo';
-import { feeAmountForPropertyClass } from '@/lib/property-fee';
+import { feeAmountForPropertyClass, propertyClassLabel } from '@/lib/property-fee';
 import { ArrowLeft, Save, UserPlus, UserCheck, MapPin, Navigation, Map as MapIcon, X, Phone, Mail, User, CheckCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -571,7 +571,7 @@ export default function NewPropertyPage() {
 
                         <div>
                             <label className="label">
-                                Property Class <span className="text-municipal-red">*</span>
+                                Property Class (Category) <span className="text-municipal-red">*</span>
                             </label>
                             <DropdownSelect
                                 value={watch('classification_id') ?? ''}
@@ -586,14 +586,22 @@ export default function NewPropertyPage() {
                                             if (amount > 0) {
                                                 setAssessedAmount(String(amount));
                                                 setSelectedRateInfo(
-                                                    `${zone.zone_name} × ${cls.name}: GHS ${amount.toLocaleString()}`
+                                                    `${zone.zone_name} × ${propertyClassLabel(cls.name)}: GHS ${amount.toLocaleString()}`
+                                                );
+                                            } else {
+                                                setAssessedAmount('');
+                                                setSelectedRateInfo(
+                                                    `${zone.zone_name} × ${propertyClassLabel(cls.name)} — no fee set for this category in Fee Configuration`
                                                 );
                                             }
                                         }
                                     }
                                 }}
-                                placeholder="Select option"
-                                options={classifications.map((c: any) => ({ value: String(c.id), label: c.name }))}
+                                placeholder="Select Category A–D"
+                                options={classifications.map((c: any) => ({
+                                    value: String(c.id),
+                                    label: propertyClassLabel(c.name) || c.name,
+                                }))}
                             />
                             <input type="hidden" {...register('classification_id', { required: 'Please select property class' })} />
                             {errors.classification_id && (
@@ -601,10 +609,10 @@ export default function NewPropertyPage() {
                             )}
                         </div>
 
-                        {/* Rating Zone (from configured fee schedule) */}
+                        {/* Rating Zone — name only; amount comes from Category × fee fixing */}
                         {rateZones.length > 0 && (
                             <div>
-                                <label className="label">Rating Zone (Fee Schedule) <span className="text-gray-400 font-normal">(select if available)</span></label>
+                                <label className="label">Rating Zone <span className="text-gray-400 font-normal">(zone / house name)</span></label>
                                 <DropdownSelect
                                     value={selectedRateZoneId}
                                     onChange={(v) => {
@@ -619,11 +627,16 @@ export default function NewPropertyPage() {
                                                     setAssessedAmount(String(amount));
                                                     setSelectedRateInfo(
                                                         cls
-                                                            ? `${zone.zone_name} × ${cls.name}: GHS ${amount.toLocaleString()}`
-                                                            : `${zone.zone_name}: GHS ${amount.toLocaleString()} (select class for exact column)`
+                                                            ? `${zone.zone_name} × ${propertyClassLabel(cls.name)}: GHS ${amount.toLocaleString()}`
+                                                            : `${zone.zone_name} — select Category A–D for the bill amount`
                                                     );
                                                 } else {
-                                                    setSelectedRateInfo(`${zone.zone_name} — set class fees in Fee Configuration`);
+                                                    setAssessedAmount('');
+                                                    setSelectedRateInfo(
+                                                        cls
+                                                            ? `${zone.zone_name} × ${propertyClassLabel(cls.name)} — no fee set for this category`
+                                                            : `${zone.zone_name} — select Category A–D for the bill amount`
+                                                    );
                                                 }
                                             }
                                         } else {
@@ -633,7 +646,7 @@ export default function NewPropertyPage() {
                                     placeholder="Select rating zone"
                                     options={rateZones.map((zone: any) => ({
                                         value: String(zone.id),
-                                        label: `${zone.zone_name} (${zone.zone_type}) — 1st: GHS ${Number(zone.cat_a_fee || zone.minimum_rate_min || 0).toLocaleString()}`,
+                                        label: zone.zone_name,
                                     }))}
                                 />
                                 {selectedRateInfo && (
@@ -657,7 +670,7 @@ export default function NewPropertyPage() {
                                 required
                             />
                             <p className="text-xs text-gray-500 mt-1">
-                                Auto-fills from fee fixing when you pick Property Class + Rating Zone (editable).
+                                Auto-fills from fee fixing when you pick Category A–D + Rating Zone (editable).
                             </p>
                         </div>
 

@@ -15,24 +15,42 @@ interface BillCalculation {
     prior_bill_ids?: string[];
 }
 
-/** Parse "1st Class" / "2nd Class" → 1, 2, … */
+const LETTER_TO_CLASS: Record<string, number> = { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6 };
+
+/** Parse "1st Class" / "Category A" / "CAT B" / legacy Residential → 1, 2, … */
 export const propertyClassNumber = (classificationName?: string | null): number | null => {
     if (!classificationName) return null;
-    const match = String(classificationName).match(/(\d+)/);
-    if (!match) return null;
-    const n = parseInt(match[1], 10);
-    return Number.isFinite(n) && n > 0 ? n : null;
+    const raw = String(classificationName).trim().toLowerCase();
+
+    if (raw === 'residential') return 1;
+    if (raw === 'commercial') return 2;
+    if (raw === 'industrial') return 3;
+    if (raw === 'mixed use' || raw === 'mixed_use') return 4;
+
+    const letterMatch =
+        raw.match(/^category\s*([a-f])\b/) ||
+        raw.match(/^cat[_\s-]?([a-f])\b/) ||
+        raw.match(/\b([a-f])\s*class\b/);
+    if (letterMatch) return LETTER_TO_CLASS[letterMatch[1]] || null;
+
+    const digitMatch = raw.match(/(\d+)/);
+    if (digitMatch) {
+        const n = parseInt(digitMatch[1], 10);
+        return Number.isFinite(n) && n > 0 ? n : null;
+    }
+    return null;
 };
 
 /**
- * Resolve bill amount from a fee-fixing zone using property class.
- * Fee-fixing Excel: unassessed rows use 1st/2nd/3rd(/4th) columns → cat_a/b/c/d.
+ * Resolve bill amount from a fee-fixing zone using property class / Category A–D.
+ * Fee-fixing Excel: class columns → cat_a/b/c/d.
  */
 export const feeAmountForPropertyClass = (
     zone: any,
     classificationName?: string | null,
     propertySize = 50
 ): number => {
+    if (!zone) return 0;
     const classNum = propertyClassNumber(classificationName);
     const catMap: Record<number, any> = {
         1: zone.cat_a_fee,
@@ -40,32 +58,37 @@ export const feeAmountForPropertyClass = (
         3: zone.cat_c_fee,
         4: zone.cat_d_fee,
     };
-    if (classNum && catMap[classNum] != null && catMap[classNum] !== '') {
-        const fee = parseFloat(catMap[classNum]);
-        if (!isNaN(fee) && fee > 0) return fee;
+
+    // Explicit class → only that CAT column (no silent CAT A fallback)
+    if (classNum) {
+        const raw = catMap[classNum];
+        if (raw != null && raw !== '') {
+            const fee = parseFloat(String(raw));
+            if (!isNaN(fee) && fee > 0) return fee;
+        }
+        return 0;
     }
 
-    // Prefer CAT A / minimum for unassessed flat fees when class column missing
-    const catA = parseFloat(zone.cat_a_fee);
+    const catA = parseFloat(String(zone.cat_a_fee ?? ''));
     if (!isNaN(catA) && catA > 0) return catA;
 
-    const rateImpost = parseFloat(zone.rate_impost_min) || 0;
-    const minimumRate = parseFloat(zone.minimum_rate_min) || 0;
+    const rateImpost = parseFloat(String(zone.rate_impost_min ?? 0)) || 0;
+    const minimumRate = parseFloat(String(zone.minimum_rate_min ?? 0)) || 0;
     const calculatedRate = rateImpost * propertySize;
     let current = Math.max(calculatedRate, minimumRate || 0);
     if ((!current || current <= 0) && minimumRate > 0) current = minimumRate;
     return current || 0;
 };
 
-/** "Category A" / "A" / "CAT A" → a */
-export const businessCategoryLetter = (categoryClass?: string | null): string => {
-    if (!categoryClass) return 'a';
+/** "Category A" / "A" / "CAT A" → a (null if unknown) */
+export const businessCategoryLetter = (categoryClass?: string | null): string | null => {
+    if (!categoryClass) return null;
     const raw = String(categoryClass).trim().toLowerCase();
     const match = raw.match(/([a-f])\b/) || raw.match(/cat[_\s-]?([a-f])/);
     if (match) return match[1];
     const stripped = raw.replace(/^category\s*/i, '').replace(/^cat[_\s-]*/i, '').trim();
     if (/^[a-f]$/.test(stripped)) return stripped;
-    return 'a';
+    return null;
 };
 
 /** BOP fee from fee-fixing item + category class (CAT A/B/C/D). */
@@ -75,8 +98,12 @@ export const feeAmountForBusinessCategory = (
 ): number => {
     if (!feeItem) return 0;
     const letter = businessCategoryLetter(categoryClass);
-    const preferred = parseFloat(feeItem[`cat_${letter}_fee`]);
-    if (!isNaN(preferred) && preferred > 0) return preferred;
+
+    if (letter) {
+        const preferred = parseFloat(String(feeItem[`cat_${letter}_fee`] ?? ''));
+        if (!isNaN(preferred) && preferred > 0) return preferred;
+        return 0;
+    }
 
     const fallbackFees = [
         feeItem.cat_a_fee,
@@ -86,7 +113,7 @@ export const feeAmountForBusinessCategory = (
         feeItem.cat_e_fee,
         feeItem.cat_f_fee,
     ]
-        .map((v: any) => parseFloat(v))
+        .map((v: any) => parseFloat(String(v)))
         .filter((n: number) => !isNaN(n) && n > 0);
     return fallbackFees[0] || 0;
 };

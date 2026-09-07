@@ -372,6 +372,7 @@ router.put('/:id', authorize(['edit_property']), async (req: AuthRequest, res: R
             population_density: Joi.string().optional().allow('', null),
             property_size: Joi.number().min(0).optional().allow(null, ''),
             property_rate_zone_id: Joi.number().integer().optional().allow(null, ''),
+            assessed_amount: Joi.number().min(0).optional().allow(null, ''),
             status: Joi.string().valid('ACTIVE', 'INACTIVE', 'DEMOLISHED').optional(),
         });
 
@@ -382,6 +383,13 @@ router.put('/:id', authorize(['edit_property']), async (req: AuthRequest, res: R
                 success: false,
                 error: error.details[0].message,
             });
+        }
+
+        if (value.assessed_amount === '' || value.assessed_amount === undefined) {
+            // leave undefined = don't touch; empty string → null clear
+            if (value.assessed_amount === '') value.assessed_amount = null;
+        } else if (value.assessed_amount !== null && value.assessed_amount !== undefined) {
+            value.assessed_amount = Number(value.assessed_amount);
         }
 
         const fields = Object.keys(value);

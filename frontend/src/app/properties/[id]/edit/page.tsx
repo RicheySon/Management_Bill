@@ -17,6 +17,7 @@ import {
 } from '@/lib/api-client';
 import { toCoord } from '@/lib/geo';
 import DropdownSelect from '@/components/DropdownSelect';
+import { feeAmountForPropertyClass, propertyClassLabel } from '@/lib/property-fee';
 import { ArrowLeft, Save, Navigation, Map as MapIcon, X, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -91,6 +92,8 @@ export default function EditPropertyPage() {
     const [loading, setLoading] = useState(true);
     const [customerId, setCustomerId] = useState<string | null>(null);
     const [selectedRateZoneId, setSelectedRateZoneId] = useState<string>('');
+    const [assessedAmount, setAssessedAmount] = useState('');
+    const [selectedRateInfo, setSelectedRateInfo] = useState('');
     const [isDetecting, setIsDetecting] = useState(false);
     const [showMap, setShowMap] = useState(false);
     const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
@@ -187,6 +190,9 @@ export default function EditPropertyPage() {
                 if (p.property_rate_zone_id) {
                     setSelectedRateZoneId(p.property_rate_zone_id.toString());
                 }
+                if (p.assessed_amount != null && p.assessed_amount !== '') {
+                    setAssessedAmount(String(p.assessed_amount));
+                }
 
                 setClassifications(classificationsData);
                 setElectoralAreas(areasData);
@@ -277,6 +283,7 @@ export default function EditPropertyPage() {
                 local_area_id: toNullableId(data.local_area_id),
                 population_density: data.population_density,
                 property_rate_zone_id: selectedRateZoneId ? parseInt(selectedRateZoneId) : null,
+                assessed_amount: assessedAmount === '' ? null : Number(assessedAmount),
             });
 
             setSuccess(true);
@@ -418,28 +425,98 @@ export default function EditPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">Property Class <span className="text-municipal-red">*</span></label>
+                            <label className="label">Property Class (Category) <span className="text-municipal-red">*</span></label>
                             <DropdownSelect
                                 value={watch('classification_id') ?? ''}
-                                onChange={(v) => setValue('classification_id', (v === '' ? undefined : Number(v)) as any, { shouldValidate: true })}
-                                placeholder="Select option"
-                                options={classifications.map((c: any) => ({ value: String(c.id), label: c.name }))}
+                                onChange={(v) => {
+                                    const classId = v === '' ? undefined : Number(v);
+                                    setValue('classification_id', classId as any, { shouldValidate: true });
+                                    const cls = (classifications as any[]).find((c: any) => c.id === classId);
+                                    if (selectedRateZoneId) {
+                                        const zone = rateZones.find((z: any) => z.id === parseInt(selectedRateZoneId));
+                                        if (zone && cls) {
+                                            const amount = feeAmountForPropertyClass(zone, cls.name);
+                                            if (amount > 0) {
+                                                setAssessedAmount(String(amount));
+                                                setSelectedRateInfo(
+                                                    `${zone.zone_name} × ${propertyClassLabel(cls.name)}: GHS ${amount.toLocaleString()}`
+                                                );
+                                            } else {
+                                                setAssessedAmount('');
+                                                setSelectedRateInfo(
+                                                    `${zone.zone_name} × ${propertyClassLabel(cls.name)} — no fee set for this category`
+                                                );
+                                            }
+                                        }
+                                    }
+                                }}
+                                placeholder="Select Category A–D"
+                                options={(classifications as any[]).map((c: any) => ({
+                                    value: String(c.id),
+                                    label: propertyClassLabel(c.name) || c.name,
+                                }))}
                             />
                             <input type="hidden" {...register('classification_id', { required: 'Please select property class' })} />
                             {errors.classification_id && <p className="text-red-500 text-sm mt-1">{errors.classification_id.message}</p>}
                         </div>
 
                         <div>
-                            <label className="label">Rating Zone (Fee Schedule)</label>
+                            <label className="label">Rating Zone <span className="text-gray-400 font-normal">(zone / house name)</span></label>
                             <DropdownSelect
                                 value={selectedRateZoneId}
-                                onChange={(v) => setSelectedRateZoneId(v)}
+                                onChange={(v) => {
+                                    setSelectedRateZoneId(v);
+                                    if (v) {
+                                        const zone = rateZones.find((z: any) => z.id === parseInt(v));
+                                        const classId = watch('classification_id');
+                                        const cls = (classifications as any[]).find((c: any) => c.id === Number(classId));
+                                        if (zone) {
+                                            const amount = feeAmountForPropertyClass(zone, cls?.name);
+                                            if (amount > 0) {
+                                                setAssessedAmount(String(amount));
+                                                setSelectedRateInfo(
+                                                    cls
+                                                        ? `${zone.zone_name} × ${propertyClassLabel(cls.name)}: GHS ${amount.toLocaleString()}`
+                                                        : `${zone.zone_name} — select Category A–D for the bill amount`
+                                                );
+                                            } else {
+                                                setAssessedAmount('');
+                                                setSelectedRateInfo(
+                                                    cls
+                                                        ? `${zone.zone_name} × ${propertyClassLabel(cls.name)} — no fee set for this category`
+                                                        : `${zone.zone_name} — select Category A–D for the bill amount`
+                                                );
+                                            }
+                                        }
+                                    } else {
+                                        setSelectedRateInfo('');
+                                    }
+                                }}
                                 placeholder="Select rating zone"
                                 options={rateZones.map((zone: any) => ({
                                     value: String(zone.id),
-                                    label: `${zone.zone_name} (${zone.zone_type}) — 1st: GHS ${Number(zone.cat_a_fee || zone.minimum_rate_min || 0).toLocaleString()}`,
+                                    label: zone.zone_name,
                                 }))}
                             />
+                            {selectedRateInfo && (
+                                <p className="text-sm text-green-700 font-medium mt-1">{selectedRateInfo}</p>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="label">Bill Amount (GHS)</label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                className="input-field"
+                                placeholder="Bill Amount (GHS)"
+                                value={assessedAmount}
+                                onChange={(e) => setAssessedAmount(e.target.value)}
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                                Auto-fills from fee fixing when you pick Category A–D + Rating Zone (editable).
+                            </p>
                         </div>
 
                         <div>

@@ -161,8 +161,8 @@ export default function FeeConfigurationPage() {
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">Fee Configuration</h1>
                             <p className="text-sm text-gray-500">Configure fee schedules for property rates and business licenses</p>
-                            <p className="text-xs text-amber-700 mt-1">
-                                Rate / fee amount edits are submitted for Super Admin approval before they take effect.
+                            <p className="text-xs text-green-700 mt-1">
+                                Fee amount edits apply immediately — no approval required.
                             </p>
                         </div>
                     </div>
@@ -435,7 +435,7 @@ function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
                 <div>
                     <h2 className="text-lg font-bold text-gray-900">Property Rating Zones</h2>
                     <p className="text-xs text-gray-500 mt-1">
-                        Class fees follow fee fixing: 1st–4th Class columns (e.g. 1Room × 1st Class = bill amount).
+                        Class fees follow fee fixing: Category A–D columns (e.g. 1Room × Category A = bill amount).
                     </p>
                 </div>
                 {canConfigure && (
@@ -469,10 +469,10 @@ function PropertyRatesTab({ scheduleId, canConfigure, showMessage }: {
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Type</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Class</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Rate Impost</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">1st</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">2nd</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">3rd</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">4th</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Cat A</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Cat B</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Cat C</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Cat D</th>
                                 {canConfigure && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>}
                             </tr>
                         </thead>
@@ -590,20 +590,20 @@ function PropertyZoneForm({ zone, onSubmit, onCancel }: {
                     <input type="number" step="0.000001" className="input-field" value={formData.rate_impost_min} onChange={e => handleChange('rate_impost_min', e.target.value)} required placeholder="0.0023" />
                 </div>
                 <div>
-                    <label className="label">1st Class Fee *</label>
+                    <label className="label">Category A Fee *</label>
                     <input type="number" step="0.01" className="input-field" value={formData.cat_a_fee} onChange={e => handleChange('cat_a_fee', e.target.value)} required placeholder="300.00" />
-                    <p className="text-[10px] text-gray-500 mt-1">Fee-fixing 1st class column</p>
+                    <p className="text-[10px] text-gray-500 mt-1">Fee-fixing CAT A column</p>
                 </div>
                 <div>
-                    <label className="label">2nd Class Fee</label>
+                    <label className="label">Category B Fee</label>
                     <input type="number" step="0.01" className="input-field" value={formData.cat_b_fee} onChange={e => handleChange('cat_b_fee', e.target.value)} placeholder="200.00" />
                 </div>
                 <div>
-                    <label className="label">3rd Class Fee</label>
+                    <label className="label">Category C Fee</label>
                     <input type="number" step="0.01" className="input-field" value={formData.cat_c_fee} onChange={e => handleChange('cat_c_fee', e.target.value)} placeholder="100.00" />
                 </div>
                 <div>
-                    <label className="label">4th Class Fee</label>
+                    <label className="label">Category D Fee</label>
                     <input type="number" step="0.01" className="input-field" value={formData.cat_d_fee} onChange={e => handleChange('cat_d_fee', e.target.value)} placeholder="50.00" />
                 </div>
             </div>
