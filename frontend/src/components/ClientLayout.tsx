@@ -85,8 +85,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                             <CollectorNavLink href="/properties" icon={<Building2 className="w-6 h-6" />} label="Property Rates" onClick={() => setIsSidebarOpen(false)} />
                             <CollectorNavLink href="/businesses" icon={<Briefcase className="w-6 h-6" />} label="Business Owners" onClick={() => setIsSidebarOpen(false)} />
                             <CollectorNavLink href="/businesses#permits" icon={<ClipboardList className="w-6 h-6" />} label="Business Operation Permits" onClick={() => setIsSidebarOpen(false)} />
-                            {(hasPermission('request_print') || hasPermission('request_delete') || hasPermission('record_payment')) && (
-                                <CollectorNavLink href="/billing" icon={<ClipboardList className="w-6 h-6" />} label="Bills & Requests" onClick={() => setIsSidebarOpen(false)} />
+                            {(hasPermission('request_print') || hasPermission('request_delete') || hasPermission('record_payment') || hasPermission('print_bill')) && (
+                                <CollectorNavLink href="/billing" icon={<ClipboardList className="w-6 h-6" />} label="Bills" onClick={() => setIsSidebarOpen(false)} />
                             )}
                         </ul>
                     </nav>
@@ -180,8 +180,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                             <NavLink href="/billing" icon={<DollarSign className="w-5 h-5" />} label="Billing" onClick={() => setIsSidebarOpen(false)} />
                         }
 
-                        {/* Cashier / collectors who pay or request actions */}
-                        {!hasPermission('generate_bill') && (hasPermission('record_payment') || hasPermission('request_print') || hasPermission('request_delete')) &&
+                        {/* Cashier / collectors who pay, download, or request actions */}
+                        {!hasPermission('generate_bill') && (hasPermission('record_payment') || hasPermission('request_print') || hasPermission('request_delete') || hasPermission('print_bill')) &&
                             <NavLink href="/billing" icon={<DollarSign className="w-5 h-5" />} label="Billing & Payments" onClick={() => setIsSidebarOpen(false)} />
                         }
 

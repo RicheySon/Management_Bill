@@ -145,7 +145,7 @@ INSERT INTO roles (name, description) VALUES
 ('Revenue Officer', 'Registration and billing access'),
 ('Cashier', 'Payment recording only'),
 ('Data Entry', 'Registration/Capturing only'),
-('Supervisor', 'Review and approval access'),
+('Supervisor', 'Review, approval, and fee configuration access'),
 ('Auditor', 'Read-only access'),
 ('Revenue Collector', 'Field data collection and registration'),
 ('Approver', 'Approve privileged print/delete action requests');
@@ -190,14 +190,14 @@ WHERE r.name = 'Admin' AND p.code IN (
     'approve_privileged_actions'
 );
 
--- Map Permissions to Revenue Officer (view/register/bill/pay + request print; no delete/edit)
+-- Map Permissions to Revenue Officer (view/register/bill/pay + direct download/print; no delete)
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p 
 WHERE r.name = 'Revenue Officer' AND p.code IN (
     'create_customer', 'view_customer',
     'register_property', 'register_business',
     'generate_bill', 'record_payment', 'view_reports',
-    'request_print'
+    'print_bill'
 );
 
 -- Map Permissions to Cashier
@@ -214,13 +214,13 @@ WHERE r.name = 'Data Entry' AND p.code IN (
     'create_customer', 'view_customer', 'register_property', 'register_business'
 );
 
--- Map Permissions to Supervisor (includes Data Entry capabilities)
+-- Map Permissions to Supervisor (includes Data Entry + Fee Configuration)
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p 
 WHERE r.name = 'Supervisor' AND p.code IN (
     'create_customer', 'edit_customer', 'view_customer',
     'register_property', 'register_business',
-    'view_reports', 'bulk_print'
+    'view_reports', 'bulk_print', 'configure_rates'
 );
 
 -- Map Permissions to Auditor
@@ -230,14 +230,14 @@ WHERE r.name = 'Auditor' AND p.code IN (
     'view_customer', 'view_reports', 'view_logs'
 );
 
--- Map Permissions to Revenue Collector
+-- Map Permissions to Revenue Collector (field work + direct download/print)
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
 WHERE r.name = 'Revenue Collector' AND p.code IN (
     'create_customer', 'view_customer',
     'register_property',
     'register_business',
-    'request_print'
+    'print_bill'
 );
 
 -- Map Permissions to Approver (additive approval rule)
