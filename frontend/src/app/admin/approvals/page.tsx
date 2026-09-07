@@ -114,7 +114,7 @@ export default function ApprovalsPage() {
                         Approvals
                     </h1>
                     <p className="text-gray-500">
-                        Review amount changes and print/delete requests from officers and collectors.
+                        Review amount changes (including Supervisor fee edits) and print/delete requests.
                     </p>
                 </div>
                 <select

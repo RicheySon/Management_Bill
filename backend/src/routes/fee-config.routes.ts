@@ -109,6 +109,7 @@ const businessFeeItemSchema = Joi.object({
     cat_f_fee: Joi.number().min(0).allow(null).optional(),
     is_group_header: Joi.boolean().optional(),
     sort_order: Joi.number().integer().optional(),
+    reason: Joi.string().allow('', null).optional(),
 });
 
 // =====================================================
@@ -292,6 +293,7 @@ router.put('/property-zones/:zoneId', authorize(['configure_rates']), async (req
         }
 
         const { money, metadata } = splitMoneyFields(value, ZONE_MONEY);
+        delete (metadata as any).reason;
         let pendingRequest = null;
 
         if (Object.keys(metadata).length > 0) {
