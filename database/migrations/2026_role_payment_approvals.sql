@@ -111,11 +111,11 @@ WHERE r.name = 'Revenue Collector'
 ON CONFLICT DO NOTHING;
 
 -- =====================================================
--- 7. Cashier: ensure billing/payment access stays solid
+-- 7. Cashier: view + payment only (no print/delete)
 -- =====================================================
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r, permissions p
 WHERE r.name = 'Cashier'
-  AND p.code IN ('view_customer', 'record_payment', 'print_bill')
+  AND p.code IN ('view_customer', 'record_payment')
 ON CONFLICT DO NOTHING;
