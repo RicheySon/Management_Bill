@@ -17,10 +17,15 @@ interface BillCalculation {
 
 const LETTER_TO_CLASS: Record<string, number> = { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6 };
 
-/** Parse "1st Class" / "Category A" / "CAT B" → 1, 2, … */
+/** Parse "1st Class" / "Category A" / "CAT B" / legacy Residential → 1, 2, … */
 export const propertyClassNumber = (classificationName?: string | null): number | null => {
     if (!classificationName) return null;
     const raw = String(classificationName).trim().toLowerCase();
+
+    if (raw === 'residential') return 1;
+    if (raw === 'commercial') return 2;
+    if (raw === 'industrial') return 3;
+    if (raw === 'mixed use' || raw === 'mixed_use') return 4;
 
     const letterMatch =
         raw.match(/^category\s*([a-f])\b/) ||
