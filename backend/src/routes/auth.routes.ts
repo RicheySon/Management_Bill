@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import pool from '../config/database';
 import { JWT_SECRET, loadUserElectoralAreas } from '../middlewares/auth.middleware';
 import { getAuditContext, logAction } from '../services/audit.service';
+import { loadUserRolesAndPermissions } from '../services/role-permissions.service';
 
 const router = express.Router();
 
@@ -41,16 +42,9 @@ router.post('/login', async (req, res) => {
     try {
         const userQuery = `
             SELECT 
-                u.id, u.full_name, u.email, u.password_hash, u.status,
-                array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) as roles,
-                array_agg(DISTINCT p.code) FILTER (WHERE p.code IS NOT NULL) as permissions
+                u.id, u.full_name, u.email, u.password_hash, u.status
             FROM system_users u
-            LEFT JOIN user_roles ur ON u.id = ur.user_id
-            LEFT JOIN roles r ON ur.role_id = r.id
-            LEFT JOIN role_permissions rp ON r.id = rp.role_id
-            LEFT JOIN permissions p ON rp.permission_id = p.id
             WHERE u.email = $1
-            GROUP BY u.id
         `;
 
         const result = await pool.query(userQuery, [email]);
@@ -68,8 +62,8 @@ router.post('/login', async (req, res) => {
         }
 
         const electoralAreaIds = await loadUserElectoralAreas(user.id);
-        const roles = (user.roles || []).filter(Boolean);
-        const permissions = (user.permissions || []).filter(Boolean);
+        // Self-heals Supervisor → configure_rates if migration was never applied on this DB
+        const { roles, permissions } = await loadUserRolesAndPermissions(user.id);
 
         const token = jwt.sign(
             {
@@ -113,7 +107,7 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// Validate Token Endpoint
+// Validate Token Endpoint — refresh roles/permissions so Fee Configuration appears after deploy
 router.get('/validate', async (req, res) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -126,7 +120,7 @@ router.get('/validate', async (req, res) => {
         const decoded = jwt.verify(token, JWT_SECRET) as any;
 
         const result = await pool.query(
-            'SELECT id, status FROM system_users WHERE id = $1',
+            'SELECT id, full_name, email, status FROM system_users WHERE id = $1',
             [decoded.id]
         );
 
@@ -134,7 +128,35 @@ router.get('/validate', async (req, res) => {
             return res.status(401).json({ success: false, error: 'User not found or inactive' });
         }
 
-        res.json({ success: true, valid: true });
+        const dbUser = result.rows[0];
+        const electoralAreaIds = await loadUserElectoralAreas(dbUser.id);
+        const { roles, permissions } = await loadUserRolesAndPermissions(dbUser.id);
+
+        const freshToken = jwt.sign(
+            {
+                id: dbUser.id,
+                email: dbUser.email,
+                permissions,
+                roles,
+                electoral_area_ids: electoralAreaIds,
+            },
+            JWT_SECRET,
+            { expiresIn: '8h' }
+        );
+
+        res.json({
+            success: true,
+            valid: true,
+            token: freshToken,
+            user: {
+                id: dbUser.id,
+                full_name: dbUser.full_name,
+                email: dbUser.email,
+                roles,
+                permissions,
+                electoral_area_ids: electoralAreaIds,
+            },
+        });
     } catch (err) {
         res.status(401).json({ success: false, error: 'Invalid or expired token' });
     }

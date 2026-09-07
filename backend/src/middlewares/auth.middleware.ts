@@ -58,9 +58,15 @@ export const authorize = (requiredPermissions: string[]) => {
             return;
         }
 
-        const hasPermission = requiredPermissions.every((perm) =>
-            req.user?.permissions?.includes(perm)
-        );
+        const roles = req.user.roles || [];
+        const perms = req.user.permissions || [];
+
+        const hasPermission = requiredPermissions.every((perm) => {
+            if (perms.includes(perm)) return true;
+            // Supervisors always allowed to configure fee schedules
+            if (perm === 'configure_rates' && roles.includes('Supervisor')) return true;
+            return false;
+        });
 
         if (!hasPermission) {
             res.status(403).json({
