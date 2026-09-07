@@ -143,7 +143,7 @@ INSERT INTO roles (name, description) VALUES
 ('Super Admin', 'Full system access'),
 ('Admin', 'Management and approval access'),
 ('Revenue Officer', 'Registration and billing access'),
-('Cashier', 'Payment recording only'),
+('Cashier', 'View bills and record payments only'),
 ('Data Entry', 'Registration/Capturing only'),
 ('Supervisor', 'Review, approval, and fee configuration access'),
 ('Auditor', 'Read-only access'),
@@ -200,11 +200,11 @@ WHERE r.name = 'Revenue Officer' AND p.code IN (
     'print_bill'
 );
 
--- Map Permissions to Cashier
+-- Map Permissions to Cashier (view + payment only; no print or delete)
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p 
 WHERE r.name = 'Cashier' AND p.code IN (
-    'view_customer', 'record_payment', 'print_bill'
+    'view_customer', 'record_payment'
 );
 
 -- Map Permissions to Data Entry

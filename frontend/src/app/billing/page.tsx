@@ -31,7 +31,7 @@ export default function BillingPage() {
 
     const canGenerate = hasPermission('generate_bill');
     const canPrintDirect = hasPermission('print_bill') || hasPermission('bulk_print') || hasPermission('manage_users');
-    // Direct delete only — Cashiers / Revenue Officers must not see a delete icon
+    // Direct delete only — Cashier has view + payment only (no delete / print)
     const canDeleteDirect = hasPermission('delete_bill');
     const canEditLinked =
         hasPermission('edit_customer') ||
