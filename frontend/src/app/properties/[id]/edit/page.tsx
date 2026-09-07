@@ -194,7 +194,7 @@ export default function EditPropertyPage() {
                 if (p.assessed_amount != null && p.assessed_amount !== '') {
                     setAssessedAmount(String(p.assessed_amount));
                 }
-                const latestBill = (data.bills || data.outstanding_bills || [])[0];
+                const latestBill = (propertyData.bills || propertyData.outstanding_bills || [])[0];
                 if (latestBill?.arrears != null) {
                     setArrearsAmount(String(latestBill.arrears));
                 }
