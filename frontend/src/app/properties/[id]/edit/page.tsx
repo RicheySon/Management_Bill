@@ -93,6 +93,7 @@ export default function EditPropertyPage() {
     const [customerId, setCustomerId] = useState<string | null>(null);
     const [selectedRateZoneId, setSelectedRateZoneId] = useState<string>('');
     const [assessedAmount, setAssessedAmount] = useState('');
+    const [arrearsAmount, setArrearsAmount] = useState('');
     const [selectedRateInfo, setSelectedRateInfo] = useState('');
     const [isDetecting, setIsDetecting] = useState(false);
     const [showMap, setShowMap] = useState(false);
@@ -193,6 +194,10 @@ export default function EditPropertyPage() {
                 if (p.assessed_amount != null && p.assessed_amount !== '') {
                     setAssessedAmount(String(p.assessed_amount));
                 }
+                const latestBill = (data.bills || data.outstanding_bills || [])[0];
+                if (latestBill?.arrears != null) {
+                    setArrearsAmount(String(latestBill.arrears));
+                }
 
                 setClassifications(classificationsData);
                 setElectoralAreas(areasData);
@@ -284,6 +289,7 @@ export default function EditPropertyPage() {
                 population_density: data.population_density,
                 property_rate_zone_id: selectedRateZoneId ? parseInt(selectedRateZoneId) : null,
                 assessed_amount: assessedAmount === '' ? null : Number(assessedAmount),
+                arrears: arrearsAmount === '' ? undefined : Number(arrearsAmount),
             });
 
             setSuccess(true);
@@ -516,6 +522,22 @@ export default function EditPropertyPage() {
                             />
                             <p className="text-xs text-gray-500 mt-1">
                                 Auto-fills from fee fixing when you pick Category A–D + Rating Zone (editable).
+                            </p>
+                        </div>
+
+                        <div>
+                            <label className="label">Arrears (GHS)</label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                className="input-field border-amber-300 focus:ring-amber-500"
+                                placeholder="0.00"
+                                value={arrearsAmount}
+                                onChange={(e) => setArrearsAmount(e.target.value)}
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                                Updates arrears on the latest property bill when saved.
                             </p>
                         </div>
 

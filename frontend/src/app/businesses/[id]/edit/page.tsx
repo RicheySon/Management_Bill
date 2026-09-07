@@ -85,6 +85,7 @@ export default function EditBusinessPage() {
     const [selectedFeeItemId, setSelectedFeeItemId] = useState<string>('');
     const [selectedFeeAmount, setSelectedFeeAmount] = useState<string>('');
     const [assessedAmount, setAssessedAmount] = useState<string>('');
+    const [arrearsAmount, setArrearsAmount] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -160,6 +161,10 @@ export default function EditBusinessPage() {
                 }
                 if (b.assessed_amount != null && b.assessed_amount !== '') {
                     setAssessedAmount(String(b.assessed_amount));
+                }
+                const latestBill = (businessData.bills || businessData.outstanding_bills || [])[0];
+                if (latestBill?.arrears != null) {
+                    setArrearsAmount(String(latestBill.arrears));
                 }
 
                 // Fill business owner (customer) fields
@@ -268,6 +273,7 @@ export default function EditBusinessPage() {
                 local_area_id: toNullableId(data.local_area_id),
                 fee_item_id: selectedFeeItemId ? parseInt(selectedFeeItemId) : null,
                 assessed_amount: toOptionalNumber(assessedAmount),
+                arrears: toOptionalNumber(arrearsAmount),
             });
 
             setSuccess(true);
@@ -502,6 +508,22 @@ export default function EditBusinessPage() {
                             />
                             <p className="text-xs text-gray-500 mt-1">
                                 Auto-fills from fee fixing when you pick Category A–D + Fee Item (editable).
+                            </p>
+                        </div>
+
+                        <div>
+                            <label className="label">Arrears (GHS)</label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                className="input-field border-amber-300 focus:ring-amber-500"
+                                value={arrearsAmount}
+                                onChange={(e) => setArrearsAmount(e.target.value)}
+                                placeholder="0.00"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                                Updates arrears on the latest BOP bill when saved.
                             </p>
                         </div>
 

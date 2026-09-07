@@ -297,7 +297,7 @@ export default function BillDetailPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs font-bold text-gray-500 uppercase">Arrears</label>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Arrears (amount already owed)</label>
                                     <input
                                         type="number"
                                         step="0.01"
@@ -307,7 +307,7 @@ export default function BillDetailPage() {
                                         onChange={(e) => setAmountForm({ ...amountForm, arrears: e.target.value })}
                                         required
                                     />
-                                    <p className="text-[11px] text-gray-500 mt-1">Adjust outstanding prior-year balance here.</p>
+                                    <p className="text-[11px] text-gray-500 mt-1">Enter or adjust outstanding prior balance.</p>
                                 </div>
                                 <div>
                                     <label className="text-xs font-bold text-gray-500 uppercase">Rebate</label>
@@ -330,6 +330,17 @@ export default function BillDetailPage() {
                                         onChange={(e) => setAmountForm({ ...amountForm, reason: e.target.value })}
                                         placeholder="Why is this change needed?"
                                     />
+                                </div>
+                                <div className="md:col-span-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm flex justify-between items-center">
+                                    <span className="font-medium text-gray-600">Estimated total</span>
+                                    <span className="font-bold text-gray-900">
+                                        GHS{' '}
+                                        {(
+                                            (parseFloat(amountForm.current_rate) || 0) +
+                                            (parseFloat(amountForm.arrears) || 0) -
+                                            (parseFloat(amountForm.rebate) || 0)
+                                        ).toFixed(2)}
+                                    </span>
                                 </div>
                                 <div className="md:col-span-2">
                                     <button type="submit" className="btn-secondary">

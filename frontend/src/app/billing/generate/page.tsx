@@ -163,7 +163,10 @@ function GenerateBillContent() {
                     ? target?.assessed_amount
                     : target?.assessed_amount) ?? calc.current_rate ?? 0;
             setBillAmount(String(preferred ?? calc.current_rate ?? ''));
-            setArrearsAmount(String(calc.arrears ?? 0));
+            // Keep officer-entered arrears if already set; otherwise use calculated
+            setArrearsAmount((prev) =>
+                prev !== '' ? prev : String(calc.arrears ?? 0)
+            );
             setRebateAmount(String(calc.rebate ?? 0));
             setShowPreview(true);
         } catch (err: any) {
@@ -358,7 +361,7 @@ function GenerateBillContent() {
                         </div>
                     )}
 
-                    {/* Billing Year */}
+                    {/* Billing Year + Arrears */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
                         <div>
                             <label className="label">Billing Year</label>
@@ -368,12 +371,27 @@ function GenerateBillContent() {
                                 ))}
                             </select>
                         </div>
-                        <div className="flex items-end">
-                            <p className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg border italic">
-                                The system will automatically calculate rates and aggregate any existing arrears for this selection.
+                        <div>
+                            <label className="label">
+                                Arrears (GHS) <span className="text-gray-400 font-normal">(optional)</span>
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                className="input-field border-amber-300 focus:ring-amber-500"
+                                placeholder="0.00"
+                                value={arrearsAmount}
+                                onChange={(e) => setArrearsAmount(e.target.value)}
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                                Enter any amount already owed. Leave blank to use system-calculated prior unpaid bills.
                             </p>
                         </div>
                     </div>
+                    <p className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg border italic">
+                        Bill amount (current rate) can be adjusted after Preview. Arrears entered here are included when you Generate or Preview.
+                    </p>
                 </div>
 
                 <div className="flex justify-end space-x-4 pt-6">
@@ -450,15 +468,16 @@ function GenerateBillContent() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-xs font-bold text-gray-500 uppercase">Previous Arrears</label>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Arrears (amount already owed)</label>
                                         <input
                                             type="number"
                                             min="0"
                                             step="0.01"
-                                            className="input-field mt-1"
+                                            className="input-field mt-1 border-amber-300 focus:ring-amber-500"
                                             value={arrearsAmount}
                                             onChange={(e) => setArrearsAmount(e.target.value)}
                                         />
+                                        <p className="text-[11px] text-gray-500 mt-1">Prior unpaid balance for this property/business.</p>
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold text-gray-500 uppercase">Rebate / Discount</label>

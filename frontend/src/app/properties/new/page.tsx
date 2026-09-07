@@ -90,6 +90,7 @@ export default function NewPropertyPage() {
     const [selectedRateZoneId, setSelectedRateZoneId] = useState<string>('');
     const [selectedRateInfo, setSelectedRateInfo] = useState<string>('');
     const [assessedAmount, setAssessedAmount] = useState<string>('');
+    const [arrearsAmount, setArrearsAmount] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const [propertyNumber, setPropertyNumber] = useState<string | null>(null);
@@ -281,6 +282,7 @@ export default function NewPropertyPage() {
                 property_size: toOptionalNumber(data.property_size),
                 property_rate_zone_id: selectedRateZoneId ? parseInt(selectedRateZoneId) : null,
                 assessed_amount: billAmount,
+                arrears: toOptionalNumber(arrearsAmount) ?? 0,
             });
 
 
@@ -671,6 +673,24 @@ export default function NewPropertyPage() {
                             />
                             <p className="text-xs text-gray-500 mt-1">
                                 Auto-fills from fee fixing when you pick Category A–D + Rating Zone (editable).
+                            </p>
+                        </div>
+
+                        <div>
+                            <label className="label">
+                                Arrears (GHS) <span className="text-gray-400 font-normal">(optional)</span>
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                className="input-field border-amber-300 focus:ring-amber-500"
+                                placeholder="0.00"
+                                value={arrearsAmount}
+                                onChange={(e) => setArrearsAmount(e.target.value)}
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                                Amount already owed — included on the registration-year bill.
                             </p>
                         </div>
 
