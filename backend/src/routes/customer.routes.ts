@@ -2,6 +2,11 @@ import { Router, Response } from 'express';
 import pool from '../config/database';
 import { authenticateToken, authorize, AuthRequest, getCollectorAreaFilter } from '../middlewares/auth.middleware';
 import Joi from 'joi';
+import {
+    cascadeDeleteCustomer,
+    cascadeDeleteAllCustomers,
+} from '../services/customer-delete.service';
+import { getAuditContext } from '../services/audit.service';
 
 const router = Router();
 
@@ -379,61 +384,72 @@ router.put('/:id', authenticateToken, authorize(['edit_customer']), async (req: 
 });
 
 /**
+ * POST /api/customers/purge-all
+ * Permanently wipe ALL customers and related properties, businesses, bills, payments.
+ * Admin / Super Admin only (delete_customer). Requires explicit confirmation phrase.
+ */
+router.post(
+    '/purge-all',
+    authenticateToken,
+    authorize(['delete_customer']),
+    async (req: AuthRequest, res: Response) => {
+        try {
+            const confirm = String(req.body?.confirm || '').trim();
+            if (confirm !== 'DELETE_ALL_CUSTOMERS') {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Confirmation required. Send { "confirm": "DELETE_ALL_CUSTOMERS" }.',
+                });
+            }
+
+            const summary = await cascadeDeleteAllCustomers(
+                req.user!.id,
+                getAuditContext(req)
+            );
+
+            res.json({
+                success: true,
+                message:
+                    summary.customers === 0
+                        ? 'No customers to delete'
+                        : `Cleared ${summary.customers} customer(s) and all related records`,
+                data: summary,
+            });
+        } catch (error: any) {
+            console.error('Error purging customers:', error);
+            res.status(500).json({
+                success: false,
+                error: error.message || 'Failed to clear all customers',
+            });
+        }
+    }
+);
+
+/**
  * DELETE /api/customers/:id
- * Soft delete customer (sets related records to inactive)
+ * Permanently delete a customer and cascade-wipe properties, businesses, bills, and payments.
  */
 router.delete('/:id', authenticateToken, authorize(['delete_customer']), async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
 
-        const client = await pool.connect();
+        const summary = await cascadeDeleteCustomer(
+            id,
+            req.user!.id,
+            getAuditContext(req)
+        );
 
-        try {
-            await client.query('BEGIN');
-
-            // Set properties to inactive
-            await client.query(
-                `UPDATE properties SET status = 'INACTIVE' WHERE customer_id = $1`,
-                [id]
-            );
-
-            // Set businesses to inactive
-            await client.query(
-                `UPDATE businesses SET status = 'INACTIVE' WHERE customer_id = $1`,
-                [id]
-            );
-
-            // Delete customer
-            const result = await client.query(
-                'DELETE FROM customers WHERE id = $1 RETURNING id',
-                [id]
-            );
-
-            if (result.rows.length === 0) {
-                await client.query('ROLLBACK');
-                return res.status(404).json({
-                    success: false,
-                    error: 'Customer not found',
-                });
-            }
-
-            await client.query('COMMIT');
-
-            res.json({
-                success: true,
-                message: 'Customer deleted successfully',
-            });
-        } catch (error) {
-            await client.query('ROLLBACK');
-            throw error;
-        } finally {
-            client.release();
-        }
+        res.json({
+            success: true,
+            message: 'Customer and all related records deleted successfully',
+            data: summary,
+        });
     } catch (error: any) {
         console.error('Error deleting customer:', error);
-        res.status(500).json({
+        const status = error.statusCode || 500;
+        res.status(status).json({
             success: false,
-            error: 'Failed to delete customer',
+            error: error.statusCode === 404 ? 'Customer not found' : 'Failed to delete customer',
         });
     }
 });

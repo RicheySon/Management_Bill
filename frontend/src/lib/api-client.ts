@@ -143,6 +143,19 @@ export const fetchCustomers = async (params?: any) => {
     return response.data;
 };
 
+export const deleteCustomer = async (id: string) => {
+    const response = await apiClient.delete(`/customers/${id}`);
+    return response.data;
+};
+
+/** Permanently wipe all customers and related properties, businesses, bills, payments. */
+export const purgeAllCustomers = async () => {
+    const response = await apiClient.post('/customers/purge-all', {
+        confirm: 'DELETE_ALL_CUSTOMERS',
+    });
+    return response.data;
+};
+
 // Properties
 export const createProperty = async (data: any) => {
     const response = await apiClient.post('/properties', data);

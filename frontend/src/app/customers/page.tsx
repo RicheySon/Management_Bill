@@ -1,32 +1,77 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { fetchCustomers } from '@/lib/api-client';
-import { Plus, Search, User, Phone, MapPin } from 'lucide-react';
+import { fetchCustomers, purgeAllCustomers } from '@/lib/api-client';
+import { useAuth } from '@/context/AuthContext';
+import { Plus, Search, User, Phone, MapPin, Trash2, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function CustomersPage() {
+    const { hasPermission } = useAuth();
+    const canDelete = hasPermission('delete_customer');
     const [customers, setCustomers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [purging, setPurging] = useState(false);
+    const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+    const loadCustomers = async () => {
+        try {
+            setLoading(true);
+            const result = await fetchCustomers();
+            setCustomers(result.data || []);
+        } catch (error) {
+            console.error('Failed to fetch customers:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const loadCustomers = async () => {
-            try {
-                const result = await fetchCustomers();
-                setCustomers(result.data || []);
-            } catch (error) {
-                console.error('Failed to fetch customers:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
         loadCustomers();
     }, []);
 
-    const filteredCustomers = customers.filter(customer =>
-        customer.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.phone_number.includes(searchTerm)
+    const handleClearAll = async () => {
+        if (!canDelete) return;
+        const phrase = window.prompt(
+            'This permanently deletes ALL customers, properties, businesses, and bills.\n\nType DELETE_ALL_CUSTOMERS to confirm:'
+        );
+        if (phrase !== 'DELETE_ALL_CUSTOMERS') {
+            if (phrase !== null) {
+                setMessage({ type: 'error', text: 'Clear cancelled — confirmation phrase did not match.' });
+            }
+            return;
+        }
+        if (!window.confirm('Final confirmation: wipe every customer and all related records? This cannot be undone.')) {
+            return;
+        }
+
+        try {
+            setPurging(true);
+            setMessage(null);
+            const res = await purgeAllCustomers();
+            const s = res.data || {};
+            setMessage({
+                type: 'success',
+                text:
+                    res.message ||
+                    `Cleared ${s.customers || 0} customers, ${s.properties || 0} properties, ${s.businesses || 0} businesses, ${s.bills || 0} bills.`,
+            });
+            await loadCustomers();
+        } catch (err: any) {
+            setMessage({
+                type: 'error',
+                text: err.response?.data?.error || 'Failed to clear customers',
+            });
+        } finally {
+            setPurging(false);
+        }
+    };
+
+    const filteredCustomers = customers.filter(
+        (customer) =>
+            customer.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            customer.phone_number.includes(searchTerm)
     );
 
     return (
@@ -36,11 +81,38 @@ export default function CustomersPage() {
                     <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
                     <p className="text-gray-600 mt-1">Manage all registered municipal citizens</p>
                 </div>
-                <Link href="/customers/new" className="btn-primary flex items-center space-x-2 self-start">
-                    <Plus className="w-5 h-5" />
-                    <span>Register New Customer</span>
-                </Link>
+                <div className="flex flex-wrap items-center gap-2 self-start">
+                    {canDelete && (
+                        <button
+                            type="button"
+                            onClick={handleClearAll}
+                            disabled={purging || customers.length === 0}
+                            className="btn-secondary flex items-center space-x-2 text-red-700 border-red-200 hover:bg-red-50 disabled:opacity-50"
+                            title="Permanently delete all customers and related records"
+                        >
+                            <Trash2 className="w-5 h-5" />
+                            <span>{purging ? 'Clearing…' : 'Clear all customers'}</span>
+                        </button>
+                    )}
+                    <Link href="/customers/new" className="btn-primary flex items-center space-x-2">
+                        <Plus className="w-5 h-5" />
+                        <span>Register New Customer</span>
+                    </Link>
+                </div>
             </div>
+
+            {message && (
+                <div
+                    className={`mb-4 flex items-start gap-2 rounded-lg border px-4 py-3 text-sm ${
+                        message.type === 'success'
+                            ? 'border-green-200 bg-green-50 text-green-800'
+                            : 'border-red-200 bg-red-50 text-red-800'
+                    }`}
+                >
+                    <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                    <span>{message.text}</span>
+                </div>
+            )}
 
             <div className="card mb-6">
                 <div className="relative">
