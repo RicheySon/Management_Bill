@@ -55,13 +55,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             if (storedToken && storedUser) {
                 try {
-                    await axios.get(`${API_BASE_URL}/auth/validate`, {
+                    const { data } = await axios.get(`${API_BASE_URL}/auth/validate`, {
                         headers: { Authorization: `Bearer ${storedToken}` },
                         timeout: 5000,
                     });
-                    setToken(storedToken);
-                    setUser(JSON.parse(storedUser));
-                    document.cookie = `auth_token=${storedToken}; path=/; SameSite=Lax`;
+                    // Prefer refreshed user/token so Supervisor Fee Configuration appears after deploy
+                    const nextToken = data.token || storedToken;
+                    const nextUser = data.user || JSON.parse(storedUser);
+                    setToken(nextToken);
+                    setUser(nextUser);
+                    localStorage.setItem('auth_token', nextToken);
+                    localStorage.setItem('auth_user', JSON.stringify(nextUser));
+                    document.cookie = `auth_token=${nextToken}; path=/; SameSite=Lax`;
                 } catch (error) {
                     localStorage.removeItem('auth_token');
                     localStorage.removeItem('auth_user');
@@ -116,7 +121,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const hasPermission = (permission: string) => {
-        return user?.permissions?.includes(permission) || false;
+        if (user?.permissions?.includes(permission)) return true;
+        // Supervisors always see/use Fee Configuration
+        if (permission === 'configure_rates' && user?.roles?.includes('Supervisor')) return true;
+        return false;
     };
 
     useEffect(() => {
