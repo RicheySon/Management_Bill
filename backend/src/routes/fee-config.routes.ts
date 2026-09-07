@@ -104,8 +104,10 @@ const businessFeeItemSchema = Joi.object({
 router.get('/schedules', async (req: AuthRequest, res: Response) => {
     try {
         const perms = req.user?.permissions || [];
+        const roles = req.user?.roles || [];
         const can =
             perms.includes('configure_rates') ||
+            roles.includes('Supervisor') ||
             perms.includes('generate_bill') ||
             perms.includes('manage_users');
         if (!can) {
@@ -126,8 +128,10 @@ router.get('/schedules', async (req: AuthRequest, res: Response) => {
 router.get('/schedules/:id', async (req: AuthRequest, res: Response) => {
     try {
         const perms = req.user?.permissions || [];
+        const roles = req.user?.roles || [];
         const can =
             perms.includes('configure_rates') ||
+            roles.includes('Supervisor') ||
             perms.includes('generate_bill') ||
             perms.includes('manage_users');
         if (!can) {
