@@ -2,19 +2,23 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { fetchCustomer, downloadBillPDF } from '@/lib/api-client';
+import { fetchCustomer, downloadBillPDF, deleteCustomer } from '@/lib/api-client';
+import { useAuth } from '@/context/AuthContext';
 import {
     User, Mail, Phone, MapPin, Navigation,
     Building2, Briefcase, FileText, Plus,
-    Printer, CreditCard, ArrowLeft, Clock
+    Printer, CreditCard, ArrowLeft, Clock, Trash2
 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function CustomerDetailPage() {
     const { id } = useParams();
     const router = useRouter();
+    const { hasPermission } = useAuth();
+    const canDelete = hasPermission('delete_customer');
     const [customer, setCustomer] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [deleting, setDeleting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -36,6 +40,23 @@ export default function CustomerDetailPage() {
         };
         loadCustomer();
     }, [id]);
+
+    const handleDelete = async () => {
+        if (!canDelete || !customer) return;
+        const ok = window.confirm(
+            `Permanently delete ${customer.full_name}?\n\nThis removes the customer and ALL related properties, businesses, bills, and payments. This cannot be undone.`
+        );
+        if (!ok) return;
+        try {
+            setDeleting(true);
+            setError(null);
+            await deleteCustomer(id as string);
+            router.push('/customers');
+        } catch (err: any) {
+            setError(err.response?.data?.error || 'Failed to delete customer');
+            setDeleting(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -71,10 +92,21 @@ export default function CustomerDetailPage() {
                         <p className="text-gray-600">Registered since {new Date(customer.created_at).toLocaleDateString()}</p>
                     </div>
                 </div>
-                <div className="flex items-center space-x-3">
+                <div className="flex flex-wrap items-center gap-3">
                     <Link href={`/customers/${id}/edit`} className="btn-secondary">
                         Edit Profile
                     </Link>
+                    {canDelete && (
+                        <button
+                            type="button"
+                            onClick={handleDelete}
+                            disabled={deleting}
+                            className="btn-secondary flex items-center space-x-2 text-red-700 border-red-200 hover:bg-red-50 disabled:opacity-50"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                            <span>{deleting ? 'Deleting…' : 'Delete customer'}</span>
+                        </button>
+                    )}
                     <div className="relative group">
                         <button className="btn-primary flex items-center space-x-2">
                             <Plus className="w-4 h-4" />

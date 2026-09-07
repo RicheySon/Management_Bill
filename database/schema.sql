@@ -156,7 +156,7 @@ INSERT INTO permissions (code, description) VALUES
 ('configure_rates', 'Configure billing rates and system fees'),
 ('create_customer', 'Register new customers'),
 ('edit_customer', 'Modify customer details'),
-('delete_customer', 'Delete customer records'),
+('delete_customer', 'Permanently delete a customer and wipe related properties, businesses, bills, and payments'),
 ('view_customer', 'View customer details'),
 ('register_property', 'Register new properties'),
 ('edit_property', 'Modify property details'),
@@ -183,7 +183,7 @@ SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = 'Super Admin';
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p 
 WHERE r.name = 'Admin' AND p.code IN (
-    'create_customer', 'edit_customer', 'view_customer',
+    'create_customer', 'edit_customer', 'view_customer', 'delete_customer',
     'register_property', 'edit_property',
     'register_business', 'edit_business',
     'generate_bill', 'delete_bill', 'print_bill', 'bulk_print', 'view_reports',
