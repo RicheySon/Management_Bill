@@ -49,7 +49,44 @@ const businessSchema = Joi.object({
     year_registered: Joi.number().integer().min(2000).max(2100).optional(),
     fee_item_id: Joi.number().integer().optional().allow(null, ''),
     assessed_amount: Joi.number().min(0).optional().allow(null, ''),
+    arrears: Joi.number().min(0).optional().allow(null, ''),
 });
+
+async function applyArrearsToLatestBill(
+    entityColumn: 'property_id' | 'business_id',
+    entityId: string,
+    arrears: number
+) {
+    const latest = await pool.query(
+        `SELECT id, current_rate, rebate, amount_paid
+         FROM bills
+         WHERE ${entityColumn} = $1
+         ORDER BY bill_period_year DESC, created_at DESC
+         LIMIT 1`,
+        [entityId]
+    );
+    if (latest.rows.length === 0) return null;
+    const bill = latest.rows[0];
+    const current_rate = Number(bill.current_rate || 0);
+    const rebate = Number(bill.rebate || 0);
+    const amount_paid = Number(bill.amount_paid || 0);
+    const total_amount = current_rate + arrears - rebate;
+    const amount_due = Math.max(total_amount - amount_paid, 0);
+    const payment_status =
+        amount_due <= 0 ? 'PAID' : amount_paid > 0 ? 'PARTIAL' : 'UNPAID';
+    const updated = await pool.query(
+        `UPDATE bills SET
+            arrears = $1,
+            total_amount = $2,
+            amount_due = $3,
+            payment_status = $4,
+            updated_at = NOW()
+         WHERE id = $5
+         RETURNING id, bill_number, arrears, total_amount, amount_due`,
+        [arrears, total_amount, amount_due, payment_status, bill.id]
+    );
+    return updated.rows[0] || null;
+}
 
 /**
  * POST /api/businesses
@@ -93,6 +130,7 @@ router.post('/', authorize(['register_business']), async (req: AuthRequest, res:
             year_registered,
             fee_item_id,
             assessed_amount,
+            arrears,
         } = value;
 
         const currentYear = new Date().getFullYear();
@@ -101,6 +139,10 @@ router.post('/', authorize(['register_business']), async (req: AuthRequest, res:
             assessed_amount === '' || assessed_amount === undefined || assessed_amount === null
                 ? null
                 : Number(assessed_amount);
+        const arrearsValue =
+            arrears === '' || arrears === undefined || arrears === null
+                ? 0
+                : Math.max(0, Number(arrears) || 0);
 
         const result = await pool.query(
             `INSERT INTO businesses (
@@ -153,7 +195,7 @@ router.post('/', authorize(['register_business']), async (req: AuthRequest, res:
                     businessId,
                     customer_id,
                     regYear,
-                    { current_rate: assessed as number, arrears: 0, rebate: 0 }
+                    { current_rate: assessed as number, arrears: arrearsValue, rebate: 0 }
                 );
             } catch (billError: any) {
                 console.error('Auto bill generation failed after business registration:', billError);
@@ -396,6 +438,7 @@ router.put('/:id', authorize(['edit_business']), async (req: AuthRequest, res: R
             local_area_id: Joi.number().integer().optional().allow(null, ''),
             fee_item_id: Joi.number().integer().optional().allow(null, ''),
             assessed_amount: Joi.number().min(0).optional().allow(null, ''),
+            arrears: Joi.number().min(0).optional().allow(null, ''),
             status: Joi.string().valid('ACTIVE', 'INACTIVE', 'CLOSED').optional(),
         });
 
@@ -408,6 +451,9 @@ router.put('/:id', authorize(['edit_business']), async (req: AuthRequest, res: R
             });
         }
 
+        const arrearsInput = value.arrears;
+        delete value.arrears;
+
         // Normalize empty assessed_amount to null
         if (value.assessed_amount === '' || value.assessed_amount === undefined) {
             // leave unset if not provided
@@ -418,30 +464,46 @@ router.put('/:id', authorize(['edit_business']), async (req: AuthRequest, res: R
         }
 
         const fields = Object.keys(value);
-        if (fields.length === 0) {
+        if (fields.length === 0 && (arrearsInput === undefined || arrearsInput === '' || arrearsInput === null)) {
             return res.status(400).json({ success: false, error: 'No fields to update' });
         }
 
-        const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
-        const values = Object.values(value);
-        values.push(id);
+        let resultRows: any[] = [];
+        if (fields.length > 0) {
+            const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
+            const values = Object.values(value);
+            values.push(id);
 
-        const result = await pool.query(
-            `UPDATE businesses SET ${setClause} WHERE id = $${values.length} RETURNING *`,
-            values
-        );
+            const result = await pool.query(
+                `UPDATE businesses SET ${setClause} WHERE id = $${values.length} RETURNING *`,
+                values
+            );
+            resultRows = result.rows;
+        } else {
+            const existing = await pool.query('SELECT * FROM businesses WHERE id = $1', [id]);
+            resultRows = existing.rows;
+        }
 
-        if (result.rows.length === 0) {
+        if (resultRows.length === 0) {
             return res.status(404).json({
                 success: false,
                 error: 'Business not found',
             });
         }
 
+        let updatedBill = null;
+        if (arrearsInput !== undefined && arrearsInput !== '' && arrearsInput !== null) {
+            const arrearsNum = Math.max(0, Number(arrearsInput) || 0);
+            updatedBill = await applyArrearsToLatestBill('business_id', id, arrearsNum);
+        }
+
         res.json({
             success: true,
-            data: result.rows[0],
-            message: 'Business updated successfully',
+            data: resultRows[0],
+            bill: updatedBill,
+            message: updatedBill
+                ? `Business updated. Bill ${updatedBill.bill_number} arrears set to GHS ${Number(updatedBill.arrears).toFixed(2)}.`
+                : 'Business updated successfully',
         });
     } catch (error: any) {
         console.error('Error updating business:', error);

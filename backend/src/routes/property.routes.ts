@@ -56,7 +56,45 @@ const propertySchema = Joi.object({
     property_rate_zone_id: Joi.number().integer().optional().allow(null, ''),
     // Optional at API level; UI still asks for bill amount so a first-year bill can be issued when provided
     assessed_amount: Joi.number().min(0).optional().allow(null, ''),
+    // Manual arrears to include on the auto-generated registration bill
+    arrears: Joi.number().min(0).optional().allow(null, ''),
 }).prefs({ convert: true, abortEarly: false });
+
+async function applyArrearsToLatestBill(
+    entityColumn: 'property_id' | 'business_id',
+    entityId: string,
+    arrears: number
+) {
+    const latest = await pool.query(
+        `SELECT id, current_rate, rebate, amount_paid
+         FROM bills
+         WHERE ${entityColumn} = $1
+         ORDER BY bill_period_year DESC, created_at DESC
+         LIMIT 1`,
+        [entityId]
+    );
+    if (latest.rows.length === 0) return null;
+    const bill = latest.rows[0];
+    const current_rate = Number(bill.current_rate || 0);
+    const rebate = Number(bill.rebate || 0);
+    const amount_paid = Number(bill.amount_paid || 0);
+    const total_amount = current_rate + arrears - rebate;
+    const amount_due = Math.max(total_amount - amount_paid, 0);
+    const payment_status =
+        amount_due <= 0 ? 'PAID' : amount_paid > 0 ? 'PARTIAL' : 'UNPAID';
+    const updated = await pool.query(
+        `UPDATE bills SET
+            arrears = $1,
+            total_amount = $2,
+            amount_due = $3,
+            payment_status = $4,
+            updated_at = NOW()
+         WHERE id = $5
+         RETURNING id, bill_number, arrears, total_amount, amount_due`,
+        [arrears, total_amount, amount_due, payment_status, bill.id]
+    );
+    return updated.rows[0] || null;
+}
 
 /**
  * POST /api/properties
@@ -81,7 +119,7 @@ router.post('/', authorize(['register_property']), async (req: AuthRequest, res:
             no_of_people, no_of_bedrooms, no_of_washrooms, no_of_other_rooms,
             street_name, gps_address, latitude, longitude, town, physical_location, landmark,
             electoral_area_id, local_area_id, population_density,
-            property_size, year_registered, property_rate_zone_id, assessed_amount,
+            property_size, year_registered, property_rate_zone_id, assessed_amount, arrears,
         } = value;
 
         const currentYear = new Date().getFullYear();
@@ -90,6 +128,10 @@ router.post('/', authorize(['register_property']), async (req: AuthRequest, res:
             assessed_amount === '' || assessed_amount === undefined || assessed_amount === null
                 ? null
                 : Number(assessed_amount);
+        const arrearsValue =
+            arrears === '' || arrears === undefined || arrears === null
+                ? 0
+                : Math.max(0, Number(arrears) || 0);
 
         const result = await pool.query(
             `INSERT INTO properties (
@@ -127,7 +169,7 @@ router.post('/', authorize(['register_property']), async (req: AuthRequest, res:
                     propertyId,
                     customer_id,
                     regYear,
-                    { current_rate: assessed as number, arrears: 0, rebate: 0 }
+                    { current_rate: assessed as number, arrears: arrearsValue, rebate: 0 }
                 );
             } catch (billError: any) {
                 console.error('Auto bill generation failed after property registration:', billError);
@@ -373,6 +415,7 @@ router.put('/:id', authorize(['edit_property']), async (req: AuthRequest, res: R
             property_size: Joi.number().min(0).optional().allow(null, ''),
             property_rate_zone_id: Joi.number().integer().optional().allow(null, ''),
             assessed_amount: Joi.number().min(0).optional().allow(null, ''),
+            arrears: Joi.number().min(0).optional().allow(null, ''),
             status: Joi.string().valid('ACTIVE', 'INACTIVE', 'DEMOLISHED').optional(),
         });
 
@@ -385,6 +428,9 @@ router.put('/:id', authorize(['edit_property']), async (req: AuthRequest, res: R
             });
         }
 
+        const arrearsInput = value.arrears;
+        delete value.arrears;
+
         if (value.assessed_amount === '' || value.assessed_amount === undefined) {
             // leave undefined = don't touch; empty string → null clear
             if (value.assessed_amount === '') value.assessed_amount = null;
@@ -393,30 +439,46 @@ router.put('/:id', authorize(['edit_property']), async (req: AuthRequest, res: R
         }
 
         const fields = Object.keys(value);
-        if (fields.length === 0) {
+        if (fields.length === 0 && (arrearsInput === undefined || arrearsInput === '' || arrearsInput === null)) {
             return res.status(400).json({ success: false, error: 'No fields to update' });
         }
 
-        const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
-        const values = Object.values(value);
-        values.push(id);
+        let resultRows: any[] = [];
+        if (fields.length > 0) {
+            const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
+            const values = Object.values(value);
+            values.push(id);
 
-        const result = await pool.query(
-            `UPDATE properties SET ${setClause} WHERE id = $${values.length} RETURNING *`,
-            values
-        );
+            const result = await pool.query(
+                `UPDATE properties SET ${setClause} WHERE id = $${values.length} RETURNING *`,
+                values
+            );
+            resultRows = result.rows;
+        } else {
+            const existing = await pool.query('SELECT * FROM properties WHERE id = $1', [id]);
+            resultRows = existing.rows;
+        }
 
-        if (result.rows.length === 0) {
+        if (resultRows.length === 0) {
             return res.status(404).json({
                 success: false,
                 error: 'Property not found',
             });
         }
 
+        let updatedBill = null;
+        if (arrearsInput !== undefined && arrearsInput !== '' && arrearsInput !== null) {
+            const arrearsNum = Math.max(0, Number(arrearsInput) || 0);
+            updatedBill = await applyArrearsToLatestBill('property_id', id, arrearsNum);
+        }
+
         res.json({
             success: true,
-            data: result.rows[0],
-            message: 'Property updated successfully',
+            data: resultRows[0],
+            bill: updatedBill,
+            message: updatedBill
+                ? `Property updated. Bill ${updatedBill.bill_number} arrears set to GHS ${Number(updatedBill.arrears).toFixed(2)}.`
+                : 'Property updated successfully',
         });
     } catch (error: any) {
         console.error('Error updating property:', error);

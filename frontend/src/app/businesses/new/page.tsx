@@ -102,6 +102,7 @@ export default function NewBusinessPage() {
     const [selectedFeeItemId, setSelectedFeeItemId] = useState<string>('');
     const [selectedFeeAmount, setSelectedFeeAmount] = useState<string>('');
     const [assessedAmount, setAssessedAmount] = useState<string>('');
+    const [arrearsAmount, setArrearsAmount] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const [businessNumber, setBusinessNumber] = useState<string | null>(null);
@@ -268,6 +269,7 @@ export default function NewBusinessPage() {
                 local_area_id: toNullableId(data.local_area_id),
                 fee_item_id: selectedFeeItemId ? parseInt(selectedFeeItemId) : null,
                 assessed_amount: toOptionalNumber(assessedAmount),
+                arrears: toOptionalNumber(arrearsAmount) ?? 0,
             });
 
             setBusinessNumber(result.data.business_number);
@@ -666,6 +668,24 @@ export default function NewBusinessPage() {
                             />
                             <p className="text-xs text-gray-500 mt-1">
                                 Auto-fills from fee fixing when you pick Category A–D + Fee Item (editable).
+                            </p>
+                        </div>
+
+                        <div className="md:col-span-2">
+                            <label className="label">
+                                Arrears (GHS) <span className="text-gray-400 font-normal">(optional)</span>
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                className="input-field border-amber-300 focus:ring-amber-500"
+                                placeholder="0.00"
+                                value={arrearsAmount}
+                                onChange={(e) => setArrearsAmount(e.target.value)}
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                                Amount already owed — included on the registration-year BOP bill.
                             </p>
                         </div>
 
