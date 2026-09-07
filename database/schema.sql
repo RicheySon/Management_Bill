@@ -39,10 +39,10 @@ CREATE TABLE property_classifications (
 
 -- Insert default property classifications (class tiers, not use types)
 INSERT INTO property_classifications (name, description, base_rate) VALUES
-('1st Class', 'First class properties', 12.00),
-('2nd Class', 'Second class properties', 10.00),
-('3rd Class', 'Third class properties', 8.00),
-('4th Class', 'Fourth class properties', 6.00);
+('Category A', 'Category A — fee fixing CAT A / 1st class column', 12.00),
+('Category B', 'Category B — fee fixing CAT B / 2nd class column', 10.00),
+('Category C', 'Category C — fee fixing CAT C / 3rd class column', 8.00),
+('Category D', 'Category D — fee fixing CAT D / 4th class column', 6.00);
 
 -- Business Categories
 CREATE TABLE business_categories (

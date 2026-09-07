@@ -21,14 +21,6 @@ import {
     parseExcelFeeSchedule,
     importFeeScheduleFromExcel,
 } from '../services/fee-config.service';
-import {
-    createAmountChangeRequest,
-    splitMoneyFields,
-    ZONE_MONEY,
-    FEE_ITEM_MONEY,
-} from '../services/amount-change.service';
-import { getAuditContext } from '../services/audit.service';
-import pool from '../config/database';
 
 const router = Router();
 
@@ -241,7 +233,7 @@ router.post('/schedules/:id/property-zones', authorize(['configure_rates']), asy
 
 /**
  * PUT /api/fee-config/property-zones/:zoneId
- * Money fields go to pending approval; metadata applies immediately.
+ * Admin/Supervisor fee edits apply immediately (no approval gate).
  */
 router.put('/property-zones/:zoneId', authorize(['configure_rates']), async (req: AuthRequest, res: Response) => {
     try {
@@ -250,37 +242,12 @@ router.put('/property-zones/:zoneId', authorize(['configure_rates']), async (req
             return res.status(400).json({ success: false, error: error.details[0].message });
         }
 
-        const { money, metadata } = splitMoneyFields(value, ZONE_MONEY);
-        let pendingRequest = null;
-
-        if (Object.keys(metadata).length > 0) {
-            await updatePropertyRateZone(parseInt(req.params.zoneId), metadata);
-        }
-
-        if (Object.keys(money).length > 0) {
-            try {
-                pendingRequest = await createAmountChangeRequest({
-                    entityType: 'PROPERTY_RATE_ZONE',
-                    entityId: String(req.params.zoneId),
-                    proposedValues: money,
-                    reason: req.body.reason || 'Fee zone rate update',
-                    requestedBy: req.user!.id,
-                    auditCtx: getAuditContext(req),
-                });
-            } catch (e: any) {
-                if (!String(e.message || '').includes('No money field changes')) throw e;
-            }
-        }
-
-        const zoneResult = await pool.query('SELECT * FROM property_rate_zones WHERE id = $1', [req.params.zoneId]);
+        const zone = await updatePropertyRateZone(parseInt(req.params.zoneId), value);
 
         res.json({
             success: true,
-            data: zoneResult.rows[0],
-            pending_request: pendingRequest,
-            message: pendingRequest
-                ? 'Metadata saved. Money field changes submitted for Super Admin approval.'
-                : 'Property rate zone updated successfully',
+            data: zone,
+            message: 'Property rate zone updated successfully',
         });
     } catch (error: any) {
         console.error('Error updating property rate zone:', error);
@@ -338,7 +305,7 @@ router.post('/schedules/:id/business-items', authorize(['configure_rates']), asy
 
 /**
  * PUT /api/fee-config/business-items/:itemId
- * Money fields (cat fees) go to pending approval; metadata applies immediately.
+ * Admin/Supervisor fee edits apply immediately (no approval gate).
  */
 router.put('/business-items/:itemId', authorize(['configure_rates']), async (req: AuthRequest, res: Response) => {
     try {
@@ -347,37 +314,12 @@ router.put('/business-items/:itemId', authorize(['configure_rates']), async (req
             return res.status(400).json({ success: false, error: error.details[0].message });
         }
 
-        const { money, metadata } = splitMoneyFields(value, FEE_ITEM_MONEY);
-        let pendingRequest = null;
-
-        if (Object.keys(metadata).length > 0) {
-            await updateBusinessFeeItem(parseInt(req.params.itemId), metadata);
-        }
-
-        if (Object.keys(money).length > 0) {
-            try {
-                pendingRequest = await createAmountChangeRequest({
-                    entityType: 'BUSINESS_FEE_ITEM',
-                    entityId: String(req.params.itemId),
-                    proposedValues: money,
-                    reason: req.body.reason || 'Business fee item rate update',
-                    requestedBy: req.user!.id,
-                    auditCtx: getAuditContext(req),
-                });
-            } catch (e: any) {
-                if (!String(e.message || '').includes('No money field changes')) throw e;
-            }
-        }
-
-        const itemResult = await pool.query('SELECT * FROM business_fee_items WHERE id = $1', [req.params.itemId]);
+        const item = await updateBusinessFeeItem(parseInt(req.params.itemId), value);
 
         res.json({
             success: true,
-            data: itemResult.rows[0],
-            pending_request: pendingRequest,
-            message: pendingRequest
-                ? 'Metadata saved. Fee amount changes submitted for Super Admin approval.'
-                : 'Business fee item updated successfully',
+            data: item,
+            message: 'Business fee item updated successfully',
         });
     } catch (error: any) {
         console.error('Error updating business fee item:', error);

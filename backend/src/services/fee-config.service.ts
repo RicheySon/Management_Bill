@@ -59,6 +59,10 @@ interface ParsedPropertyZone {
     rate_impost_max?: number;
     minimum_rate_min: number;
     minimum_rate_max?: number;
+    cat_a_fee?: number;
+    cat_b_fee?: number;
+    cat_c_fee?: number;
+    cat_d_fee?: number;
     affected_areas?: string;
 }
 
@@ -474,16 +478,35 @@ export const parseExcelFeeSchedule = (buffer: Buffer): ParsedFeeData => {
                 // Property Zone Catch-all: ONLY in PROPERTY section or very first rows
                 if (currentSection === 'PROPERTY') {
                     const vals = Object.values(fees) as number[];
-                    const rateImpost = vals.find(v => v < 1) || 0;
-                    const minRate = vals.find(v => v >= 1) || 0;
+                    // Typical property row: optional impost (< 1) then Cat A–D class fees (>= 1)
+                    let rateImpost = 0;
+                    const classFees: number[] = [];
+                    for (const v of vals) {
+                        if (v > 0 && v < 1 && rateImpost === 0) rateImpost = v;
+                        else if (v >= 1) classFees.push(v);
+                    }
+                    if (classFees.length === 0 && vals.length > 0) {
+                        for (const v of vals) {
+                            if (v >= 1) classFees.push(v);
+                        }
+                    }
 
-                    if (rateImpost > 0 || minRate > 0) {
+                    const catA = classFees[0] || 0;
+                    const catB = classFees[1];
+                    const catC = classFees[2];
+                    const catD = classFees[3];
+
+                    if (rateImpost > 0 || catA > 0) {
                         propertyZones.push({
                             zone_name: desc,
                             zone_type: detectZoneType(desc),
                             zone_class: detectZoneClass(desc),
                             rate_impost_min: rateImpost,
-                            minimum_rate_min: minRate,
+                            minimum_rate_min: catA,
+                            cat_a_fee: catA || undefined,
+                            cat_b_fee: catB,
+                            cat_c_fee: catC,
+                            cat_d_fee: catD,
                         });
                         continue;
                     }
@@ -508,6 +531,10 @@ export const parseExcelFeeSchedule = (buffer: Buffer): ParsedFeeData => {
                             zone_class: detectZoneClass(desc),
                             rate_impost_min: (fees as any).cat_a_fee,
                             minimum_rate_min: (fees as any).cat_b_fee || 0,
+                            cat_a_fee: (fees as any).cat_b_fee || (fees as any).cat_a_fee,
+                            cat_b_fee: (fees as any).cat_c_fee,
+                            cat_c_fee: (fees as any).cat_d_fee,
+                            cat_d_fee: (fees as any).cat_e_fee,
                         });
                         currentSection = 'PROPERTY';
                         continue;
@@ -582,9 +609,29 @@ export const importFeeScheduleFromExcel = async (
         for (let i = 0; i < parsedData.propertyZones.length; i++) {
             const zone = parsedData.propertyZones[i];
             await client.query(
-                `INSERT INTO property_rate_zones (fee_schedule_id, zone_name, zone_type, zone_class, rate_impost_min, rate_impost_max, minimum_rate_min, minimum_rate_max, affected_areas, sort_order)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-                [feeScheduleId, zone.zone_name, zone.zone_type, zone.zone_class, zone.rate_impost_min, zone.rate_impost_max || null, zone.minimum_rate_min, zone.minimum_rate_max || null, zone.affected_areas || null, i]
+                `INSERT INTO property_rate_zones (
+                    fee_schedule_id, zone_name, zone_type, zone_class,
+                    rate_impost_min, rate_impost_max, minimum_rate_min, minimum_rate_max,
+                    cat_a_fee, cat_b_fee, cat_c_fee, cat_d_fee,
+                    affected_areas, sort_order
+                 )
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+                [
+                    feeScheduleId,
+                    zone.zone_name,
+                    zone.zone_type,
+                    zone.zone_class,
+                    zone.rate_impost_min,
+                    zone.rate_impost_max || null,
+                    zone.minimum_rate_min,
+                    zone.minimum_rate_max || null,
+                    zone.cat_a_fee ?? zone.minimum_rate_min ?? null,
+                    zone.cat_b_fee ?? null,
+                    zone.cat_c_fee ?? null,
+                    zone.cat_d_fee ?? null,
+                    zone.affected_areas || null,
+                    i,
+                ]
             );
             propertyZonesCreated++;
         }

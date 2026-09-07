@@ -38,6 +38,11 @@ describe('billing.service smoke', () => {
         expect(feeAmountForPropertyClass(zone, '1st Class')).toBe(300);
         expect(feeAmountForPropertyClass(zone, '2nd Class')).toBe(200);
         expect(feeAmountForPropertyClass(zone, '3rd Class')).toBe(100);
+        expect(feeAmountForPropertyClass(zone, 'Category A')).toBe(300);
+        expect(feeAmountForPropertyClass(zone, 'Category B')).toBe(200);
+        expect(feeAmountForPropertyClass(zone, 'Category C')).toBe(100);
+        // Missing CAT for selected class must not silently fall back to CAT A
+        expect(feeAmountForPropertyClass({ cat_a_fee: 300 }, 'Category C')).toBe(0);
     });
 
     it('feeAmountForBusinessCategory maps Category A–D to CAT columns', () => {
