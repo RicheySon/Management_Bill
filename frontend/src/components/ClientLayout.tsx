@@ -83,6 +83,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                             <CollectorNavLink href="/" icon={<Home className="w-6 h-6" />} label="Home" onClick={() => setIsSidebarOpen(false)} />
                             <CollectorNavLink href="/customers" icon={<Users className="w-6 h-6" />} label="Rate Payers" onClick={() => setIsSidebarOpen(false)} />
                             <CollectorNavLink href="/properties" icon={<Building2 className="w-6 h-6" />} label="Property Rates" onClick={() => setIsSidebarOpen(false)} />
+                            <CollectorNavLink href="/business-properties" icon={<Building2 className="w-6 h-6" />} label="Business Properties" onClick={() => setIsSidebarOpen(false)} />
                             <CollectorNavLink href="/businesses" icon={<Briefcase className="w-6 h-6" />} label="Business Owners" onClick={() => setIsSidebarOpen(false)} />
                             <CollectorNavLink href="/businesses#permits" icon={<ClipboardList className="w-6 h-6" />} label="Business Operation Permits" onClick={() => setIsSidebarOpen(false)} />
                             {(hasPermission('request_print') || hasPermission('request_delete') || hasPermission('record_payment') || hasPermission('print_bill')) && (
@@ -170,6 +171,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
                         {(hasPermission('register_property') || hasPermission('edit_property')) &&
                             <NavLink href="/properties" icon={<Building2 className="w-5 h-5" />} label="Properties" onClick={() => setIsSidebarOpen(false)} />
+                        }
+
+                        {(hasPermission('register_property') || hasPermission('edit_property')) &&
+                            <NavLink href="/business-properties" icon={<Building2 className="w-5 h-5" />} label="Business Properties" onClick={() => setIsSidebarOpen(false)} />
                         }
 
                         {(hasPermission('register_business') || hasPermission('edit_business')) &&

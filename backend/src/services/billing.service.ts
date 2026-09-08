@@ -240,16 +240,19 @@ export const calculatePropertyBill = async (
         }
     }
 
-    // Check for arrears (previous unpaid bills not already rolled into another bill)
+    // Check for arrears (previous unpaid bills of the same sector, not already rolled)
+    const propertyBillType =
+        property.property_kind === 'BUSINESS_PROPERTY' ? 'BUSINESS_PROPERTY' : 'PROPERTY_RATE';
     const arrearsResult = await pool.query(
         `SELECT COALESCE(SUM(amount_due), 0) as total_arrears,
                 COALESCE(array_agg(id) FILTER (WHERE id IS NOT NULL), '{}') as prior_bill_ids
      FROM bills
      WHERE property_id = $1
-       AND bill_period_year < $2
+       AND bill_type = $2
+       AND bill_period_year < $3
        AND payment_status != 'PAID'
        AND rolled_into_bill_id IS NULL`,
-        [propertyId, billYear]
+        [propertyId, propertyBillType, billYear]
     );
 
     const arrears = parseFloat(arrearsResult.rows[0].total_arrears);
@@ -259,12 +262,14 @@ export const calculatePropertyBill = async (
     const total_amount = billTotal(current_rate, arrears, rebate, basic_rate);
     const amount_due = total_amount;
 
+    const billTypeLabel =
+        property.property_kind === 'BUSINESS_PROPERTY' ? 'Business Property Rate' : 'Property Rate';
     const bill_details = {
-        bill_type: 'PROPERTY_RATE',
+        bill_type: property.property_kind === 'BUSINESS_PROPERTY' ? 'BUSINESS_PROPERTY' : 'PROPERTY_RATE',
         basic_rate,
         items: [
             {
-                description: `Property Rate - ${property.classification_name || 'Standard'}`,
+                description: `${billTypeLabel} - ${property.classification_name || 'Standard'}`,
                 rate_info: rateDescription,
                 current_rate: current_rate.toFixed(2),
                 basic_rate: basic_rate.toFixed(2),
@@ -397,7 +402,7 @@ export const calculateBusinessBill = async (
  * Generate a new bill
  */
 export const generateBill = async (
-    billType: 'PROPERTY_RATE' | 'BOP',
+    billType: 'PROPERTY_RATE' | 'BUSINESS_PROPERTY' | 'BOP',
     targetId: string,
     customerId: string,
     billYear?: number,
@@ -411,10 +416,16 @@ export const generateBill = async (
     let businessId = null;
     let billPeriodDescription = '';
 
-    if (billType === 'PROPERTY_RATE') {
+    if (billType === 'PROPERTY_RATE' || billType === 'BUSINESS_PROPERTY') {
         calculation = await calculatePropertyBill(targetId, year);
         propertyId = targetId;
-        billPeriodDescription = `${year} Annual Property Rate`;
+        billPeriodDescription =
+            billType === 'BUSINESS_PROPERTY'
+                ? `${year} Annual Business Property Rate`
+                : `${year} Annual Property Rate`;
+        if (calculation.bill_details) {
+            calculation.bill_details.bill_type = billType;
+        }
     } else {
         calculation = await calculateBusinessBill(targetId, year);
         businessId = targetId;
@@ -455,7 +466,7 @@ export const generateBill = async (
 
         // Persist assessed amount back onto the property/business for future bills
         if (amountOverride.current_rate !== undefined && Number(amountOverride.current_rate) >= 0) {
-            if (billType === 'PROPERTY_RATE') {
+            if (billType === 'PROPERTY_RATE' || billType === 'BUSINESS_PROPERTY') {
                 await pool.query(
                     `UPDATE properties SET assessed_amount = $1, updated_at = NOW() WHERE id = $2`,
                     [Number(amountOverride.current_rate), targetId]
@@ -474,7 +485,7 @@ export const generateBill = async (
         `SELECT id FROM bills
      WHERE bill_type = $1 
        AND bill_period_year = $2
-       AND ${billType === 'PROPERTY_RATE' ? 'property_id' : 'business_id'} = $3`,
+       AND ${billType === 'BOP' ? 'business_id' : 'property_id'} = $3`,
         [billType, year, targetId]
     );
 

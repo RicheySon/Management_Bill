@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname } from 'next/navigation';
 import { fetchProperty, deleteProperty } from '@/lib/api-client';
+import { sectorFromPath } from '@/lib/property-sector';
 import {
     Building2, User, MapPin, Tag, Calendar,
     ArrowLeft, History, FileText, Plus, AlertCircle, Trash2, Edit
@@ -12,6 +13,8 @@ import Link from 'next/link';
 export default function PropertyDetailPage() {
     const { id } = useParams();
     const router = useRouter();
+    const pathname = usePathname();
+    const sector = sectorFromPath(pathname);
     const [property, setProperty] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -38,9 +41,9 @@ export default function PropertyDetailPage() {
         if (!confirm('Are you sure you want to delete this property? This will also affect associated bills and records.')) return;
         try {
             await deleteProperty(id as string);
-            router.push('/properties');
+            router.push(sector.basePath);
         } catch (err: any) {
-            alert(err.response?.data?.error || 'Failed to delete property');
+            alert(err.response?.data?.error || `Failed to delete ${sector.label.toLowerCase()}`);
         }
     };
 
@@ -98,7 +101,7 @@ export default function PropertyDetailPage() {
                     </div>
                 </div>
                 <div className="flex items-center space-x-3">
-                    <Link href={`/properties/${id}/edit`} className="btn-secondary flex items-center space-x-2">
+                    <Link href={`${sector.basePath}/${id}/edit`} className="btn-secondary flex items-center space-x-2">
                         <Edit className="w-4 h-4" />
                         <span>Edit</span>
                     </Link>
@@ -106,7 +109,14 @@ export default function PropertyDetailPage() {
                         <Trash2 className="w-4 h-4" />
                         <span>Delete</span>
                     </button>
-                    <Link href={`/billing/generate?property_id=${id}`} className="btn-primary flex items-center space-x-2">
+                    <Link
+                        href={`/billing/generate?property_id=${id}${
+                            property.property_kind === 'BUSINESS_PROPERTY' || sector.kind === 'BUSINESS_PROPERTY'
+                                ? '&bill_type=BUSINESS_PROPERTY'
+                                : ''
+                        }`}
+                        className="btn-primary flex items-center space-x-2"
+                    >
                         <Plus className="w-4 h-4" />
                         <span>Generate Bill</span>
                     </Link>
@@ -253,7 +263,11 @@ export default function PropertyDetailPage() {
                                     </p>
                                 )}
                                 <Link
-                                    href={`/billing/generate?property_id=${id}`}
+                                    href={`/billing/generate?property_id=${id}${
+                                        property.property_kind === 'BUSINESS_PROPERTY' || sector.kind === 'BUSINESS_PROPERTY'
+                                            ? '&bill_type=BUSINESS_PROPERTY'
+                                            : ''
+                                    }`}
                                     className="btn-primary inline-flex items-center space-x-2"
                                 >
                                     <Plus className="w-4 h-4" />

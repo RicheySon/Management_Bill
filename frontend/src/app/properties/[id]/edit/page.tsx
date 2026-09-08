@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, usePathname } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import {
     fetchProperty,
@@ -18,6 +18,7 @@ import {
 import { toCoord } from '@/lib/geo';
 import DropdownSelect from '@/components/DropdownSelect';
 import { feeAmountForPropertyClass, propertyClassLabel } from '@/lib/property-fee';
+import { sectorFromPath } from '@/lib/property-sector';
 import { ArrowLeft, Save, Navigation, Map as MapIcon, X, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -80,6 +81,8 @@ interface PropertyEditForm {
 
 export default function EditPropertyPage() {
     const router = useRouter();
+    const pathname = usePathname();
+    const sector = sectorFromPath(pathname);
     const { id } = useParams();
     const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<PropertyEditForm>();
 
@@ -293,7 +296,7 @@ export default function EditPropertyPage() {
             });
 
             setSuccess(true);
-            setTimeout(() => { router.push(`/properties/${id}`); }, 1500);
+            setTimeout(() => { router.push(`${sector.basePath}/${id}`); }, 1500);
         } catch (err: any) {
             setError(err.response?.data?.error || 'Failed to update property');
         }
@@ -314,7 +317,7 @@ export default function EditPropertyPage() {
                     <h1 className="text-3xl font-bold text-gray-900">Edit Property</h1>
                     <p className="text-gray-600 mt-1">Update all property and rate payer details</p>
                 </div>
-                <Link href={`/properties/${id}`} className="btn-secondary flex items-center space-x-2">
+                <Link href={`${sector.basePath}/${id}`} className="btn-secondary flex items-center space-x-2">
                     <ArrowLeft className="w-4 h-4" />
                     <span>Cancel</span>
                 </Link>
@@ -846,7 +849,7 @@ export default function EditPropertyPage() {
                 </div>
 
                 <div className="flex justify-end space-x-4">
-                    <Link href={`/properties/${id}`} className="btn-secondary">Cancel</Link>
+                    <Link href={`${sector.basePath}/${id}`} className="btn-secondary">Cancel</Link>
                     <button type="submit" disabled={isSubmitting} className="btn-primary flex items-center space-x-2 px-8">
                         {isSubmitting ? (
                             <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div><span>Saving...</span></>

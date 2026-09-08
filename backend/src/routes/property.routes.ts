@@ -25,6 +25,7 @@ router.use(authenticateToken);
 const propertySchema = Joi.object({
     customer_id: Joi.string().uuid().required(),
     classification_id: Joi.number().integer().required(),
+    property_kind: Joi.string().valid('RESIDENTIAL', 'BUSINESS_PROPERTY').default('RESIDENTIAL'),
     property_use: Joi.string().optional().allow('', null),
     building_type: Joi.string().optional().allow('', null),
     no_of_storeys: Joi.number().integer().min(0).optional().allow(null, ''),
@@ -112,7 +113,7 @@ router.post('/', authorize(['register_property']), async (req: AuthRequest, res:
         }
 
         const {
-            customer_id, classification_id,
+            customer_id, classification_id, property_kind,
             property_use, building_type, no_of_storeys, ownership,
             building_permit_status, account_number, parcel_number, house_number,
             source_of_water, sanitation_facility, solid_waste_disposal, liquid_waste_disposal,
@@ -124,6 +125,10 @@ router.post('/', authorize(['register_property']), async (req: AuthRequest, res:
 
         const currentYear = new Date().getFullYear();
         const regYear = year_registered || currentYear;
+        const kind = property_kind === 'BUSINESS_PROPERTY' ? 'BUSINESS_PROPERTY' : 'RESIDENTIAL';
+        const billType = kind === 'BUSINESS_PROPERTY' ? 'BUSINESS_PROPERTY' : 'PROPERTY_RATE';
+        const defaultUse =
+            property_use || (kind === 'BUSINESS_PROPERTY' ? 'Commercial' : null);
         const assessed =
             assessed_amount === '' || assessed_amount === undefined || assessed_amount === null
                 ? null
@@ -135,7 +140,7 @@ router.post('/', authorize(['register_property']), async (req: AuthRequest, res:
 
         const result = await pool.query(
             `INSERT INTO properties (
-                customer_id, classification_id,
+                customer_id, classification_id, property_kind,
                 property_use, building_type, no_of_storeys, ownership,
                 building_permit_status, account_number, parcel_number, house_number,
                 source_of_water, sanitation_facility, solid_waste_disposal, liquid_waste_disposal,
@@ -143,11 +148,11 @@ router.post('/', authorize(['register_property']), async (req: AuthRequest, res:
                 street_name, gps_address, latitude, longitude, town, physical_location, landmark,
                 electoral_area_id, local_area_id, population_density,
                 property_size, year_registered, property_rate_zone_id, assessed_amount
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33)
             RETURNING *`,
             [
-                customer_id, classification_id,
-                property_use || null, building_type || null, no_of_storeys || 0, ownership || null,
+                customer_id, classification_id, kind,
+                defaultUse, building_type || null, no_of_storeys || 0, ownership || null,
                 building_permit_status || null, account_number || null, parcel_number || null, house_number || null,
                 source_of_water || null, sanitation_facility || null, solid_waste_disposal || null, liquid_waste_disposal || null,
                 no_of_people || 0, no_of_bedrooms || 0, no_of_washrooms || 0, no_of_other_rooms || 0,
@@ -165,7 +170,7 @@ router.post('/', authorize(['register_property']), async (req: AuthRequest, res:
         if (Number.isFinite(assessed as number) && (assessed as number) > 0) {
             try {
                 initialBill = await generateBill(
-                    'PROPERTY_RATE',
+                    billType,
                     propertyId,
                     customer_id,
                     regYear,
@@ -194,9 +199,10 @@ router.post('/', authorize(['register_property']), async (req: AuthRequest, res:
         );
 
         const propertyNumber = propertyWithDetails.rows[0].property_number;
+        const sectorLabel = kind === 'BUSINESS_PROPERTY' ? 'Business property' : 'Property';
         const message = initialBill
-            ? `Property registered successfully. Property Number: ${propertyNumber}. ${regYear} bill ${initialBill.bill_number} issued for GHS ${Number(initialBill.total_amount).toFixed(2)}.`
-            : `Property registered successfully. Property Number: ${propertyNumber}`;
+            ? `${sectorLabel} registered successfully. Number: ${propertyNumber}. ${regYear} bill ${initialBill.bill_number} issued for GHS ${Number(initialBill.total_amount).toFixed(2)}.`
+            : `${sectorLabel} registered successfully. Number: ${propertyNumber}`;
 
         res.status(201).json({
             success: true,
@@ -287,6 +293,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
             classification_id,
             electoral_area_id,
             customer_id,
+            property_kind,
             status = 'ACTIVE',
             page = 1,
             limit = 50,
@@ -311,6 +318,12 @@ router.get('/', async (req: AuthRequest, res: Response) => {
         if (status) {
             query += ` AND p.status = $${paramIndex}`;
             queryParams.push(status);
+            paramIndex++;
+        }
+
+        if (property_kind) {
+            query += ` AND p.property_kind = $${paramIndex}`;
+            queryParams.push(property_kind);
             paramIndex++;
         }
 

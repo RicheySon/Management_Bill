@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import {
     createProperty,
@@ -14,6 +14,7 @@ import {
     reverseGeocode,
     formatGeoAddress,
 } from '@/lib/api-client';
+import { sectorFromPath } from '@/lib/property-sector';
 import { toCoord } from '@/lib/geo';
 import { feeAmountForPropertyClass, propertyClassLabel } from '@/lib/property-fee';
 import { ArrowLeft, Save, UserPlus, UserCheck, MapPin, Navigation, Map as MapIcon, X, Phone, Mail, User, CheckCircle, AlertCircle } from 'lucide-react';
@@ -79,9 +80,16 @@ interface PropertyForm {
     property_size?: number;
 }
 
-export default function NewPropertyPage() {
+function NewPropertyPageContent() {
     const router = useRouter();
-    const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<PropertyForm>();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const sector = sectorFromPath(pathname);
+    const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<PropertyForm>({
+        defaultValues: {
+            property_use: sector.kind === 'BUSINESS_PROPERTY' ? 'Commercial' : undefined,
+        },
+    });
 
     const [classifications, setClassifications] = useState<any[]>([]);
     const [electoralAreas, setElectoralAreas] = useState<any[]>([]);
@@ -181,14 +189,30 @@ export default function NewPropertyPage() {
                 ]);
                 setClassifications(classificationsData || []);
                 setElectoralAreas(areasData || []);
-                setRateZones(rateZonesData || []);
+                const zones = rateZonesData || [];
+                if (sector.kind === 'BUSINESS_PROPERTY') {
+                    const commercial = zones.filter((z: any) =>
+                        String(z.zone_type || '').toUpperCase() === 'COMMERCIAL'
+                    );
+                    setRateZones(commercial.length > 0 ? commercial : zones);
+                } else {
+                    setRateZones(zones);
+                }
             } catch (err) {
                 console.error('Failed to load data:', err);
                 setError('Failed to load essential form data. Please refresh the page.');
             }
         };
         loadData();
-    }, []);
+    }, [sector.kind]);
+
+    useEffect(() => {
+        const presetCustomerId = searchParams.get('customer_id');
+        if (presetCustomerId) {
+            setIsNewRatePayer(false);
+            setValue('customer_id', presetCustomerId);
+        }
+    }, [searchParams, setValue]);
 
     useEffect(() => {
         const eaId = toNullableId(selectedElectoralArea);
@@ -254,7 +278,10 @@ export default function NewPropertyPage() {
             const propertyResult = await createProperty({
                 customer_id: customerId,
                 classification_id: toNullableId(data.classification_id),
-                property_use: data.property_use || null,
+                property_kind: sector.kind,
+                property_use:
+                    data.property_use ||
+                    (sector.kind === 'BUSINESS_PROPERTY' ? 'Commercial' : null),
                 building_type: data.building_type || null,
                 no_of_storeys: toOptionalNumber(data.no_of_storeys),
                 ownership: data.ownership || null,
@@ -290,10 +317,10 @@ export default function NewPropertyPage() {
             setSuccess(true);
 
             setTimeout(() => {
-                router.push(`/properties/${propertyResult.data.id}`);
+                router.push(`${sector.basePath}/${propertyResult.data.id}`);
             }, 2000);
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Failed to register property');
+            setError(err.response?.data?.error || `Failed to register ${sector.label.toLowerCase()}`);
         }
     };
 
@@ -301,10 +328,10 @@ export default function NewPropertyPage() {
         <div className="max-w-4xl mx-auto">
             <div className="mb-6 flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">New Property</h1>
-                    <p className="text-gray-600 mt-1">Register a new property with rate payer details</p>
+                    <h1 className="text-3xl font-bold text-gray-900">{sector.registerTitle}</h1>
+                    <p className="text-gray-600 mt-1">{sector.registerSubtitle}</p>
                 </div>
-                <Link href="/properties" className="btn-secondary flex items-center space-x-2">
+                <Link href={sector.basePath} className="btn-secondary flex items-center space-x-2">
                     <ArrowLeft className="w-4 h-4" />
                     <span>Go back</span>
                 </Link>
@@ -312,8 +339,8 @@ export default function NewPropertyPage() {
 
             {success && propertyNumber && (
                 <div className="bg-green-50 border-2 border-green-500 text-green-800 px-6 py-4 rounded-lg mb-6">
-                    <p className="font-semibold">Property registered successfully!</p>
-                    <p className="text-sm mt-1">Property Number: <span className="font-mono font-bold">{propertyNumber}</span></p>
+                    <p className="font-semibold">{sector.label} registered successfully!</p>
+                    <p className="text-sm mt-1">Number: <span className="font-mono font-bold">{propertyNumber}</span></p>
                     <p className="text-sm">Redirecting...</p>
                 </div>
             )}
@@ -549,7 +576,7 @@ export default function NewPropertyPage() {
                 {/* ============================================= */}
                 <div className="card">
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 mb-6">
-                        <h2 className="text-municipal-teal font-bold text-lg text-center">Property Information</h2>
+                        <h2 className="text-municipal-teal font-bold text-lg text-center">{sector.sectionTitle}</h2>
                         <p className="text-center text-sm text-gray-600 mt-1">
                             Core fields (class + bill amount) are required. Other property details are optional.
                         </p>
@@ -1130,5 +1157,13 @@ export default function NewPropertyPage() {
                 </div>
             </form>
         </div>
+    );
+}
+
+export default function NewPropertyPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center h-96"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-municipal-red"></div></div>}>
+            <NewPropertyPageContent />
+        </Suspense>
     );
 }

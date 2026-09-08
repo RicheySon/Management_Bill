@@ -193,13 +193,13 @@ export default function BillDetailPage() {
                                     </div>
                                 </div>
                                 <div className="flex items-start space-x-3">
-                                    {bill.bill_type === 'PROPERTY_RATE' ? <Building2 className="w-5 h-5 text-gray-400 mt-1" /> : <Briefcase className="w-5 h-5 text-gray-400 mt-1" />}
+                                    {bill.bill_type === 'BOP' ? <Briefcase className="w-5 h-5 text-gray-400 mt-1" /> : <Building2 className="w-5 h-5 text-gray-400 mt-1" />}
                                     <div>
                                         <p className="font-bold text-gray-900">
-                                            {bill.bill_type === 'PROPERTY_RATE' ? bill.property_number : bill.business_name}
+                                            {bill.bill_type === 'BOP' ? bill.business_name : bill.property_number}
                                         </p>
                                         <p className="text-sm text-gray-500">
-                                            {bill.bill_type === 'PROPERTY_RATE' ? bill.classification_name : bill.business_number}
+                                            {bill.bill_type === 'BOP' ? bill.business_number : bill.classification_name}
                                         </p>
                                     </div>
                                 </div>
