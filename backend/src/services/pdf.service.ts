@@ -24,21 +24,32 @@ const fetchBillData = async (billId: string): Promise<BillData> => {
     const result = await pool.query(
         `SELECT b.*,
       c.full_name, c.phone_number, c.gps_address as customer_gps,
-      p.property_number, p.street_name as property_street, 
+      p.property_number, p.street_name as property_street,
       p.gps_address as property_gps, p.landmark as property_landmark,
+      p.property_use, p.building_type, p.account_number as property_account_number,
+      p.latitude as property_latitude, p.longitude as property_longitude,
+      pc.name as property_classification,
+      prz.zone_name as property_zone_name,
       ea_p.name as property_electoral_area,
       bus.business_number, bus.business_name, bus.business_activity,
       bus.street_name as business_street, bus.gps_address as business_gps,
       bus.landmark as business_landmark,
+      bus.business_type_main, bus.business_type_sub, bus.business_category_class,
+      bus.account_number as business_account_number,
+      bus.latitude as business_latitude, bus.longitude as business_longitude,
       ea_b.name as business_electoral_area,
-      bc.name as business_category
+      bc.name as business_category,
+      bfi.description as business_fee_item_name
      FROM bills b
      LEFT JOIN customers c ON b.customer_id = c.id
      LEFT JOIN properties p ON b.property_id = p.id
+     LEFT JOIN property_classifications pc ON p.classification_id = pc.id
+     LEFT JOIN property_rate_zones prz ON p.property_rate_zone_id = prz.id
      LEFT JOIN electoral_areas ea_p ON p.electoral_area_id = ea_p.id
      LEFT JOIN businesses bus ON b.business_id = bus.id
      LEFT JOIN electoral_areas ea_b ON bus.electoral_area_id = ea_b.id
      LEFT JOIN business_categories bc ON bus.category_id = bc.id
+     LEFT JOIN business_fee_items bfi ON bus.fee_item_id = bfi.id
      WHERE b.id = $1`,
         [billId]
     );
@@ -49,6 +60,37 @@ const fetchBillData = async (billId: string): Promise<BillData> => {
 
     const row = result.rows[0];
 
+    const formatGps = (gpsAddress?: string | null, lat?: any, lng?: any) => {
+        const addr = String(gpsAddress || '').trim();
+        if (addr) return addr;
+        const la = lat != null && lat !== '' ? Number(lat) : NaN;
+        const lo = lng != null && lng !== '' ? Number(lng) : NaN;
+        if (Number.isFinite(la) && Number.isFinite(lo)) {
+            return `${la.toFixed(6)}, ${lo.toFixed(6)}`;
+        }
+        return '';
+    };
+
+    // Fee-fixing zone name is the main "property type" (e.g. Residential property 2 to 5 rooms)
+    const propertyType =
+        [row.property_zone_name, row.property_use, row.property_classification, row.building_type]
+            .map((v: any) => (v != null ? String(v).trim() : ''))
+            .find(Boolean) || '';
+
+    // Prefer fee-fixing item description, then category / typed activity
+    const businessType =
+        [
+            row.business_fee_item_name,
+            row.business_category,
+            [row.business_type_main, row.business_type_sub].filter(Boolean).join(' - '),
+            row.business_activity,
+        ]
+            .map((v: any) => (v != null ? String(v).trim() : ''))
+            .filter(Boolean)
+            .filter((v: string, i: number, arr: string[]) => arr.indexOf(v) === i)
+            .slice(0, 2)
+            .join(' / ') || '';
+
     return {
         bill: row,
         customer: {
@@ -56,21 +98,33 @@ const fetchBillData = async (billId: string): Promise<BillData> => {
             phone_number: row.phone_number,
             customer_number: row.bill_type === 'BOP' ? row.business_number : row.property_number,
         },
-        property: row.property_id ? {
-            property_number: row.property_number,
-            street_name: row.property_street,
-            gps_address: row.property_gps,
-            landmark: row.property_landmark,
-        } : null,
-        business: row.business_id ? {
-            business_number: row.business_number,
-            business_name: row.business_name,
-            business_activity: row.business_activity,
-            business_category: row.business_category,
-            street_name: row.business_street,
-            gps_address: row.business_gps,
-            landmark: row.business_landmark,
-        } : null,
+        property: row.property_id
+            ? {
+                  property_number: row.property_number,
+                  street_name: row.property_street,
+                  gps_address: formatGps(row.property_gps, row.property_latitude, row.property_longitude),
+                  landmark: row.property_landmark,
+                  property_type: propertyType,
+                  account_number: row.property_account_number,
+                  classification: row.property_classification,
+                  zone_name: row.property_zone_name,
+                  property_use: row.property_use,
+                  building_type: row.building_type,
+              }
+            : null,
+        business: row.business_id
+            ? {
+                  business_number: row.business_number,
+                  business_name: row.business_name,
+                  business_activity: row.business_activity,
+                  business_category: row.business_category,
+                  business_type: businessType,
+                  street_name: row.business_street,
+                  gps_address: formatGps(row.business_gps, row.business_latitude, row.business_longitude),
+                  landmark: row.business_landmark,
+                  account_number: row.business_account_number,
+              }
+            : null,
         electoral_area: row.property_electoral_area || row.business_electoral_area,
         landmark: row.property_landmark || row.business_landmark,
     };
@@ -191,36 +245,51 @@ const drawBill = async (doc: typeof PDFDocument, billId: string): Promise<void> 
     doc.rect(margin + 10, currentY, 160, 25).stroke();
     doc.rect(margin + 175, currentY, 190, 25).stroke();
 
+    const streetName = (isBOP ? business?.street_name : property?.street_name) || '';
+    const typeLabel = isBOP ? 'BUSINESS TYPE:' : 'PROPERTY TYPE:';
+    const typeValue = isBOP
+        ? (business?.business_type || business?.business_category || '')
+        : (property?.property_type || '');
+    const gpsValue = (isBOP ? business?.gps_address : property?.gps_address) || '';
+    const landmarkValue =
+        (isBOP ? business?.landmark : property?.landmark) || landmark || '';
+    const oldAccount =
+        bill.old_account_no ||
+        (isBOP ? business?.account_number : property?.account_number) ||
+        '';
+
     doc.fontSize(8);
     doc.font('Helvetica-Bold').text('STREET NAME:', margin + 15, currentY + 4);
-    doc.font('Helvetica').text(business?.street_name || property?.street_name || 'N/A', margin + 15, currentY + 13);
+    doc.font('Helvetica').text(streetName || 'N/A', margin + 15, currentY + 13, { width: 145 });
 
-    doc.font('Helvetica-Bold').text('ELECTRAL AREA:', margin + 180, currentY + 4);
-    doc.font('Helvetica').text((electoral_area || 'N/A').toUpperCase(), margin + 180, currentY + 13);
+    doc.font('Helvetica-Bold').text('ELECTORAL AREA:', margin + 180, currentY + 4);
+    doc.font('Helvetica').text((electoral_area || 'N/A').toUpperCase(), margin + 180, currentY + 13, { width: 175 });
 
     currentY += 30;
 
-    // Business Type & Landmark
+    // Property/Business Type & Landmark
     doc.rect(margin + 10, currentY, 190, 25).stroke();
     doc.rect(margin + 205, currentY, 160, 25).stroke();
 
-    doc.font('Helvetica-Bold').text('BUSINESS TYPE:', margin + 15, currentY + 4);
-    doc.font('Helvetica').text((business?.business_category || 'N/A').toUpperCase(), margin + 15, currentY + 13);
+    doc.font('Helvetica-Bold').text(typeLabel, margin + 15, currentY + 4);
+    doc.font('Helvetica').text(typeValue || 'N/A', margin + 15, currentY + 13, {
+        width: 180,
+    });
 
     doc.font('Helvetica-Bold').text('LANDMARK:', margin + 210, currentY + 4);
-    doc.font('Helvetica').text(landmark || 'N/A', margin + 210, currentY + 13);
+    doc.font('Helvetica').text(landmarkValue || 'N/A', margin + 210, currentY + 13, { width: 150 });
 
     currentY += 30;
 
-    // Old Account No & GPS
+    // Old Account No & GPS Address
     doc.rect(margin + 10, currentY, 190, 20).stroke();
     doc.rect(margin + 205, currentY, 160, 20).stroke();
 
     doc.font('Helvetica-Bold').text('OLD ACCOUNT NO:', margin + 15, currentY + 6, { continued: true })
-        .font('Helvetica').text(` ${bill.old_account_no || 'N/A'}`);
+        .font('Helvetica').text(` ${oldAccount || 'N/A'}`);
 
-    doc.font('Helvetica-Bold').text('GPS COORDINATE:', margin + 210, currentY + 6, { continued: true })
-        .font('Helvetica').text(` ${business?.gps_address || property?.gps_address || 'N/A'}`);
+    doc.font('Helvetica-Bold').text('GPS ADDRESS:', margin + 210, currentY + 6, { continued: true })
+        .font('Helvetica').text(` ${gpsValue || 'N/A'}`);
 
     currentY += 25;
 
@@ -260,25 +329,36 @@ const drawBill = async (doc: typeof PDFDocument, billId: string): Promise<void> 
     currentY += 20;
 
     // Bill Item Row
+    const defaultDescription = isBOP
+        ? (business?.business_type || 'Business Operating Permit')
+        : (property?.property_type || property?.zone_name || 'Property Rate');
     const item = billDetails.items[0] || {
-        description: isBOP ? 'Business Operating Permit' : 'Basic Rate Charge',
+        description: defaultDescription,
         current_rate: bill.current_rate || 0,
     };
+    const billTypeLabel = isBOP
+        ? (item.description || defaultDescription)
+        : (item.description || defaultDescription);
+    const basicRate = Number(
+        billDetails.basic_rate ?? item.basic_rate ?? 8
+    );
+
     doc.rect(margin + 10, currentY, col1, 60).stroke();
     doc.rect(margin + 10 + col1, currentY, col2, 60).stroke();
     doc.rect(margin + 10 + col1 + col2, currentY, col3, 60).stroke();
     doc.rect(margin + 10 + col1 + col2 + col3, currentY, col4, 60).stroke();
     doc.rect(margin + 10 + col1 + col2 + col3 + col4, currentY, col5, 60).stroke();
 
-    doc.fontSize(9).font('Helvetica');
-    doc.text(item.description, margin + 15, currentY + 20, { width: col1 - 10, align: 'center' });
-    doc.text(parseFloat(item.current_rate).toFixed(2), margin + 10 + col1, currentY + 20, { width: col2, align: 'center' });
+    doc.fontSize(8).font('Helvetica');
+    doc.text(String(billTypeLabel), margin + 15, currentY + 12, { width: col1 - 10, align: 'center' });
+    doc.fontSize(9);
+    doc.text(parseFloat(String(item.current_rate ?? bill.current_rate ?? 0)).toFixed(2), margin + 10 + col1, currentY + 12, { width: col2, align: 'center' });
+    doc.fontSize(6).fillColor('#333333')
+        .text(`Basic Rate: ${basicRate.toFixed(2)}`, margin + 10 + col1, currentY + 28, { width: col2, align: 'center' });
+    doc.fillColor('#000000').fontSize(9);
     doc.text(parseFloat(bill.arrears || 0).toFixed(2), margin + 10 + col1 + col2, currentY + 20, { width: col3, align: 'center' });
     doc.text(parseFloat(bill.rebate || 0).toFixed(2), margin + 10 + col1 + col2 + col3, currentY + 20, { width: col4, align: 'center' });
     doc.text(parseFloat(bill.total_amount || 0).toFixed(2), margin + 10 + col1 + col2 + col3 + col4, currentY + 20, { width: col5, align: 'center' });
-
-    // Sum row inside the current rate column?
-    doc.text(parseFloat(item.current_rate).toFixed(2), margin + 10 + col1, currentY + 45, { width: col2, align: 'center' });
 
     currentY += 70;
 
