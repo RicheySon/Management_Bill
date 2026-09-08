@@ -239,6 +239,8 @@ const mapFilters = (frontendFilters: any) => {
 
     if (frontendFilters.bill_type === 'PROPERTY') {
         mapped.bill_type = 'PROPERTY_RATE';
+    } else if (frontendFilters.bill_type === 'BUSINESS_PROPERTY') {
+        mapped.bill_type = 'BUSINESS_PROPERTY';
     } else if (frontendFilters.bill_type === 'BOP') {
         mapped.bill_type = 'BOP';
     }

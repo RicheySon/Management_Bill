@@ -141,7 +141,8 @@ export default function BillingPage() {
                         onChange={(e) => setFilters({ ...filters, type: e.target.value })}
                     >
                         <option value="">All Bill Types</option>
-                        <option value="PROPERTY">Property Rate</option>
+                        <option value="PROPERTY">Residential Property</option>
+                        <option value="BUSINESS_PROPERTY">Business Property</option>
                         <option value="BOP">Business Permit (BOP)</option>
                     </select>
                     <select
@@ -222,6 +223,8 @@ export default function BillingPage() {
                                                     href={
                                                         bill.bill_type === 'PROPERTY_RATE'
                                                             ? `/properties/${bill.property_id}/edit`
+                                                            : bill.bill_type === 'BUSINESS_PROPERTY'
+                                                                ? `/business-properties/${bill.property_id}/edit`
                                                             : bill.bill_type === 'BOP'
                                                                 ? `/businesses/${bill.business_id}/edit`
                                                                 : `/customers/${bill.customer_id}/edit`

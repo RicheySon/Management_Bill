@@ -18,7 +18,7 @@ router.use(authenticateToken);
 router.post('/generate', authenticateToken, authorize(['generate_bill']), async (req: AuthRequest, res: Response) => {
     try {
         const schema = Joi.object({
-            bill_type: Joi.string().valid('PROPERTY_RATE', 'BOP').required(),
+            bill_type: Joi.string().valid('PROPERTY_RATE', 'BUSINESS_PROPERTY', 'BOP').required(),
             target_id: Joi.string().uuid().required(), // property_id or business_id
             customer_id: Joi.string().uuid().required(),
             bill_year: Joi.number().integer().min(2000).max(2100).optional(),
@@ -200,7 +200,7 @@ router.put('/:id/amounts', async (req: AuthRequest, res: Response) => {
 router.post('/preview', authenticateToken, async (req: AuthRequest, res: Response) => {
     try {
         const schema = Joi.object({
-            bill_type: Joi.string().valid('PROPERTY_RATE', 'BOP').required(),
+            bill_type: Joi.string().valid('PROPERTY_RATE', 'BUSINESS_PROPERTY', 'BOP').required(),
             target_id: Joi.string().uuid().required(),
             customer_id: Joi.string().uuid().required(),
             bill_year: Joi.number().integer().min(2000).max(2100).optional(),
@@ -213,7 +213,7 @@ router.post('/preview', authenticateToken, async (req: AuthRequest, res: Respons
         const year = bill_year || new Date().getFullYear();
 
         let calculation;
-        if (bill_type === 'PROPERTY_RATE') {
+        if (bill_type === 'PROPERTY_RATE' || bill_type === 'BUSINESS_PROPERTY') {
             const { calculatePropertyBill } = require('../services/billing.service');
             calculation = await calculatePropertyBill(target_id, year);
         } else {

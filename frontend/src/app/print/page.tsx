@@ -146,7 +146,9 @@ export default function BulkPrintPage() {
                                     onChange={(e) => setFilters({ ...filters, bill_type: e.target.value })}
                                 >
                                     <option value="">All Types (Mixed)</option>
-                                    <option value="PROPERTY">Property Rates Only</option>
+                                    <option value="PROPERTY">Residential Property Rates</option>
+                                    <option value="BUSINESS_PROPERTY">Business Property Rates</option>
+                                    <option value="BOP">BOP Only</option>
                                     <option value="BOP">BOP Permits Only</option>
                                 </select>
                             </div>

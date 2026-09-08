@@ -15,11 +15,21 @@ import { ArrowLeft, Send, Search, Building2, Briefcase, FileText, CheckCircle } 
 import Link from 'next/link';
 
 interface GenerateBillForm {
-    bill_type: 'PROPERTY' | 'BOP';
+    bill_type: 'PROPERTY' | 'BUSINESS_PROPERTY' | 'BOP';
     customer_id: string;
     property_id?: string;
     business_id?: string;
     billing_year: number;
+}
+
+function toApiBillType(billType: GenerateBillForm['bill_type']) {
+    if (billType === 'PROPERTY') return 'PROPERTY_RATE';
+    if (billType === 'BUSINESS_PROPERTY') return 'BUSINESS_PROPERTY';
+    return 'BOP';
+}
+
+function isPropertySector(billType: GenerateBillForm['bill_type']) {
+    return billType === 'PROPERTY' || billType === 'BUSINESS_PROPERTY';
 }
 
 function GenerateBillContent() {
@@ -29,11 +39,19 @@ function GenerateBillContent() {
     // Read pre-fill params from URL
     const presetPropertyId = searchParams.get('property_id');
     const presetBusinessId = searchParams.get('business_id');
+    const presetBillType = searchParams.get('bill_type');
     const isPreset = !!(presetPropertyId || presetBusinessId);
 
     const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<GenerateBillForm>({
         defaultValues: {
-            bill_type: presetPropertyId ? 'PROPERTY' : presetBusinessId ? 'BOP' : 'PROPERTY',
+            bill_type:
+                presetBillType === 'BUSINESS_PROPERTY'
+                    ? 'BUSINESS_PROPERTY'
+                    : presetPropertyId
+                      ? 'PROPERTY'
+                      : presetBusinessId
+                        ? 'BOP'
+                        : 'PROPERTY',
             billing_year: new Date().getFullYear(),
         }
     });
@@ -77,8 +95,12 @@ function GenerateBillContent() {
                     const data = await fetchProperty(presetPropertyId);
                     const p = data.property;
                     const customerId = p.customer_id;
+                    const kind =
+                        presetBillType === 'BUSINESS_PROPERTY' || p.property_kind === 'BUSINESS_PROPERTY'
+                            ? 'BUSINESS_PROPERTY'
+                            : 'PROPERTY';
 
-                    setValue('bill_type', 'PROPERTY');
+                    setValue('bill_type', kind);
                     setValue('customer_id', customerId);
                     setValue('property_id', presetPropertyId);
 
@@ -136,32 +158,29 @@ function GenerateBillContent() {
         setError(null);
         try {
             const apiData = {
-                bill_type: data.bill_type === 'PROPERTY' ? 'PROPERTY_RATE' : 'BOP',
-                target_id: data.bill_type === 'PROPERTY' ? data.property_id : data.business_id,
+                bill_type: toApiBillType(data.bill_type),
+                target_id: isPropertySector(data.bill_type) ? data.property_id : data.business_id,
                 customer_id: data.customer_id,
                 bill_year: parseInt(data.billing_year as any)
             };
 
             const calculation = await previewBill(apiData);
 
-            const targetId = data.bill_type === 'PROPERTY' ? data.property_id : data.business_id;
-            const target = data.bill_type === 'PROPERTY'
+            const targetId = isPropertySector(data.bill_type) ? data.property_id : data.business_id;
+            const target = isPropertySector(data.bill_type)
                 ? selectedCustomerData.properties.find((p: any) => p.id === targetId)
                 : selectedCustomerData.businesses.find((b: any) => b.id === targetId);
 
             setPreviewData({
                 ...data,
                 customer_name: selectedCustomerData.customer.full_name,
-                target_name: data.bill_type === 'PROPERTY' ? target.property_number : target.business_name,
-                target_details: data.bill_type === 'PROPERTY' ? target.classification_name : target.category_name,
+                target_name: isPropertySector(data.bill_type) ? target.property_number : target.business_name,
+                target_details: isPropertySector(data.bill_type) ? target.classification_name : target.category_name,
                 calculation: calculation.data
             });
             const calc = calculation.data || {};
             // Prefer assessed amount from property/business when present
-            const preferred =
-                (data.bill_type === 'PROPERTY'
-                    ? target?.assessed_amount
-                    : target?.assessed_amount) ?? calc.current_rate ?? 0;
+            const preferred = target?.assessed_amount ?? calc.current_rate ?? 0;
             setBillAmount(String(preferred ?? calc.current_rate ?? ''));
             // Keep officer-entered arrears if already set; otherwise use calculated
             setArrearsAmount((prev) =>
@@ -178,8 +197,8 @@ function GenerateBillContent() {
         setError(null);
         try {
             const apiData = {
-                bill_type: data.bill_type === 'PROPERTY' ? 'PROPERTY_RATE' : 'BOP',
-                target_id: data.bill_type === 'PROPERTY' ? data.property_id : data.business_id,
+                bill_type: toApiBillType(data.bill_type),
+                target_id: isPropertySector(data.bill_type) ? data.property_id : data.business_id,
                 customer_id: data.customer_id,
                 bill_year: parseInt(data.billing_year as any),
                 current_rate: billAmount !== '' ? parseFloat(billAmount) : undefined,
@@ -243,12 +262,19 @@ function GenerateBillContent() {
                     {/* Bill Type Selection */}
                     <div>
                         <label className="label">What type of bill are you generating?</label>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <label className={`flex items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all ${watchBillType === 'PROPERTY' ? 'border-municipal-red bg-red-50' : 'border-gray-200'} ${isPreset ? 'opacity-70 pointer-events-none' : ''}`}>
                                 <input type="radio" value="PROPERTY" {...register('bill_type')} className="hidden" disabled={isPreset} />
                                 <div className="text-center">
                                     <Building2 className={`w-8 h-8 mx-auto mb-2 ${watchBillType === 'PROPERTY' ? 'text-municipal-red' : 'text-gray-400'}`} />
-                                    <span className={`font-bold ${watchBillType === 'PROPERTY' ? 'text-municipal-red' : 'text-gray-500'}`}>Property Rate</span>
+                                    <span className={`font-bold ${watchBillType === 'PROPERTY' ? 'text-municipal-red' : 'text-gray-500'}`}>Residential Property</span>
+                                </div>
+                            </label>
+                            <label className={`flex items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all ${watchBillType === 'BUSINESS_PROPERTY' ? 'border-municipal-red bg-red-50' : 'border-gray-200'} ${isPreset ? 'opacity-70 pointer-events-none' : ''}`}>
+                                <input type="radio" value="BUSINESS_PROPERTY" {...register('bill_type')} className="hidden" disabled={isPreset} />
+                                <div className="text-center">
+                                    <Building2 className={`w-8 h-8 mx-auto mb-2 ${watchBillType === 'BUSINESS_PROPERTY' ? 'text-municipal-red' : 'text-gray-400'}`} />
+                                    <span className={`font-bold ${watchBillType === 'BUSINESS_PROPERTY' ? 'text-municipal-red' : 'text-gray-500'}`}>Business Property</span>
                                 </div>
                             </label>
                             <label className={`flex items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all ${watchBillType === 'BOP' ? 'border-municipal-red bg-red-50' : 'border-gray-200'} ${isPreset ? 'opacity-70 pointer-events-none' : ''}`}>
@@ -307,14 +333,22 @@ function GenerateBillContent() {
                     {/* Asset Selection */}
                     {selectedCustomerData && !loadingCustomer && (
                         <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                            {watchBillType === 'PROPERTY' ? (
+                            {watchBillType === 'PROPERTY' || watchBillType === 'BUSINESS_PROPERTY' ? (
                                 <div>
-                                    <label className="label">Select Property</label>
-                                    {selectedCustomerData.properties?.length > 0 ? (
+                                    <label className="label">
+                                        {watchBillType === 'BUSINESS_PROPERTY' ? 'Select Business Property' : 'Select Residential Property'}
+                                    </label>
+                                    {(() => {
+                                        const filtered = (selectedCustomerData.properties || []).filter((p: any) =>
+                                            watchBillType === 'BUSINESS_PROPERTY'
+                                                ? p.property_kind === 'BUSINESS_PROPERTY'
+                                                : p.property_kind !== 'BUSINESS_PROPERTY'
+                                        );
+                                        return filtered.length > 0 ? (
                                         <div className="grid gap-3">
-                                            {selectedCustomerData.properties.map((p: any) => (
+                                            {filtered.map((p: any) => (
                                                 <label key={p.id} className={`flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-all ${watch('property_id') === p.id ? 'border-municipal-red bg-red-50 ring-1 ring-municipal-red' : ''}`}>
-                                                    <input type="radio" value={p.id} {...register('property_id', { required: watchBillType === 'PROPERTY' ? 'Please select a property' : false })} className="mr-3" />
+                                                    <input type="radio" value={p.id} {...register('property_id', { required: isPropertySector(watchBillType) ? 'Please select a property' : false })} className="mr-3" />
                                                     <div className="flex-1">
                                                         <p className="font-bold text-sm">{p.property_number}</p>
                                                         <p className="text-xs text-gray-500">{p.classification_name} • {p.physical_location || p.street_name || 'No address'}</p>
@@ -327,9 +361,10 @@ function GenerateBillContent() {
                                         </div>
                                     ) : (
                                         <div className="p-4 bg-yellow-50 text-yellow-800 rounded-lg text-sm border border-yellow-100 italic">
-                                            This customer has no registered properties.
+                                            This customer has no registered {watchBillType === 'BUSINESS_PROPERTY' ? 'business properties' : 'residential properties'}.
                                         </div>
-                                    )}
+                                    );
+                                    })()}
                                     {errors.property_id && <p className="text-red-500 text-sm mt-1">{errors.property_id.message}</p>}
                                 </div>
                             ) : (
@@ -399,7 +434,7 @@ function GenerateBillContent() {
                     <button
                         type="button"
                         onClick={handleSubmit(handlePreview)}
-                        disabled={isSubmitting || (watchBillType === 'PROPERTY' && !watch('property_id')) || (watchBillType === 'BOP' && !watch('business_id'))}
+                        disabled={isSubmitting || (isPropertySector(watchBillType) && !watch('property_id')) || (watchBillType === 'BOP' && !watch('business_id'))}
                         className="btn-secondary flex items-center space-x-2"
                     >
                         <Search className="w-4 h-4" />
@@ -407,7 +442,7 @@ function GenerateBillContent() {
                     </button>
                     <button
                         type="submit"
-                        disabled={isSubmitting || (watchBillType === 'PROPERTY' && !watch('property_id')) || (watchBillType === 'BOP' && !watch('business_id'))}
+                        disabled={isSubmitting || (isPropertySector(watchBillType) && !watch('property_id')) || (watchBillType === 'BOP' && !watch('business_id'))}
                         className="btn-primary flex items-center space-x-2"
                     >
                         {isSubmitting ? (
@@ -438,9 +473,17 @@ function GenerateBillContent() {
                                 <div className="font-bold text-gray-900">{previewData.customer_name}</div>
 
                                 <div className="text-gray-500 font-medium">Bill Type:</div>
-                                <div className="font-bold text-gray-900">{previewData.bill_type === 'PROPERTY' ? 'Property Rate' : 'BOP Permit'}</div>
+                                <div className="font-bold text-gray-900">
+                                    {previewData.bill_type === 'PROPERTY'
+                                        ? 'Residential Property'
+                                        : previewData.bill_type === 'BUSINESS_PROPERTY'
+                                          ? 'Business Property'
+                                          : 'BOP Permit'}
+                                </div>
 
-                                <div className="text-gray-500 font-medium">{previewData.bill_type === 'PROPERTY' ? 'Property No:' : 'Business:'}</div>
+                                <div className="text-gray-500 font-medium">
+                                    {isPropertySector(previewData.bill_type) ? 'Property No:' : 'Business:'}
+                                </div>
                                 <div className="font-bold text-municipal-red">{previewData.target_name}</div>
 
                                 <div className="text-gray-500 font-medium">Category:</div>

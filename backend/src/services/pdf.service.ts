@@ -166,6 +166,7 @@ const drawBill = async (doc: typeof PDFDocument, billId: string): Promise<void> 
     }
 
     const isBOP = bill.bill_type === 'BOP';
+    const isBusinessProperty = bill.bill_type === 'BUSINESS_PROPERTY';
     let billDetails = typeof bill.bill_details === 'string'
         ? JSON.parse(bill.bill_details)
         : bill.bill_details;
@@ -194,13 +195,19 @@ const drawBill = async (doc: typeof PDFDocument, billId: string): Promise<void> 
 
     // Bill Type Header Box
     let currentY = doc.y;
-    doc.rect(margin + 40, currentY, 110, 20)
+    const headerLabel = isBOP
+        ? 'BOP BILL'
+        : isBusinessProperty
+          ? 'BUSINESS PROPERTY BILL'
+          : 'PROPERTY BILL';
+    const headerWidth = isBusinessProperty ? 170 : 110;
+    doc.rect(margin + 40, currentY, headerWidth, 20)
         .fill('#000000');
 
     doc.fillColor('#FFFFFF')
-        .fontSize(10)
+        .fontSize(isBusinessProperty ? 8 : 10)
         .font('Helvetica-Bold')
-        .text(isBOP ? 'BOP BILL' : 'PROPERTY BILL', margin + 45, currentY + 5, { width: 100, align: 'center' });
+        .text(headerLabel, margin + 40, currentY + 5, { width: headerWidth, align: 'center' });
 
     // Printed On Date
     doc.fillColor('#000000')

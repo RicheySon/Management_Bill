@@ -1,11 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { fetchProperties } from '@/lib/api-client';
+import { sectorFromPath } from '@/lib/property-sector';
 import { Plus, Search, Building2, MapPin, User, Tag } from 'lucide-react';
 import Link from 'next/link';
 
 export default function PropertiesPage() {
+    const pathname = usePathname();
+    const sector = sectorFromPath(pathname);
     const [properties, setProperties] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -13,7 +17,7 @@ export default function PropertiesPage() {
     useEffect(() => {
         const loadProperties = async () => {
             try {
-                const result = await fetchProperties();
+                const result = await fetchProperties({ property_kind: sector.kind });
                 setProperties(result.data || []);
             } catch (error) {
                 console.error('Failed to fetch properties:', error);
@@ -22,7 +26,7 @@ export default function PropertiesPage() {
             }
         };
         loadProperties();
-    }, []);
+    }, [sector.kind]);
 
     const filteredProperties = properties.filter(prop =>
         prop.property_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -33,12 +37,12 @@ export default function PropertiesPage() {
         <div>
             <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Properties</h1>
-                    <p className="text-gray-600 mt-1">Manage and track all registered properties</p>
+                    <h1 className="text-3xl font-bold text-gray-900">{sector.listTitle}</h1>
+                    <p className="text-gray-600 mt-1">{sector.listSubtitle}</p>
                 </div>
-                <Link href="/properties/new" className="btn-primary flex items-center space-x-2 self-start">
+                <Link href={`${sector.basePath}/new`} className="btn-primary flex items-center space-x-2 self-start">
                     <Plus className="w-5 h-5" />
-                    <span>Register New Property</span>
+                    <span>Register New {sector.shortLabel}</span>
                 </Link>
             </div>
 
@@ -47,7 +51,7 @@ export default function PropertiesPage() {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <input
                         type="text"
-                        placeholder="Search by property number or owner name..."
+                        placeholder={`Search by ${sector.label.toLowerCase()} number or owner name...`}
                         className="input-field pl-10"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -58,14 +62,14 @@ export default function PropertiesPage() {
             {loading ? (
                 <div className="text-center py-20">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-municipal-red mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading properties...</p>
+                    <p className="text-gray-600">Loading {sector.listTitle.toLowerCase()}...</p>
                 </div>
             ) : filteredProperties.length > 0 ? (
                 <div className="overflow-x-auto card p-0">
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Property Number</th>
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Number</th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Account Number</th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Owner</th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
@@ -79,7 +83,11 @@ export default function PropertiesPage() {
                                 <tr key={prop.id} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="flex items-center">
-                                            <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600 mr-3">
+                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center mr-3 ${
+                                                sector.kind === 'BUSINESS_PROPERTY'
+                                                    ? 'bg-amber-50 text-amber-700'
+                                                    : 'bg-purple-50 text-purple-600'
+                                            }`}>
                                                 <Building2 className="w-4 h-4" />
                                             </div>
                                             <span className="font-mono font-bold text-gray-900">{prop.property_number}</span>
@@ -113,7 +121,7 @@ export default function PropertiesPage() {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <Link href={`/properties/${prop.id}`} className="text-municipal-red hover:underline">
+                                        <Link href={`${sector.basePath}/${prop.id}`} className="text-municipal-red hover:underline">
                                             View Details
                                         </Link>
                                     </td>
@@ -123,12 +131,12 @@ export default function PropertiesPage() {
                     </table>
                 </div>
             ) : (
-                <div className="card text-center py-20">
-                    <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Building2 className="w-8 h-8 text-gray-400" />
-                    </div>
-                    <h3 className="text-lg font-medium text-gray-900">No properties found</h3>
-                    <p className="text-gray-600 mt-1">Try a different search or register a new property.</p>
+                <div className="card text-center py-16">
+                    <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-600 font-medium">No {sector.listTitle.toLowerCase()} found</p>
+                    <Link href={`${sector.basePath}/new`} className="text-municipal-red hover:underline text-sm mt-2 inline-block">
+                        Register the first one
+                    </Link>
                 </div>
             )}
         </div>

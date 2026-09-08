@@ -79,6 +79,13 @@ export default function CustomerDetailPage() {
         );
     }
 
+    const residentialProperties = (customer.properties || []).filter(
+        (p: any) => p.property_kind !== 'BUSINESS_PROPERTY'
+    );
+    const businessProperties = (customer.properties || []).filter(
+        (p: any) => p.property_kind === 'BUSINESS_PROPERTY'
+    );
+
     return (
         <div className="space-y-8">
             {/* Header */}
@@ -113,7 +120,8 @@ export default function CustomerDetailPage() {
                             <span>New Registration</span>
                         </button>
                         <div className="absolute right-0 mt-2 w-48 bg-white border rounded-lg shadow-xl hidden group-hover:block z-10">
-                            <Link href={`/properties/new?customer_id=${id}`} className="block px-4 py-2 hover:bg-gray-50 text-gray-700">Property Rate</Link>
+                            <Link href={`/properties/new?customer_id=${id}`} className="block px-4 py-2 hover:bg-gray-50 text-gray-700">Residential Property</Link>
+                            <Link href={`/business-properties/new?customer_id=${id}`} className="block px-4 py-2 hover:bg-gray-50 text-gray-700">Business Property</Link>
                             <Link href={`/businesses/new?customer_id=${id}`} className="block px-4 py-2 hover:bg-gray-50 text-gray-700">Business Permit (BOP)</Link>
                         </div>
                     </div>
@@ -162,18 +170,18 @@ export default function CustomerDetailPage() {
 
                 {/* Assets & Billing Summary */}
                 <div className="lg:col-span-2 space-y-8">
-                    {/* Properties Section */}
+                    {/* Residential Properties Section */}
                     <div className="card">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-xl font-bold flex items-center space-x-2">
                                 <Building2 className="w-5 h-5 text-municipal-red" />
-                                <span>Properties</span>
+                                <span>Residential Properties</span>
                             </h2>
                             <span className="bg-red-50 text-red-700 text-xs font-bold px-2.5 py-0.5 rounded-full">
-                                {customer.properties?.length || 0} Total
+                                {residentialProperties.length} Total
                             </span>
                         </div>
-                        {customer.properties && customer.properties.length > 0 ? (
+                        {residentialProperties.length > 0 ? (
                             <div className="overflow-x-auto">
                                 <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-50">
@@ -186,7 +194,7 @@ export default function CustomerDetailPage() {
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
-                                        {customer.properties.map((prop: any) => (
+                                        {residentialProperties.map((prop: any) => (
                                             <tr key={prop.id} className="hover:bg-gray-50">
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-municipal-red">
                                                     <Link href={`/properties/${prop.id}`}>{prop.property_number}</Link>
@@ -201,7 +209,50 @@ export default function CustomerDetailPage() {
                                 </table>
                             </div>
                         ) : (
-                            <p className="text-gray-500 text-center py-4 italic">No properties registered.</p>
+                            <p className="text-gray-500 text-center py-4 italic">No residential properties registered.</p>
+                        )}
+                    </div>
+
+                    {/* Business Properties Section */}
+                    <div className="card">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-xl font-bold flex items-center space-x-2">
+                                <Building2 className="w-5 h-5 text-amber-700" />
+                                <span>Business Properties</span>
+                            </h2>
+                            <span className="bg-amber-50 text-amber-800 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                                {businessProperties.length} Total
+                            </span>
+                        </div>
+                        {businessProperties.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Number</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account Number</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Classification</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
+                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Balance</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {businessProperties.map((prop: any) => (
+                                            <tr key={prop.id} className="hover:bg-gray-50">
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-municipal-red">
+                                                    <Link href={`/business-properties/${prop.id}`}>{prop.property_number}</Link>
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-mono text-gray-600">{prop.account_number || '—'}</td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{prop.classification_name}</td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 truncate max-w-[150px]">{prop.physical_location}</td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-right font-bold text-red-600">GHS {parseFloat(prop.total_outstanding || 0).toFixed(2)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <p className="text-gray-500 text-center py-4 italic">No business properties registered.</p>
                         )}
                     </div>
 
