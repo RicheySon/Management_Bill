@@ -51,26 +51,40 @@ export const feeAmountForPropertyClass = (
         4: zone.cat_d_fee,
     };
 
-    // Explicit class/category selected → use only that CAT column (no silent CAT A fallback)
-    if (classNum) {
-        const raw = catMap[classNum];
-        if (raw != null && raw !== '') {
-            const fee = parseFloat(String(raw));
-            if (!isNaN(fee) && fee > 0) return fee;
-        }
-        return 0;
+    // Amount is always zone × property class (CAT A–D). Never guess CAT A alone.
+    if (!classNum) return 0;
+
+    const raw = catMap[classNum];
+    if (raw != null && raw !== '') {
+        const fee = parseFloat(String(raw));
+        if (!isNaN(fee) && fee > 0) return fee;
     }
+    return 0;
+};
 
-    // No class yet — allow provisional CAT A / minimum for legacy rows
-    const catA = parseFloat(String(zone.cat_a_fee ?? ''));
-    if (!isNaN(catA) && catA > 0) return catA;
-
-    const rateImpost = parseFloat(String(zone.rate_impost_min ?? 0)) || 0;
-    const minimumRate = parseFloat(String(zone.minimum_rate_min ?? 0)) || 0;
-    const calculatedRate = rateImpost * propertySize;
-    let current = Math.max(calculatedRate, minimumRate || 0);
-    if ((!current || current <= 0) && minimumRate > 0) current = minimumRate;
-    return current || 0;
+/** Hint text for registration UI when linking rating zone + property class */
+export const zoneClassFeeMessage = (
+    zone: any | null | undefined,
+    classificationName?: string | null
+): { amount: number; message: string } => {
+    if (!zone) return { amount: 0, message: '' };
+    if (!propertyClassNumber(classificationName)) {
+        return {
+            amount: 0,
+            message: `${zone.zone_name} — select Property Class (Category A–D); amount comes from fee fixing for that class`,
+        };
+    }
+    const amount = feeAmountForPropertyClass(zone, classificationName);
+    if (amount > 0) {
+        return {
+            amount,
+            message: `${zone.zone_name} × ${propertyClassLabel(classificationName)}: GHS ${amount.toLocaleString()}`,
+        };
+    }
+    return {
+        amount: 0,
+        message: `${zone.zone_name} × ${propertyClassLabel(classificationName)} — no fee set for this category in Fee Configuration`,
+    };
 };
 
 /** "Category A" / "A" / "CAT A" → a (null if unknown) */

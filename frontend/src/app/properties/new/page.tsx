@@ -16,7 +16,7 @@ import {
 } from '@/lib/api-client';
 import { sectorFromPath } from '@/lib/property-sector';
 import { toCoord } from '@/lib/geo';
-import { feeAmountForPropertyClass, propertyClassLabel } from '@/lib/property-fee';
+import { propertyClassLabel, zoneClassFeeMessage } from '@/lib/property-fee';
 import { ArrowLeft, Save, UserPlus, UserCheck, MapPin, Navigation, Map as MapIcon, X, Phone, Mail, User, CheckCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -610,19 +610,10 @@ function NewPropertyPageContent() {
                                     const cls = classifications.find((c: any) => c.id === classId);
                                     if (selectedRateZoneId) {
                                         const zone = rateZones.find((z: any) => z.id === parseInt(selectedRateZoneId));
-                                        if (zone && cls) {
-                                            const amount = feeAmountForPropertyClass(zone, cls.name);
-                                            if (amount > 0) {
-                                                setAssessedAmount(String(amount));
-                                                setSelectedRateInfo(
-                                                    `${zone.zone_name} × ${propertyClassLabel(cls.name)}: GHS ${amount.toLocaleString()}`
-                                                );
-                                            } else {
-                                                setAssessedAmount('');
-                                                setSelectedRateInfo(
-                                                    `${zone.zone_name} × ${propertyClassLabel(cls.name)} — no fee set for this category in Fee Configuration`
-                                                );
-                                            }
+                                        if (zone) {
+                                            const { amount, message } = zoneClassFeeMessage(zone, cls?.name);
+                                            setAssessedAmount(amount > 0 ? String(amount) : '');
+                                            setSelectedRateInfo(message);
                                         }
                                     }
                                 }}
@@ -636,12 +627,22 @@ function NewPropertyPageContent() {
                             {errors.classification_id && (
                                 <p className="text-red-500 text-sm mt-1">{errors.classification_id.message}</p>
                             )}
+                            <p className="text-xs text-gray-500 mt-1">
+                                Bill amount is linked to this class × the rating zone (same as residential fee fixing).
+                            </p>
                         </div>
 
-                        {/* Rating Zone — name only; amount comes from Category × fee fixing */}
+                        {/* Rating Zone — amount only after Property Class is also selected */}
                         {rateZones.length > 0 && (
                             <div>
-                                <label className="label">Rating Zone <span className="text-gray-400 font-normal">(zone / house name)</span></label>
+                                <label className="label">
+                                    Rating Zone{' '}
+                                    <span className="text-gray-400 font-normal">
+                                        {sector.kind === 'BUSINESS_PROPERTY'
+                                            ? '(commercial rooms / zone name)'
+                                            : '(zone / house name)'}
+                                    </span>
+                                </label>
                                 <DropdownSelect
                                     value={selectedRateZoneId}
                                     onChange={(v) => {
@@ -651,35 +652,30 @@ function NewPropertyPageContent() {
                                             const classId = watch('classification_id');
                                             const cls = classifications.find((c: any) => c.id === Number(classId));
                                             if (zone) {
-                                                const amount = feeAmountForPropertyClass(zone, cls?.name);
-                                                if (amount > 0) {
-                                                    setAssessedAmount(String(amount));
-                                                    setSelectedRateInfo(
-                                                        cls
-                                                            ? `${zone.zone_name} × ${propertyClassLabel(cls.name)}: GHS ${amount.toLocaleString()}`
-                                                            : `${zone.zone_name} — select Category A–D for the bill amount`
-                                                    );
-                                                } else {
-                                                    setAssessedAmount('');
-                                                    setSelectedRateInfo(
-                                                        cls
-                                                            ? `${zone.zone_name} × ${propertyClassLabel(cls.name)} — no fee set for this category`
-                                                            : `${zone.zone_name} — select Category A–D for the bill amount`
-                                                    );
-                                                }
+                                                const { amount, message } = zoneClassFeeMessage(zone, cls?.name);
+                                                setAssessedAmount(amount > 0 ? String(amount) : '');
+                                                setSelectedRateInfo(message);
                                             }
                                         } else {
                                             setSelectedRateInfo('');
                                         }
                                     }}
-                                    placeholder="Select rating zone"
+                                    placeholder={
+                                        sector.kind === 'BUSINESS_PROPERTY'
+                                            ? 'Select commercial rating zone'
+                                            : 'Select rating zone'
+                                    }
                                     options={rateZones.map((zone: any) => ({
                                         value: String(zone.id),
                                         label: zone.zone_name,
                                     }))}
                                 />
                                 {selectedRateInfo && (
-                                    <p className="text-sm text-green-700 font-medium mt-1">{selectedRateInfo}</p>
+                                    <p className={`text-sm font-medium mt-1 ${
+                                        selectedRateInfo.includes('GHS') ? 'text-green-700' : 'text-amber-700'
+                                    }`}>
+                                        {selectedRateInfo}
+                                    </p>
                                 )}
                             </div>
                         )}
