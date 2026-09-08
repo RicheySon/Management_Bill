@@ -152,6 +152,7 @@ router.get('/monthly', authorize(['view_reports']), async (req: Request, res: Re
              ${paymentAreaJoin}
              WHERE EXTRACT(YEAR FROM p.payment_date) = $1
                AND EXTRACT(MONTH FROM p.payment_date) BETWEEN $2 AND $3
+               AND COALESCE(p.clearance_status, 'CLEARED') = 'CLEARED'
              ${paymentAreaFilter}
              GROUP BY 1, 2
              ORDER BY 1 ASC, 2 ASC`,

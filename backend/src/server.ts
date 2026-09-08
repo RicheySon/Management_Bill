@@ -20,6 +20,7 @@ import feeConfigRoutes from './routes/fee-config.routes';
 import dataRoutes from './routes/data.routes';
 import amountChangeRoutes from './routes/amount-change.routes';
 import actionRequestRoutes from './routes/action-request.routes';
+import paymentClearanceRoutes from './routes/payment-clearance.routes';
 
 // Load environment variables
 dotenv.config();
@@ -69,6 +70,7 @@ app.use('/api/fee-config', feeConfigRoutes);
 app.use('/api/data', dataRoutes);
 app.use('/api/amount-changes', amountChangeRoutes);
 app.use('/api/action-requests', actionRequestRoutes);
+app.use('/api/payments', paymentClearanceRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

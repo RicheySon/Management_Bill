@@ -271,11 +271,13 @@ router.get('/:id([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-
             });
         }
 
-        // Get payments for this bill (include recorder name)
         const paymentsResult = await pool.query(
-            `SELECT p.*, u.full_name as recorded_by_name
+            `SELECT p.*,
+                u.full_name as recorded_by_name,
+                clr.full_name as cleared_by_name
              FROM payments p
              LEFT JOIN system_users u ON p.recorded_by = u.id
+             LEFT JOIN system_users clr ON p.cleared_by = clr.id
              WHERE p.bill_id = $1
              ORDER BY p.payment_date DESC, p.created_at DESC`,
             [id]
@@ -542,9 +544,11 @@ router.post('/:id/payment', authenticateToken, authorize(['record_payment']), as
             req.user!.id
         );
 
+        const isPendingCheque = payment.clearance_status === 'PENDING';
+
         await logAction(
             req.user!.id,
-            'PAYMENT_RECORDED',
+            isPendingCheque ? 'CHEQUE_PAYMENT_PENDING' : 'PAYMENT_RECORDED',
             'payments',
             payment.id,
             null,
@@ -553,6 +557,8 @@ router.post('/:id/payment', authenticateToken, authorize(['record_payment']), as
                 amount,
                 gcr_number: payment.gcr_number,
                 receipt_number: payment.receipt_number,
+                payment_method: payment.payment_method,
+                clearance_status: payment.clearance_status,
                 recorded_by: req.user!.id,
             },
             getAuditContext(req)
@@ -561,7 +567,9 @@ router.post('/:id/payment', authenticateToken, authorize(['record_payment']), as
         res.status(201).json({
             success: true,
             data: payment,
-            message: `Payment recorded successfully. Receipt Number: ${payment.receipt_number}`,
+            message: isPendingCheque
+                ? `Cheque payment recorded (pending clearance). Receipt ${payment.receipt_number}. Amount will hit the bill after a Revenue Officer confirms the cheque has cleared.`
+                : `Payment recorded successfully. Receipt Number: ${payment.receipt_number}`,
         });
     } catch (error: any) {
         console.error('Error recording payment:', error);
