@@ -153,7 +153,7 @@ export default function ApprovalsPage() {
                         Approvals
                     </h1>
                     <p className="text-gray-500">
-                        Review cheque clearances, amount changes, and print/delete requests.
+                        Revenue Officers clear pending cheques here. Amount and print/delete queues appear for their assigned approvers.
                     </p>
                 </div>
                 <select
