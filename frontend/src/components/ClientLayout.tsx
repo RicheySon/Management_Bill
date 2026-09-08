@@ -196,12 +196,23 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                             <NavLink href="/reports" icon={<BarChart3 className="w-5 h-5" />} label="Reports" onClick={() => setIsSidebarOpen(false)} />
                         }
 
+                        {/* Revenue Officer only — cheque clearance queue */}
+                        {hasPermission('approve_cheque_payments') && (
+                            <NavLink
+                                href="/admin/approvals"
+                                icon={<ClipboardList className="w-5 h-5" />}
+                                label="Cheque Clearance"
+                                badge={pendingApprovals}
+                                onClick={() => setIsSidebarOpen(false)}
+                            />
+                        )}
+
                         {hasPermission('bulk_print') &&
                             <NavLink href="/print" icon={<Printer className="w-5 h-5" />} label="Bulk Printing" onClick={() => setIsSidebarOpen(false)} />
                         }
 
                         {/* Admin Links */}
-                        {(hasPermission('manage_users') || hasPermission('configure_rates') || hasPermission('view_logs') || hasPermission('approve_amount_changes') || hasPermission('approve_privileged_actions') || hasPermission('approve_cheque_payments')) && (
+                        {(hasPermission('manage_users') || hasPermission('configure_rates') || hasPermission('view_logs') || hasPermission('approve_amount_changes') || hasPermission('approve_privileged_actions')) && (
                             <div className="pt-4 pb-2">
                                 <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Administration</p>
                             </div>
@@ -211,12 +222,16 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                             <NavLink href="/admin/users" icon={<Shield className="w-5 h-5" />} label="User Management" onClick={() => setIsSidebarOpen(false)} />
                         }
 
-                        {canSeeApprovals && (
+                        {/* Amount / print-delete approvals (not cheque — that is RO-only above) */}
+                        {(hasPermission('approve_amount_changes') || hasPermission('approve_privileged_actions')) && (
                             <NavLink
                                 href="/admin/approvals"
                                 icon={<ClipboardList className="w-5 h-5" />}
                                 label="Approvals"
-                                badge={pendingApprovals}
+                                badge={
+                                    // Avoid double-counting when a user somehow has both queues
+                                    hasPermission('approve_cheque_payments') ? undefined : pendingApprovals
+                                }
                                 onClick={() => setIsSidebarOpen(false)}
                             />
                         )}
