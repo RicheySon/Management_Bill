@@ -21,7 +21,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     const canSeeApprovals =
         !!user &&
         (user.permissions?.includes('approve_amount_changes') ||
-            user.permissions?.includes('approve_privileged_actions'));
+            user.permissions?.includes('approve_privileged_actions') ||
+            user.permissions?.includes('approve_cheque_payments'));
 
     const refreshPendingApprovals = useCallback(async () => {
         if (!canSeeApprovals || !user) {
@@ -32,6 +33,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             const counts = await fetchPendingApprovalsCount({
                 canAmount: user.permissions?.includes('approve_amount_changes'),
                 canActions: user.permissions?.includes('approve_privileged_actions'),
+                canCheques: user.permissions?.includes('approve_cheque_payments'),
             });
             setPendingApprovals(counts.total);
         } catch {
@@ -199,7 +201,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                         }
 
                         {/* Admin Links */}
-                        {(hasPermission('manage_users') || hasPermission('configure_rates') || hasPermission('view_logs') || hasPermission('approve_amount_changes') || hasPermission('approve_privileged_actions')) && (
+                        {(hasPermission('manage_users') || hasPermission('configure_rates') || hasPermission('view_logs') || hasPermission('approve_amount_changes') || hasPermission('approve_privileged_actions') || hasPermission('approve_cheque_payments')) && (
                             <div className="pt-4 pb-2">
                                 <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Administration</p>
                             </div>

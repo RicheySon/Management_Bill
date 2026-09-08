@@ -183,10 +183,17 @@ describe('billing.service smoke', () => {
                         },
                     ],
                 })
+                .mockResolvedValueOnce({ rows: [{ pending_total: 0 }] }) // pending cheques
                 .mockResolvedValueOnce({ rows: [] }) // no duplicate GCR
                 .mockResolvedValueOnce({ rows: [{ receipt_number: 'GN-RCT-2026-000001' }] })
                 .mockResolvedValueOnce({
-                    rows: [{ id: 'pay-1', receipt_number: 'GN-RCT-2026-000001', amount: 100 }],
+                    rows: [{
+                        id: 'pay-1',
+                        receipt_number: 'GN-RCT-2026-000001',
+                        amount: 100,
+                        clearance_status: 'CLEARED',
+                        payment_method: 'CASH',
+                    }],
                 })
                 .mockResolvedValueOnce({}) // update bill
                 .mockResolvedValueOnce({}), // COMMIT
@@ -212,6 +219,56 @@ describe('billing.service smoke', () => {
         expect(insertCall).toBeTruthy();
         expect(insertCall[1]).toContain('user-1');
         expect(insertCall[1]).toContain('25/1234567');
+        expect(insertCall[1]).toContain('CLEARED');
+    });
+
+    it('recordPayment holds cheque amounts as PENDING without updating the bill', async () => {
+        const client = {
+            query: jest
+                .fn()
+                .mockResolvedValueOnce({}) // BEGIN
+                .mockResolvedValueOnce({
+                    rows: [
+                        {
+                            id: 'bill-1',
+                            amount_paid: 0,
+                            total_amount: 100,
+                            payment_status: 'UNPAID',
+                        },
+                    ],
+                })
+                .mockResolvedValueOnce({ rows: [{ pending_total: 0 }] })
+                .mockResolvedValueOnce({ rows: [] })
+                .mockResolvedValueOnce({ rows: [{ receipt_number: 'GN-RCT-2026-000002' }] })
+                .mockResolvedValueOnce({
+                    rows: [{
+                        id: 'pay-2',
+                        receipt_number: 'GN-RCT-2026-000002',
+                        amount: 50,
+                        clearance_status: 'PENDING',
+                        payment_method: 'CHEQUE',
+                    }],
+                })
+                .mockResolvedValueOnce({}), // COMMIT (no bill update)
+            release: jest.fn(),
+        };
+        (pool.connect as jest.Mock).mockResolvedValue(client);
+
+        const payment = await recordPayment(
+            'bill-1',
+            'cust-1',
+            50,
+            'CHEQUE',
+            '25/7654321',
+            undefined,
+            'user-1'
+        );
+        expect(payment.clearance_status).toBe('PENDING');
+        expect(payment.payment_method).toBe('CHEQUE');
+        const billUpdate = client.query.mock.calls.find(
+            (c: any[]) => typeof c[0] === 'string' && c[0].includes('UPDATE bills SET')
+        );
+        expect(billUpdate).toBeFalsy();
     });
 });
 

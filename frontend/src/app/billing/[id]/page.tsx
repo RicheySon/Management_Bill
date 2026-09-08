@@ -8,13 +8,15 @@ import {
     downloadBillPDF,
     printBillPDF,
     requestBillAmountChange,
+    approveChequePayment,
+    rejectChequePayment,
 } from '@/lib/api-client';
 import { useAuth } from '@/context/AuthContext';
 import {
     ArrowLeft, Printer, CreditCard,
     User, Building2, Briefcase, Calendar,
     Wallet, CheckCircle2, AlertCircle, History,
-    FileDown, Pencil
+    FileDown, Pencil, XCircle
 } from 'lucide-react';
 
 import { GCR_HINT, GCR_PLACEHOLDER, formatGcrInput, isValidGcr, normalizeGcr } from '@/lib/gcr';
@@ -32,12 +34,15 @@ export default function BillDetailPage() {
     const [gcrNumber, setGcrNumber] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [successMsg, setSuccessMsg] = useState('');
     const [amountForm, setAmountForm] = useState({ current_rate: '', arrears: '', rebate: '', reason: '' });
     const [amountMsg, setAmountMsg] = useState<string | null>(null);
     const [actionMsg, setActionMsg] = useState<string | null>(null);
+    const [chequeBusyId, setChequeBusyId] = useState<string | null>(null);
 
     const canPrintDirect = hasPermission('print_bill') || hasPermission('bulk_print') || hasPermission('manage_users');
     const canPay = hasPermission('record_payment');
+    const canClearCheques = hasPermission('approve_cheque_payments');
 
     const loadBill = async () => {
         try {
@@ -56,7 +61,11 @@ export default function BillDetailPage() {
             setBill(billRow);
             setPayments(paymentRows);
             const outstanding = parseFloat(billRow.total_amount) - parseFloat(billRow.amount_paid);
-            setPaymentAmount(Math.max(0, outstanding).toFixed(2));
+            const pendingCheque = paymentRows
+                .filter((p: any) => p.clearance_status === 'PENDING')
+                .reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0);
+            const available = Math.max(0, outstanding - pendingCheque);
+            setPaymentAmount(available.toFixed(2));
             setAmountForm({
                 current_rate: String(billRow.current_rate ?? ''),
                 arrears: String(billRow.arrears ?? ''),
@@ -83,20 +92,53 @@ export default function BillDetailPage() {
             if (!isValidGcr(gcr)) {
                 throw new Error(GCR_HINT);
             }
-            await recordPayment(id as string, {
+            const res = await recordPayment(id as string, {
                 amount: parseFloat(paymentAmount),
                 payment_method: paymentMethod,
                 gcr_number: gcr,
                 customer_id: bill.customer_id,
             });
             setSuccess(true);
+            setSuccessMsg(res.message || 'Payment recorded');
             setGcrNumber('');
             await loadBill();
-            setTimeout(() => setSuccess(false), 3000);
+            setTimeout(() => setSuccess(false), 5000);
         } catch (err: any) {
             setError(err.response?.data?.error || err.message || 'Failed to record payment');
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleApproveCheque = async (paymentId: string) => {
+        setChequeBusyId(paymentId);
+        setError(null);
+        try {
+            await approveChequePayment(paymentId, 'Cheque cleared — funds received');
+            setSuccess(true);
+            setSuccessMsg('Cheque approved. Amount applied to the bill.');
+            await loadBill();
+            setTimeout(() => setSuccess(false), 4000);
+        } catch (err: any) {
+            setError(err.response?.data?.error || 'Failed to approve cheque');
+        } finally {
+            setChequeBusyId(null);
+        }
+    };
+
+    const handleRejectCheque = async (paymentId: string) => {
+        setChequeBusyId(paymentId);
+        setError(null);
+        try {
+            await rejectChequePayment(paymentId, 'Cheque bounced');
+            setSuccess(true);
+            setSuccessMsg('Cheque declined as bounced. Bill balance unchanged.');
+            await loadBill();
+            setTimeout(() => setSuccess(false), 4000);
+        } catch (err: any) {
+            setError(err.response?.data?.error || 'Failed to decline cheque');
+        } finally {
+            setChequeBusyId(null);
         }
     };
 
@@ -132,6 +174,10 @@ export default function BillDetailPage() {
     if (!bill) return <div className="text-center py-20 text-red-500">Bill not found</div>;
 
     const balance = parseFloat(bill.total_amount) - parseFloat(bill.amount_paid);
+    const pendingChequeTotal = payments
+        .filter((p: any) => p.clearance_status === 'PENDING')
+        .reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0);
+    const availableToPay = Math.max(0, balance - pendingChequeTotal);
 
     return (
         <div className="max-w-5xl mx-auto space-y-6">
@@ -255,6 +301,12 @@ export default function BillDetailPage() {
                                     <span>Outstanding Balance</span>
                                     <span>GHS {Math.max(0, balance).toFixed(2)}</span>
                                 </div>
+                                {pendingChequeTotal > 0 && (
+                                    <div className="flex justify-between text-sm font-semibold text-amber-700 mt-2 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                                        <span>Pending cheque(s) held</span>
+                                        <span>GHS {pendingChequeTotal.toFixed(2)}</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -267,19 +319,68 @@ export default function BillDetailPage() {
                         {payments && payments.length > 0 ? (
                             <div className="space-y-3">
                                 {payments.map((p: any) => (
-                                    <div key={p.id} className="flex justify-between items-center p-3 border rounded-lg bg-white">
-                                        <div>
-                                            <p className="font-bold text-gray-900">{p.receipt_number}</p>
-                                            <p className="text-xs text-gray-500">
-                                                GCR: {p.gcr_number || 'N/A'} • {new Date(p.payment_date).toLocaleString()} • {p.payment_method}
-                                            </p>
-                                            <p className="text-xs text-municipal-red font-medium mt-1">
-                                                Recorded by: {p.recorded_by_name || user?.full_name || 'Unknown'}
-                                            </p>
+                                    <div key={p.id} className="p-3 border rounded-lg bg-white space-y-2">
+                                        <div className="flex justify-between items-start gap-3">
+                                            <div>
+                                                <p className="font-bold text-gray-900">{p.receipt_number}</p>
+                                                <p className="text-xs text-gray-500">
+                                                    GCR: {p.gcr_number || 'N/A'} • {new Date(p.payment_date).toLocaleString()} • {p.payment_method}
+                                                </p>
+                                                <p className="text-xs text-municipal-red font-medium mt-1">
+                                                    Recorded by: {p.recorded_by_name || user?.full_name || 'Unknown'}
+                                                </p>
+                                                {p.clearance_status && p.clearance_status !== 'CLEARED' && (
+                                                    <p className="text-xs text-gray-500 mt-1">
+                                                        Clearance: {p.clearance_status}
+                                                        {p.cleared_by_name ? ` · by ${p.cleared_by_name}` : ''}
+                                                        {p.clearance_note ? ` · ${p.clearance_note}` : ''}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div className="text-right">
+                                                <p className={`font-bold ${
+                                                    p.clearance_status === 'PENDING'
+                                                        ? 'text-amber-600'
+                                                        : p.clearance_status === 'REJECTED'
+                                                          ? 'text-red-600'
+                                                          : 'text-green-600'
+                                                }`}>
+                                                    GHS {parseFloat(p.amount).toFixed(2)}
+                                                </p>
+                                                {p.clearance_status === 'PENDING' && (
+                                                    <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
+                                                        Awaiting clearance
+                                                    </span>
+                                                )}
+                                                {p.clearance_status === 'REJECTED' && (
+                                                    <span className="text-[10px] font-bold uppercase tracking-wide text-red-700 bg-red-50 px-2 py-0.5 rounded">
+                                                        Bounced
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="font-bold text-green-600">GHS {parseFloat(p.amount).toFixed(2)}</p>
-                                        </div>
+                                        {canClearCheques && p.clearance_status === 'PENDING' && (
+                                            <div className="flex flex-wrap gap-2 pt-1">
+                                                <button
+                                                    type="button"
+                                                    disabled={chequeBusyId === p.id}
+                                                    onClick={() => handleApproveCheque(p.id)}
+                                                    className="btn-primary text-xs py-1.5 px-3 inline-flex items-center gap-1"
+                                                >
+                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                    Approve cleared
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    disabled={chequeBusyId === p.id}
+                                                    onClick={() => handleRejectCheque(p.id)}
+                                                    className="btn-secondary text-xs py-1.5 px-3 text-red-700 border-red-200 hover:bg-red-50 inline-flex items-center gap-1"
+                                                >
+                                                    <XCircle className="w-3.5 h-3.5" />
+                                                    Decline bounced
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -382,9 +483,9 @@ export default function BillDetailPage() {
                             </h3>
 
                             {success && (
-                                <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm mb-4 border border-green-200 flex items-center space-x-2">
-                                    <CheckCircle2 className="w-4 h-4" />
-                                    <span>Payment recorded successfully!</span>
+                                <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm mb-4 border border-green-200 flex items-start space-x-2">
+                                    <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                                    <span>{successMsg || 'Payment recorded successfully!'}</span>
                                 </div>
                             )}
 
@@ -407,8 +508,8 @@ export default function BillDetailPage() {
                                             placeholder="0.00"
                                             value={paymentAmount}
                                             onChange={(e) => setPaymentAmount(e.target.value)}
-                                            disabled={balance <= 0}
-                                            max={balance}
+                                            disabled={availableToPay <= 0}
+                                            max={availableToPay}
                                             required
                                         />
                                     </div>
@@ -420,13 +521,18 @@ export default function BillDetailPage() {
                                         className="input-field"
                                         value={paymentMethod}
                                         onChange={(e) => setPaymentMethod(e.target.value)}
-                                        disabled={balance <= 0}
+                                        disabled={availableToPay <= 0}
                                     >
                                         <option value="CASH">Cash</option>
                                         <option value="MOBILE_MONEY">Mobile Money</option>
                                         <option value="BANK_TRANSFER">Bank Transfer</option>
                                         <option value="CHEQUE">Cheque</option>
                                     </select>
+                                    {paymentMethod === 'CHEQUE' && (
+                                        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2 mt-2">
+                                            Cheque payments do not hit the account until a Revenue Officer confirms the cheque has cleared. If it bounces, they will decline it.
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div>
@@ -437,7 +543,7 @@ export default function BillDetailPage() {
                                         placeholder={GCR_PLACEHOLDER}
                                         value={gcrNumber}
                                         onChange={(e) => setGcrNumber(formatGcrInput(e.target.value))}
-                                        disabled={balance <= 0}
+                                        disabled={availableToPay <= 0}
                                         minLength={10}
                                         maxLength={10}
                                         inputMode="numeric"
@@ -451,16 +557,24 @@ export default function BillDetailPage() {
                                 <button
                                     type="submit"
                                     className="w-full btn-primary py-3 flex items-center justify-center space-x-2 disabled:bg-gray-300 disabled:shadow-none"
-                                    disabled={isSubmitting || balance <= 0 || !paymentAmount || !gcrNumber.trim()}
+                                    disabled={isSubmitting || availableToPay <= 0 || !paymentAmount || !gcrNumber.trim()}
                                 >
                                     {isSubmitting ? (
                                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                                     ) : (
                                         <CheckCircle2 className="w-5 h-5" />
                                     )}
-                                    <span>Confirm Payment</span>
+                                    <span>{paymentMethod === 'CHEQUE' ? 'Submit Cheque (pending clearance)' : 'Confirm Payment'}</span>
                                 </button>
                             </form>
+
+                            {availableToPay <= 0 && balance > 0 && (
+                                <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg text-center">
+                                    <AlertCircle className="w-8 h-8 text-amber-600 mx-auto mb-2" />
+                                    <p className="text-amber-900 font-bold">Outstanding is fully covered by pending cheque(s).</p>
+                                    <p className="text-amber-800 text-sm mt-1">Await Revenue Officer clearance before recording another payment.</p>
+                                </div>
+                            )}
 
                             {balance <= 0 && (
                                 <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg text-center">

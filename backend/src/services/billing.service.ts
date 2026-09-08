@@ -552,7 +552,20 @@ export const generateBill = async (
 };
 
 /**
- * Record a payment against a bill
+ * Normalize payment method spellings (CHECK → CHEQUE)
+ */
+export const normalizePaymentMethod = (method: string): string => {
+    const raw = String(method || '').trim().toUpperCase().replace(/\s+/g, '_');
+    if (raw === 'CHECK' || raw === 'CHEQUE') return 'CHEQUE';
+    return raw || 'CASH';
+};
+
+export const isChequePaymentMethod = (method: string): boolean =>
+    normalizePaymentMethod(method) === 'CHEQUE';
+
+/**
+ * Record a payment against a bill.
+ * Cheque payments are stored as PENDING and do not update the bill until cleared.
  */
 export const recordPayment = async (
     billId: string,
@@ -564,6 +577,8 @@ export const recordPayment = async (
     recordedBy?: string
 ): Promise<any> => {
     const client = await pool.connect();
+    const method = normalizePaymentMethod(paymentMethod);
+    const isCheque = method === 'CHEQUE';
 
     try {
         await client.query('BEGIN');
@@ -585,8 +600,21 @@ export const recordPayment = async (
         }
 
         const outstanding = parseFloat(bill.total_amount) - parseFloat(bill.amount_paid);
-        if (amount > outstanding + 0.001) {
-            throw new Error(`Payment amount exceeds outstanding balance of GHS ${outstanding.toFixed(2)}`);
+        const pendingResult = await client.query(
+            `SELECT COALESCE(SUM(amount), 0) AS pending_total
+             FROM payments
+             WHERE bill_id = $1 AND clearance_status = 'PENDING'`,
+            [billId]
+        );
+        const pendingTotal = parseFloat(pendingResult.rows[0]?.pending_total) || 0;
+        const available = outstanding - pendingTotal;
+
+        if (amount > available + 0.001) {
+            const msg =
+                pendingTotal > 0
+                    ? `Payment amount exceeds available balance of GHS ${available.toFixed(2)} (GHS ${pendingTotal.toFixed(2)} already held by pending cheque(s))`
+                    : `Payment amount exceeds outstanding balance of GHS ${outstanding.toFixed(2)}`;
+            throw new Error(msg);
         }
 
         // GCR format: YY/####### — auto-insert slash for mobile digit-only entry
@@ -607,16 +635,6 @@ export const recordPayment = async (
             );
         }
 
-        const newAmountPaid = parseFloat(bill.amount_paid) + amount;
-        const newAmountDue = parseFloat(bill.total_amount) - newAmountPaid;
-
-        let newStatus = 'UNPAID';
-        if (newAmountDue <= 0) {
-            newStatus = 'PAID';
-        } else if (newAmountPaid > 0) {
-            newStatus = 'PARTIAL';
-        }
-
         // Generate receipt number
         const receiptResult = await client.query(
             `SELECT generate_auto_number('RECEIPT', $1) as receipt_number`,
@@ -624,26 +642,49 @@ export const recordPayment = async (
         );
 
         const receiptNumber = receiptResult.rows[0].receipt_number;
+        const clearanceStatus = isCheque ? 'PENDING' : 'CLEARED';
 
         // Insert payment with recorder attribution
         const paymentResult = await client.query(
             `INSERT INTO payments (
         receipt_number, gcr_number, bill_id, customer_id, amount,
-        payment_method, payment_reference, recorded_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        payment_method, payment_reference, recorded_by, clearance_status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *`,
-            [receiptNumber, gcr, billId, customerId, amount, paymentMethod, paymentReference || null, recordedBy || null]
+            [
+                receiptNumber,
+                gcr,
+                billId,
+                customerId,
+                amount,
+                method,
+                paymentReference || null,
+                recordedBy || null,
+                clearanceStatus,
+            ]
         );
 
-        // Update bill
-        await client.query(
-            `UPDATE bills SET
+        // Cash / MoMo / transfer hit the account immediately; cheques wait for clearance
+        if (!isCheque) {
+            const newAmountPaid = parseFloat(bill.amount_paid) + amount;
+            const newAmountDue = parseFloat(bill.total_amount) - newAmountPaid;
+
+            let newStatus = 'UNPAID';
+            if (newAmountDue <= 0) {
+                newStatus = 'PAID';
+            } else if (newAmountPaid > 0) {
+                newStatus = 'PARTIAL';
+            }
+
+            await client.query(
+                `UPDATE bills SET
         amount_paid = $1,
         amount_due = $2,
         payment_status = $3
        WHERE id = $4`,
-            [newAmountPaid, Math.max(newAmountDue, 0), newStatus, billId]
-        );
+                [newAmountPaid, Math.max(newAmountDue, 0), newStatus, billId]
+            );
+        }
 
         await client.query('COMMIT');
 
@@ -656,13 +697,163 @@ export const recordPayment = async (
     }
 };
 
+/**
+ * Apply a CLEARED payment amount onto its bill (used after cheque approval).
+ */
+const applyPaymentToBill = async (client: any, billId: string, amount: number) => {
+    const billResult = await client.query('SELECT * FROM bills WHERE id = $1 FOR UPDATE', [billId]);
+    if (billResult.rows.length === 0) {
+        throw new Error('Bill not found');
+    }
+    const bill = billResult.rows[0];
+    const newAmountPaid = parseFloat(bill.amount_paid) + amount;
+    const newAmountDue = parseFloat(bill.total_amount) - newAmountPaid;
+    let newStatus = 'UNPAID';
+    if (newAmountDue <= 0) {
+        newStatus = 'PAID';
+    } else if (newAmountPaid > 0) {
+        newStatus = 'PARTIAL';
+    }
+    await client.query(
+        `UPDATE bills SET
+            amount_paid = $1,
+            amount_due = $2,
+            payment_status = $3,
+            updated_at = NOW()
+         WHERE id = $4`,
+        [newAmountPaid, Math.max(newAmountDue, 0), newStatus, billId]
+    );
+};
+
+/**
+ * Revenue Officer confirms cheque cleared — amount now hits the bill.
+ */
+export const approveChequePayment = async (
+    paymentId: string,
+    clearedBy: string,
+    clearanceNote?: string
+): Promise<any> => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const paymentResult = await client.query(
+            `SELECT * FROM payments WHERE id = $1 FOR UPDATE`,
+            [paymentId]
+        );
+        if (paymentResult.rows.length === 0) {
+            throw new Error('Payment not found');
+        }
+        const payment = paymentResult.rows[0];
+        if (payment.clearance_status !== 'PENDING') {
+            throw new Error(`Cheque payment is already ${payment.clearance_status}`);
+        }
+        if (normalizePaymentMethod(payment.payment_method) !== 'CHEQUE') {
+            throw new Error('Only cheque payments require clearance approval');
+        }
+
+        await applyPaymentToBill(client, payment.bill_id, parseFloat(payment.amount));
+
+        const updated = await client.query(
+            `UPDATE payments SET
+                clearance_status = 'CLEARED',
+                cleared_by = $1,
+                cleared_at = NOW(),
+                clearance_note = $2
+             WHERE id = $3
+             RETURNING *`,
+            [clearedBy, clearanceNote || null, paymentId]
+        );
+
+        await client.query('COMMIT');
+        return updated.rows[0];
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+        client.release();
+    }
+};
+
+/**
+ * Revenue Officer declines a bounced cheque — bill balance unchanged.
+ */
+export const rejectChequePayment = async (
+    paymentId: string,
+    clearedBy: string,
+    clearanceNote?: string
+): Promise<any> => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const paymentResult = await client.query(
+            `SELECT * FROM payments WHERE id = $1 FOR UPDATE`,
+            [paymentId]
+        );
+        if (paymentResult.rows.length === 0) {
+            throw new Error('Payment not found');
+        }
+        const payment = paymentResult.rows[0];
+        if (payment.clearance_status !== 'PENDING') {
+            throw new Error(`Cheque payment is already ${payment.clearance_status}`);
+        }
+        if (normalizePaymentMethod(payment.payment_method) !== 'CHEQUE') {
+            throw new Error('Only cheque payments can be declined for bounce');
+        }
+
+        const updated = await client.query(
+            `UPDATE payments SET
+                clearance_status = 'REJECTED',
+                cleared_by = $1,
+                cleared_at = NOW(),
+                clearance_note = $2
+             WHERE id = $3
+             RETURNING *`,
+            [clearedBy, clearanceNote || 'Cheque bounced', paymentId]
+        );
+
+        await client.query('COMMIT');
+        return updated.rows[0];
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+        client.release();
+    }
+};
+
+export const listChequePayments = async (status = 'PENDING', limit = 100): Promise<any[]> => {
+    const result = await pool.query(
+        `SELECT p.*,
+            b.bill_number, b.bill_type, b.amount_due as bill_amount_due,
+            c.full_name as customer_name, c.phone_number as customer_phone,
+            rec.full_name as recorded_by_name,
+            clr.full_name as cleared_by_name
+         FROM payments p
+         LEFT JOIN bills b ON p.bill_id = b.id
+         LEFT JOIN customers c ON p.customer_id = c.id
+         LEFT JOIN system_users rec ON p.recorded_by = rec.id
+         LEFT JOIN system_users clr ON p.cleared_by = clr.id
+         WHERE UPPER(p.payment_method) IN ('CHEQUE', 'CHECK')
+           AND p.clearance_status = $1
+         ORDER BY p.created_at ASC
+         LIMIT $2`,
+        [status, limit]
+    );
+    return result.rows;
+};
+
 export default {
     BASIC_RATE_GHC,
     billTotal,
     normalizeGcrNumber,
     isValidGcrNumber,
+    normalizePaymentMethod,
+    isChequePaymentMethod,
     calculatePropertyBill,
     calculateBusinessBill,
     generateBill,
     recordPayment,
+    approveChequePayment,
+    rejectChequePayment,
+    listChequePayments,
 };

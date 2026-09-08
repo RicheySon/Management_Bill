@@ -260,6 +260,21 @@ export const recordPayment = async (billId: string, data: { amount: number; paym
     return response.data;
 };
 
+export const fetchChequePayments = async (params?: { status?: string; limit?: number }) => {
+    const response = await apiClient.get('/payments/cheques', { params });
+    return response.data.data || [];
+};
+
+export const approveChequePayment = async (id: string, clearance_note?: string) => {
+    const response = await apiClient.post(`/payments/${id}/approve-cheque`, { clearance_note });
+    return response.data;
+};
+
+export const rejectChequePayment = async (id: string, clearance_note?: string) => {
+    const response = await apiClient.post(`/payments/${id}/reject-cheque`, { clearance_note });
+    return response.data;
+};
+
 export const requestBillAmountChange = async (
     billId: string,
     data: {
@@ -804,27 +819,34 @@ export const fetchActionRequests = async (params?: { status?: string; limit?: nu
     return response.data.data || [];
 };
 
-/** Pending counts for admin notification bell (amount + privileged action approvals). */
+/** Pending counts for admin notification bell (amount + privileged + cheque clearances). */
 export const fetchPendingApprovalsCount = async (opts?: {
     canAmount?: boolean;
     canActions?: boolean;
-}): Promise<{ amounts: number; actions: number; total: number }> => {
+    canCheques?: boolean;
+}): Promise<{ amounts: number; actions: number; cheques: number; total: number }> => {
     const canAmount = opts?.canAmount !== false;
     const canActions = opts?.canActions !== false;
-    const [amounts, actions] = await Promise.all([
+    const canCheques = opts?.canCheques === true;
+    const [amounts, actions, cheques] = await Promise.all([
         canAmount
             ? fetchAmountChanges({ status: 'PENDING', limit: 100 }).catch(() => [])
             : Promise.resolve([]),
         canActions
             ? fetchActionRequests({ status: 'PENDING', limit: 100 }).catch(() => [])
             : Promise.resolve([]),
+        canCheques
+            ? fetchChequePayments({ status: 'PENDING', limit: 100 }).catch(() => [])
+            : Promise.resolve([]),
     ]);
     const amountsCount = Array.isArray(amounts) ? amounts.length : 0;
     const actionsCount = Array.isArray(actions) ? actions.length : 0;
+    const chequesCount = Array.isArray(cheques) ? cheques.length : 0;
     return {
         amounts: amountsCount,
         actions: actionsCount,
-        total: amountsCount + actionsCount,
+        cheques: chequesCount,
+        total: amountsCount + actionsCount + chequesCount,
     };
 };
 
