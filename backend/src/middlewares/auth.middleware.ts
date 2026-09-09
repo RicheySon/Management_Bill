@@ -98,23 +98,66 @@ export const loadUserElectoralAreas = async (userId: string): Promise<number[]> 
 /**
  * Returns SQL fragment + params to restrict by collector electoral areas.
  * If user is not a Revenue Collector or has no areas, returns empty filter.
+ *
+ * @param columnSql Electoral-area expression (may be COALESCE of several columns)
+ * @param localAreaIdSql Optional local_area_id expression — also matches when the
+ *   community's parent electoral area is assigned (covers records with null EA).
  */
 export const getCollectorAreaFilter = (
     req: AuthRequest,
     columnSql: string,
-    startParamIndex: number
+    startParamIndex: number,
+    localAreaIdSql?: string
 ): { clause: string; params: number[]; nextIndex: number } => {
     const roles = req.user?.roles || [];
     const isCollector = roles.includes('Revenue Collector');
-    const areaIds = req.user?.electoral_area_ids || [];
+    const areaIds = (req.user?.electoral_area_ids || [])
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id) && id > 0);
 
     if (!isCollector || areaIds.length === 0) {
         return { clause: '', params: [], nextIndex: startParamIndex };
     }
 
+    const param = `$${startParamIndex}`;
+    let clause = ` AND (${columnSql} = ANY(${param}::int[])`;
+    if (localAreaIdSql) {
+        clause += ` OR EXISTS (
+            SELECT 1 FROM local_areas _collector_la
+            WHERE _collector_la.id = ${localAreaIdSql}
+              AND _collector_la.electoral_area_id = ANY(${param}::int[])
+        )`;
+    }
+    clause += ')';
+
     return {
-        clause: ` AND ${columnSql} = ANY($${startParamIndex}::int[])`,
+        clause,
         params: [areaIds as any],
         nextIndex: startParamIndex + 1,
     };
+};
+
+/** Derive electoral_area_id from local_area when EA was left blank. */
+export const resolveElectoralAreaId = async (
+    electoralAreaId: any,
+    localAreaId: any
+): Promise<number | null> => {
+    const ea =
+        electoralAreaId === '' || electoralAreaId === undefined || electoralAreaId === null
+            ? null
+            : Number(electoralAreaId);
+    if (ea && Number.isFinite(ea)) return ea;
+
+    const la =
+        localAreaId === '' || localAreaId === undefined || localAreaId === null
+            ? null
+            : Number(localAreaId);
+    if (!la || !Number.isFinite(la)) return null;
+
+    const result = await pool.query(
+        'SELECT electoral_area_id FROM local_areas WHERE id = $1',
+        [la]
+    );
+    const derived = result.rows[0]?.electoral_area_id;
+    return derived != null ? Number(derived) : null;
 };
