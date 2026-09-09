@@ -98,8 +98,22 @@ export const loadUserElectoralAreas = async (userId: string): Promise<number[]> 
 };
 
 /**
+ * Normalize JWT/session electoral_area_ids into a positive int array.
+ * Handles missing values, a bare number/string (single area), and arrays.
+ * Never throws — callers can safely .length-check the result.
+ */
+export const normalizeElectoralAreaIds = (raw: unknown): number[] => {
+    if (raw == null || raw === '') return [];
+    const list = Array.isArray(raw) ? raw : [raw];
+    return list
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id) && id > 0);
+};
+
+/**
  * Returns SQL fragment + params to restrict by collector electoral areas.
- * If user is not a Revenue Collector or has no areas, returns empty filter.
+ * Non-collectors: no filter. Collectors with no valid areas: match nothing
+ * (fail-closed — must stay aligned with assertCollectorCanAccessBill).
  *
  * @param columnSql Electoral-area expression (may be COALESCE of several columns)
  * @param localAreaIdSql Optional local_area_id expression — also matches when the
@@ -113,12 +127,15 @@ export const getCollectorAreaFilter = (
 ): { clause: string; params: number[]; nextIndex: number } => {
     const roles = req.user?.roles || [];
     const isCollector = roles.includes('Revenue Collector');
-    const areaIds = (req.user?.electoral_area_ids || [])
-        .map((id) => Number(id))
-        .filter((id) => Number.isFinite(id) && id > 0);
-
-    if (!isCollector || areaIds.length === 0) {
+    if (!isCollector) {
         return { clause: '', params: [], nextIndex: startParamIndex };
+    }
+
+    const areaIds = normalizeElectoralAreaIds(req.user?.electoral_area_ids);
+    // Fail-closed: collectors with no areas must not see the global bill list
+    // (assertCollectorCanAccessBill would 403 every detail open).
+    if (areaIds.length === 0) {
+        return { clause: ' AND FALSE', params: [], nextIndex: startParamIndex };
     }
 
     const param = `$${startParamIndex}`;
@@ -142,60 +159,67 @@ export const getCollectorAreaFilter = (
 /**
  * Ensure a Revenue Collector may access a bill in their assigned electoral areas.
  * Non-collectors always pass. Collectors with no areas get no bill access.
- * Returns null if allowed, or an error message if denied / not found.
+ * Must not throw — exceptions here are caught by GET /bills/:id and surfaced as
+ * the generic "Failed to fetch bill details" 500.
  */
 export const assertCollectorCanAccessBill = async (
     req: AuthRequest,
     billId: string
 ): Promise<{ allowed: boolean; status: number; error?: string }> => {
-    const roles = req.user?.roles || [];
-    if (!roles.includes('Revenue Collector')) {
-        return { allowed: true, status: 200 };
-    }
-
-    const areaIds = (req.user?.electoral_area_ids || [])
-        .map((id) => Number(id))
-        .filter((id) => Number.isFinite(id) && id > 0);
-
-    if (areaIds.length === 0) {
-        return {
-            allowed: false,
-            status: 403,
-            error: 'No electoral area assigned. Contact an administrator to assign your collection areas.',
-        };
-    }
-
-    const result = await pool.query(
-        `SELECT b.id
-         FROM bills b
-         LEFT JOIN customers c ON b.customer_id = c.id
-         LEFT JOIN properties p ON b.property_id = p.id
-         LEFT JOIN businesses bus ON b.business_id = bus.id
-         LEFT JOIN local_areas la_p ON p.local_area_id = la_p.id
-         LEFT JOIN local_areas la_bus ON bus.local_area_id = la_bus.id
-         LEFT JOIN local_areas la_c ON c.local_area_id = la_c.id
-         WHERE b.id = $1
-           AND COALESCE(
-                p.electoral_area_id, bus.electoral_area_id, c.electoral_area_id,
-                la_p.electoral_area_id, la_bus.electoral_area_id, la_c.electoral_area_id
-           ) = ANY($2::int[])`,
-        [billId, areaIds]
-    );
-
-    if (result.rows.length === 0) {
-        // Distinguish missing bill vs out-of-area
-        const exists = await pool.query('SELECT id FROM bills WHERE id = $1', [billId]);
-        if (exists.rows.length === 0) {
-            return { allowed: false, status: 404, error: 'Bill not found' };
+    try {
+        const roles = req.user?.roles || [];
+        if (!roles.includes('Revenue Collector')) {
+            return { allowed: true, status: 200 };
         }
+
+        const areaIds = normalizeElectoralAreaIds(req.user?.electoral_area_ids);
+
+        if (areaIds.length === 0) {
+            return {
+                allowed: false,
+                status: 403,
+                error: 'No electoral area assigned. Contact an administrator to assign your collection areas.',
+            };
+        }
+
+        const result = await pool.query(
+            `SELECT b.id
+             FROM bills b
+             LEFT JOIN customers c ON b.customer_id = c.id
+             LEFT JOIN properties p ON b.property_id = p.id
+             LEFT JOIN businesses bus ON b.business_id = bus.id
+             LEFT JOIN local_areas la_p ON p.local_area_id = la_p.id
+             LEFT JOIN local_areas la_bus ON bus.local_area_id = la_bus.id
+             LEFT JOIN local_areas la_c ON c.local_area_id = la_c.id
+             WHERE b.id = $1
+               AND COALESCE(
+                    p.electoral_area_id, bus.electoral_area_id, c.electoral_area_id,
+                    la_p.electoral_area_id, la_bus.electoral_area_id, la_c.electoral_area_id
+               ) = ANY($2::int[])`,
+            [billId, areaIds]
+        );
+
+        if (result.rows.length === 0) {
+            const exists = await pool.query('SELECT id FROM bills WHERE id = $1', [billId]);
+            if (exists.rows.length === 0) {
+                return { allowed: false, status: 404, error: 'Bill not found' };
+            }
+            return {
+                allowed: false,
+                status: 403,
+                error: 'This bill is outside your assigned electoral area(s).',
+            };
+        }
+
+        return { allowed: true, status: 200 };
+    } catch (err: any) {
+        console.error('assertCollectorCanAccessBill failed:', err?.message || err);
         return {
             allowed: false,
-            status: 403,
-            error: 'This bill is outside your assigned electoral area(s).',
+            status: 500,
+            error: 'Failed to verify bill access. Please try again or contact support.',
         };
     }
-
-    return { allowed: true, status: 200 };
 };
 
 /** Derive electoral_area_id from local_area when EA was left blank. */
