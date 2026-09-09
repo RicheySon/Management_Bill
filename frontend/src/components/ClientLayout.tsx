@@ -20,9 +20,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
     const canSeeApprovals =
         !!user &&
-        (user.permissions?.includes('approve_amount_changes') ||
-            user.permissions?.includes('approve_privileged_actions') ||
-            user.permissions?.includes('approve_cheque_payments'));
+        (hasPermission('approve_amount_changes') ||
+            hasPermission('approve_privileged_actions') ||
+            hasPermission('approve_cheque_payments'));
 
     const refreshPendingApprovals = useCallback(async () => {
         if (!canSeeApprovals || !user) {
@@ -31,15 +31,15 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         }
         try {
             const counts = await fetchPendingApprovalsCount({
-                canAmount: user.permissions?.includes('approve_amount_changes'),
-                canActions: user.permissions?.includes('approve_privileged_actions'),
-                canCheques: user.permissions?.includes('approve_cheque_payments'),
+                canAmount: hasPermission('approve_amount_changes'),
+                canActions: hasPermission('approve_privileged_actions'),
+                canCheques: hasPermission('approve_cheque_payments'),
             });
             setPendingApprovals(counts.total);
         } catch {
             // keep last known count
         }
-    }, [canSeeApprovals, user]);
+    }, [canSeeApprovals, user, hasPermission]);
 
     useEffect(() => {
         if (!user || !canSeeApprovals) return;
