@@ -98,8 +98,22 @@ export const loadUserElectoralAreas = async (userId: string): Promise<number[]> 
 };
 
 /**
+ * Normalize JWT/session electoral_area_ids into a positive int array.
+ * Handles missing values, a bare number/string (single area), and arrays.
+ * Never throws — callers can safely .length-check the result.
+ */
+export const normalizeElectoralAreaIds = (raw: unknown): number[] => {
+    if (raw == null || raw === '') return [];
+    const list = Array.isArray(raw) ? raw : [raw];
+    return list
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id) && id > 0);
+};
+
+/**
  * Returns SQL fragment + params to restrict by collector electoral areas.
- * If user is not a Revenue Collector or has no areas, returns empty filter.
+ * Non-collectors: no filter. Collectors with no valid areas: match nothing
+ * (fail-closed — must stay aligned with assertCollectorCanAccessBill).
  *
  * @param columnSql Electoral-area expression (may be COALESCE of several columns)
  * @param localAreaIdSql Optional local_area_id expression — also matches when the
@@ -113,12 +127,15 @@ export const getCollectorAreaFilter = (
 ): { clause: string; params: number[]; nextIndex: number } => {
     const roles = req.user?.roles || [];
     const isCollector = roles.includes('Revenue Collector');
-    const areaIds = (req.user?.electoral_area_ids || [])
-        .map((id) => Number(id))
-        .filter((id) => Number.isFinite(id) && id > 0);
-
-    if (!isCollector || areaIds.length === 0) {
+    if (!isCollector) {
         return { clause: '', params: [], nextIndex: startParamIndex };
+    }
+
+    const areaIds = normalizeElectoralAreaIds(req.user?.electoral_area_ids);
+    // Fail-closed: collectors with no areas must not see the global bill list
+    // (assertCollectorCanAccessBill would 403 every detail open).
+    if (areaIds.length === 0) {
+        return { clause: ' AND FALSE', params: [], nextIndex: startParamIndex };
     }
 
     const param = `$${startParamIndex}`;
@@ -142,7 +159,8 @@ export const getCollectorAreaFilter = (
 /**
  * Ensure a Revenue Collector may access a bill in their assigned electoral areas.
  * Non-collectors always pass. Collectors with no areas get no bill access.
- * Returns null if allowed, or an error message if denied / not found.
+ * Must not throw — exceptions here are caught by GET /bills/:id and surfaced as
+ * the generic "Failed to fetch bill details" 500.
  */
 export const assertCollectorCanAccessBill = async (
     req: AuthRequest,
@@ -153,9 +171,7 @@ export const assertCollectorCanAccessBill = async (
         return { allowed: true, status: 200 };
     }
 
-    const areaIds = (req.user?.electoral_area_ids || [])
-        .map((id) => Number(id))
-        .filter((id) => Number.isFinite(id) && id > 0);
+    const areaIds = normalizeElectoralAreaIds(req.user?.electoral_area_ids);
 
     if (areaIds.length === 0) {
         return {
