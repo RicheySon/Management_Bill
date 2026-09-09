@@ -22,7 +22,8 @@ import {
 import { GCR_HINT, GCR_PLACEHOLDER, formatGcrInput, isValidGcr, normalizeGcr } from '@/lib/gcr';
 
 export default function BillDetailPage() {
-    const { id } = useParams();
+    const params = useParams();
+    const id = Array.isArray(params.id) ? params.id[0] : (params.id as string);
     const router = useRouter();
     const { hasPermission, user } = useAuth();
     const [bill, setBill] = useState<any>(null);
@@ -45,8 +46,15 @@ export default function BillDetailPage() {
     const canClearCheques = hasPermission('approve_cheque_payments');
 
     const loadBill = async () => {
+        if (!id) {
+            setError('Invalid bill link');
+            setLoading(false);
+            return;
+        }
+        setLoading(true);
+        setError(null);
         try {
-            const data = await fetchBill(id as string);
+            const data = await fetchBill(id);
             const billRow = data.bill ?? data;
             let details = billRow.bill_details;
             if (typeof details === 'string') {
@@ -60,7 +68,7 @@ export default function BillDetailPage() {
             const paymentRows = data.payments ?? [];
             setBill(billRow);
             setPayments(paymentRows);
-            const outstanding = parseFloat(billRow.total_amount) - parseFloat(billRow.amount_paid);
+            const outstanding = parseFloat(billRow.total_amount) - parseFloat(billRow.amount_paid || 0);
             const pendingCheque = paymentRows
                 .filter((p: any) => p.clearance_status === 'PENDING')
                 .reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0);
@@ -73,7 +81,9 @@ export default function BillDetailPage() {
                 reason: '',
             });
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Failed to load bill details');
+            const apiError = err.response?.data?.error;
+            setError(apiError || err.message || 'Failed to load bill details');
+            setBill(null);
         } finally {
             setLoading(false);
         }
