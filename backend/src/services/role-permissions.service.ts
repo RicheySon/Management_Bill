@@ -17,12 +17,51 @@ export const ensureSupervisorConfigureRates = async (): Promise<void> => {
 };
 
 /**
+ * Cheque clearance is Revenue Officer only.
+ * Self-heals DBs where Admin/Super Admin still hold approve_cheque_payments
+ * (migration not applied, or older seed still grants it).
+ */
+export const ensureRevenueOfficerChequeClearance = async (): Promise<void> => {
+    await pool.query(
+        `INSERT INTO permissions (code, description)
+         VALUES (
+           'approve_cheque_payments',
+           'Approve or decline pending cheque payments after bank clearance'
+         )
+         ON CONFLICT (code) DO NOTHING`
+    );
+
+    await pool.query(
+        `DELETE FROM role_permissions
+         WHERE permission_id = (SELECT id FROM permissions WHERE code = 'approve_cheque_payments')
+           AND role_id IN (
+             SELECT id FROM roles
+             WHERE name IN (
+               'Super Admin', 'Admin', 'Approver', 'Supervisor',
+               'Cashier', 'Revenue Collector'
+             )
+           )`
+    );
+
+    await pool.query(
+        `INSERT INTO role_permissions (role_id, permission_id)
+         SELECT r.id, p.id
+         FROM roles r
+         CROSS JOIN permissions p
+         WHERE r.name = 'Revenue Officer'
+           AND p.code IN ('approve_cheque_payments', 'view_reports')
+         ON CONFLICT DO NOTHING`
+    );
+};
+
+/**
  * Load roles + permission codes for a user (after optional role grants).
  */
 export const loadUserRolesAndPermissions = async (
     userId: string
 ): Promise<{ roles: string[]; permissions: string[] }> => {
     await ensureSupervisorConfigureRates();
+    await ensureRevenueOfficerChequeClearance();
 
     const result = await pool.query(
         `SELECT
@@ -45,6 +84,18 @@ export const loadUserRolesAndPermissions = async (
     // Belt-and-suspenders: Supervisors always get configure_rates in the session
     if (roles.includes('Supervisor') && !permissions.includes('configure_rates')) {
         permissions = [...permissions, 'configure_rates'];
+    }
+
+    // Cheque clearance is role-gated to Revenue Officer only (strip stale Admin JWT grants)
+    if (roles.includes('Revenue Officer')) {
+        if (!permissions.includes('approve_cheque_payments')) {
+            permissions = [...permissions, 'approve_cheque_payments'];
+        }
+        if (!permissions.includes('view_reports')) {
+            permissions = [...permissions, 'view_reports'];
+        }
+    } else {
+        permissions = permissions.filter((p) => p !== 'approve_cheque_payments');
     }
 
     return { roles, permissions };

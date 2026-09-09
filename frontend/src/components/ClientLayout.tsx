@@ -18,11 +18,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [pendingApprovals, setPendingApprovals] = useState(0);
 
-    const canSeeApprovals =
-        !!user &&
-        (user.permissions?.includes('approve_amount_changes') ||
-            user.permissions?.includes('approve_privileged_actions') ||
-            user.permissions?.includes('approve_cheque_payments'));
+    const canCheques = hasPermission('approve_cheque_payments');
+    const canAmountApprovals = hasPermission('approve_amount_changes');
+    const canActionApprovals = hasPermission('approve_privileged_actions');
+    const canSeeApprovals = !!user && (canAmountApprovals || canActionApprovals || canCheques);
 
     const refreshPendingApprovals = useCallback(async () => {
         if (!canSeeApprovals || !user) {
@@ -31,15 +30,15 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         }
         try {
             const counts = await fetchPendingApprovalsCount({
-                canAmount: user.permissions?.includes('approve_amount_changes'),
-                canActions: user.permissions?.includes('approve_privileged_actions'),
-                canCheques: user.permissions?.includes('approve_cheque_payments'),
+                canAmount: canAmountApprovals,
+                canActions: canActionApprovals,
+                canCheques,
             });
             setPendingApprovals(counts.total);
         } catch {
             // keep last known count
         }
-    }, [canSeeApprovals, user]);
+    }, [canSeeApprovals, user, canAmountApprovals, canActionApprovals, canCheques]);
 
     useEffect(() => {
         if (!user || !canSeeApprovals) return;

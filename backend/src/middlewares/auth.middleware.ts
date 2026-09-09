@@ -62,6 +62,10 @@ export const authorize = (requiredPermissions: string[]) => {
         const perms = req.user.permissions || [];
 
         const hasPermission = requiredPermissions.every((perm) => {
+            // Cheque clearance is Revenue Officer only — ignore stale Admin JWT grants
+            if (perm === 'approve_cheque_payments') {
+                return roles.includes('Revenue Officer');
+            }
             if (perms.includes(perm)) return true;
             // Supervisors always allowed to configure fee schedules
             if (perm === 'configure_rates' && roles.includes('Supervisor')) return true;

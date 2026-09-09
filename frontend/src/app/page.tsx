@@ -50,12 +50,13 @@ export default function HomePage() {
                         Role: {(user?.roles || []).join(', ') || 'Staff'}
                     </p>
                     <p className="text-gray-500 mt-4">
-                        Use the sidebar to register customers, properties, and businesses in your assigned area.
+                        Use the sidebar to register customers, properties, business properties, and businesses in your assigned area.
                         Revenue analytics are available to officers with reporting access.
                     </p>
-                    <div className="mt-6 grid sm:grid-cols-3 gap-3">
+                    <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         <a href="/customers" className="btn-secondary text-center">Customers</a>
                         <a href="/properties" className="btn-secondary text-center">Properties</a>
+                        <a href="/business-properties" className="btn-secondary text-center">Business Properties</a>
                         <a href="/businesses" className="btn-secondary text-center">Businesses</a>
                     </div>
                 </div>
@@ -118,7 +119,7 @@ export default function HomePage() {
             {/* Quick Actions */}
             <div className="card">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <ActionButton
                         href="/customers/new"
                         label="Register Customer"
@@ -127,6 +128,11 @@ export default function HomePage() {
                     <ActionButton
                         href="/properties/new"
                         label="Register Property"
+                        icon={<Building2 className="w-5 h-5" />}
+                    />
+                    <ActionButton
+                        href="/business-properties/new"
+                        label="Register Business Property"
                         icon={<Building2 className="w-5 h-5" />}
                     />
                     <ActionButton

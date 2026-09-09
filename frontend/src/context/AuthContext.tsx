@@ -121,6 +121,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const hasPermission = (permission: string) => {
+        // Cheque clearance is Revenue Officer only — ignore stale Admin JWT grants
+        if (permission === 'approve_cheque_payments') {
+            return !!user?.roles?.includes('Revenue Officer');
+        }
         if (user?.permissions?.includes(permission)) return true;
         // Supervisors always see/use Fee Configuration
         if (permission === 'configure_rates' && user?.roles?.includes('Supervisor')) return true;
