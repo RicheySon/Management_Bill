@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import Joi from 'joi';
-import { authenticateToken, authorize, AuthRequest } from '../middlewares/auth.middleware';
+import { authenticateToken, authorize, AuthRequest, assertCollectorCanAccessBill } from '../middlewares/auth.middleware';
 import { generateBillPDF, generateBulkBillsPDF } from '../services/pdf.service';
 import { canUserPrintBill, markPrintRequestCompleted } from '../services/action-request.service';
 import pool from '../config/database';
@@ -19,6 +19,14 @@ router.get('/bill/:id', async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
         const perms = req.user?.permissions || [];
+
+        const areaAccess = await assertCollectorCanAccessBill(req, id);
+        if (!areaAccess.allowed) {
+            return res.status(areaAccess.status).json({
+                success: false,
+                error: areaAccess.error,
+            });
+        }
 
         const access = await canUserPrintBill(req.user!.id, perms, id);
         if (!access.allowed) {
