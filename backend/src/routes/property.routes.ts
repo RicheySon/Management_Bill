@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import pool from '../config/database';
-import { authenticateToken, authorize, AuthRequest, getCollectorAreaFilter } from '../middlewares/auth.middleware';
+import { authenticateToken, authorize, AuthRequest, getCollectorAreaFilter, resolveElectoralAreaId } from '../middlewares/auth.middleware';
 import { generateBill } from '../services/billing.service';
 import Joi from 'joi';
 
@@ -119,9 +119,11 @@ router.post('/', authorize(['register_property']), async (req: AuthRequest, res:
             source_of_water, sanitation_facility, solid_waste_disposal, liquid_waste_disposal,
             no_of_people, no_of_bedrooms, no_of_washrooms, no_of_other_rooms,
             street_name, gps_address, latitude, longitude, town, physical_location, landmark,
-            electoral_area_id, local_area_id, population_density,
+            electoral_area_id: electoralAreaRaw, local_area_id, population_density,
             property_size, year_registered, property_rate_zone_id, assessed_amount, arrears,
         } = value;
+
+        const electoral_area_id = await resolveElectoralAreaId(electoralAreaRaw, local_area_id);
 
         const currentYear = new Date().getFullYear();
         const regYear = year_registered || currentYear;
@@ -308,7 +310,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
             FROM properties p
             LEFT JOIN customers c ON p.customer_id = c.id
             LEFT JOIN property_classifications pc ON p.classification_id = pc.id
-            LEFT JOIN electoral_areas ea ON p.electoral_area_id = ea.id
+            LEFT JOIN local_areas la ON p.local_area_id = la.id
+            LEFT JOIN electoral_areas ea ON COALESCE(p.electoral_area_id, la.electoral_area_id) = ea.id
             WHERE 1=1
         `;
 
@@ -345,7 +348,12 @@ router.get('/', async (req: AuthRequest, res: Response) => {
             paramIndex++;
         }
 
-        const areaFilter = getCollectorAreaFilter(req, 'p.electoral_area_id', paramIndex);
+        const areaFilter = getCollectorAreaFilter(
+            req,
+            'COALESCE(p.electoral_area_id, la.electoral_area_id)',
+            paramIndex,
+            'p.local_area_id'
+        );
         query += areaFilter.clause;
         queryParams.push(...areaFilter.params);
         paramIndex = areaFilter.nextIndex;
@@ -449,6 +457,13 @@ router.put('/:id', authorize(['edit_property']), async (req: AuthRequest, res: R
             if (value.assessed_amount === '') value.assessed_amount = null;
         } else if (value.assessed_amount !== null && value.assessed_amount !== undefined) {
             value.assessed_amount = Number(value.assessed_amount);
+        }
+
+        if ('electoral_area_id' in value || 'local_area_id' in value) {
+            value.electoral_area_id = await resolveElectoralAreaId(
+                value.electoral_area_id,
+                value.local_area_id
+            );
         }
 
         const fields = Object.keys(value);

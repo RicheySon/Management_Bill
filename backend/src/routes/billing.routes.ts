@@ -375,7 +375,13 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
             LEFT JOIN customers c ON b.customer_id = c.id
             LEFT JOIN properties p ON b.property_id = p.id
             LEFT JOIN businesses bus ON b.business_id = bus.id
-            LEFT JOIN electoral_areas ea ON COALESCE(p.electoral_area_id, bus.electoral_area_id) = ea.id
+            LEFT JOIN local_areas la_p ON p.local_area_id = la_p.id
+            LEFT JOIN local_areas la_bus ON bus.local_area_id = la_bus.id
+            LEFT JOIN local_areas la_c ON c.local_area_id = la_c.id
+            LEFT JOIN electoral_areas ea ON COALESCE(
+                p.electoral_area_id, bus.electoral_area_id, c.electoral_area_id,
+                la_p.electoral_area_id, la_bus.electoral_area_id, la_c.electoral_area_id
+            ) = ea.id
             WHERE 1 = 1
         `;
 
@@ -401,14 +407,20 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
         }
 
         if (electoral_area_id) {
-            query += ` AND (p.electoral_area_id = $${paramIndex} OR bus.electoral_area_id = $${paramIndex})`;
+            query += ` AND COALESCE(
+                p.electoral_area_id, bus.electoral_area_id, c.electoral_area_id,
+                la_p.electoral_area_id, la_bus.electoral_area_id, la_c.electoral_area_id
+            ) = $${paramIndex}`;
             queryParams.push(electoral_area_id);
             paramIndex++;
         }
 
         const areaFilter = getCollectorAreaFilter(
             req,
-            'COALESCE(p.electoral_area_id, bus.electoral_area_id, c.electoral_area_id)',
+            `COALESCE(
+                p.electoral_area_id, bus.electoral_area_id, c.electoral_area_id,
+                la_p.electoral_area_id, la_bus.electoral_area_id, la_c.electoral_area_id
+            )`,
             paramIndex
         );
         query += areaFilter.clause;

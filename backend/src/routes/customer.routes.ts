@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import pool from '../config/database';
-import { authenticateToken, authorize, AuthRequest, getCollectorAreaFilter } from '../middlewares/auth.middleware';
+import { authenticateToken, authorize, AuthRequest, getCollectorAreaFilter, resolveElectoralAreaId } from '../middlewares/auth.middleware';
 import Joi from 'joi';
 import {
     cascadeDeleteCustomer,
@@ -59,12 +59,14 @@ router.post('/', authenticateToken, authorize(['create_customer']), async (req: 
             longitude,
             physical_location,
             landmark,
-            electoral_area_id,
+            electoral_area_id: electoralAreaRaw,
             local_area_id,
             next_of_kin_name,
             next_of_kin_contact,
             ghana_card_no,
         } = value;
+
+        const electoral_area_id = await resolveElectoralAreaId(electoralAreaRaw, local_area_id);
 
         const result = await pool.query(
             `INSERT INTO customers (
@@ -228,7 +230,12 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
             paramIndex++;
         }
 
-        const areaFilter = getCollectorAreaFilter(req, 'c.electoral_area_id', paramIndex);
+        const areaFilter = getCollectorAreaFilter(
+            req,
+            'COALESCE(c.electoral_area_id, la.electoral_area_id)',
+            paramIndex,
+            'c.local_area_id'
+        );
         query += areaFilter.clause;
         queryParams.push(...areaFilter.params);
         paramIndex = areaFilter.nextIndex;
@@ -314,12 +321,14 @@ router.put('/:id', authenticateToken, authorize(['edit_customer']), async (req: 
             longitude,
             physical_location,
             landmark,
-            electoral_area_id,
+            electoral_area_id: electoralAreaRaw,
             local_area_id,
             next_of_kin_name,
             next_of_kin_contact,
             ghana_card_no,
         } = value;
+
+        const electoral_area_id = await resolveElectoralAreaId(electoralAreaRaw, local_area_id);
 
         const result = await pool.query(
             `UPDATE customers SET

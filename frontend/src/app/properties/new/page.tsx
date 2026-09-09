@@ -1130,7 +1130,7 @@ function NewPropertyPageContent() {
                 {/* Submit */}
                 {/* ============================================= */}
                 <div className="flex justify-end space-x-4">
-                    <Link href="/properties" className="btn-secondary">
+                    <Link href={sector.basePath} className="btn-secondary">
                         Cancel
                     </Link>
                     <button

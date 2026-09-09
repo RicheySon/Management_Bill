@@ -4,7 +4,6 @@ import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import {
-    fetchCustomers,
     generateBill,
     fetchCustomer,
     previewBill,
@@ -13,6 +12,7 @@ import {
 } from '@/lib/api-client';
 import { ArrowLeft, Send, Search, Building2, Briefcase, FileText, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
+import CustomerSearchSelect from '@/components/CustomerSearchSelect';
 
 interface GenerateBillForm {
     bill_type: 'PROPERTY' | 'BUSINESS_PROPERTY' | 'BOP';
@@ -56,7 +56,6 @@ function GenerateBillContent() {
         }
     });
 
-    const [customers, setCustomers] = useState<any[]>([]);
     const [selectedCustomerData, setSelectedCustomerData] = useState<any>(null);
     const [loadingCustomer, setLoadingCustomer] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -72,18 +71,11 @@ function GenerateBillContent() {
     const watchBillType = watch('bill_type');
     const watchCustomerId = watch('customer_id');
 
-    // 1. Load customers
+    // 1. Load customers — removed bulk preload; CustomerSearchSelect searches on demand
     useEffect(() => {
-        const loadCustomers = async () => {
-            try {
-                const data = await fetchCustomers({ limit: 1000 });
-                setCustomers(data.data);
-            } catch (err) {
-                console.error('Failed to load customers');
-            }
-        };
-        loadCustomers();
-    }, []);
+        // keep customer_id registered for validation
+        register('customer_id', { required: 'Please select a customer' });
+    }, [register]);
 
     // 2. Auto-load preset property/business and set customer/selection
     useEffect(() => {
@@ -289,23 +281,23 @@ function GenerateBillContent() {
 
                     <hr className="my-4" />
 
-                    {/* Customer Selection — hidden/pre-filled when preset */}
+                    {/* Customer Selection — searchable; hidden/pre-filled when preset */}
                     {!isPreset && (
                         <div>
-                            <label className="label">Select Customer</label>
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                <select
-                                    {...register('customer_id', { required: 'Please select a customer' })}
-                                    className="input-field pl-10"
-                                >
-                                    <option value="">-- Choose Customer --</option>
-                                    {customers.map(c => (
-                                        <option key={c.id} value={c.id}>{c.full_name} ({c.phone_number})</option>
-                                    ))}
-                                </select>
-                            </div>
-                            {errors.customer_id && <p className="text-red-500 text-sm mt-1">{errors.customer_id.message}</p>}
+                            <CustomerSearchSelect
+                                label="Select Customer"
+                                required
+                                value={watchCustomerId || ''}
+                                error={errors.customer_id?.message}
+                                onChange={(customerId) => {
+                                    setValue('customer_id', customerId, { shouldValidate: true });
+                                    if (!customerId) {
+                                        setSelectedCustomerData(null);
+                                        setValue('property_id', undefined);
+                                        setValue('business_id', undefined);
+                                    }
+                                }}
+                            />
                         </div>
                     )}
 

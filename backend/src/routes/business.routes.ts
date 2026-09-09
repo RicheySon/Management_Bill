@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import pool from '../config/database';
-import { authenticateToken, authorize, AuthRequest, getCollectorAreaFilter } from '../middlewares/auth.middleware';
+import { authenticateToken, authorize, AuthRequest, getCollectorAreaFilter, resolveElectoralAreaId } from '../middlewares/auth.middleware';
 import { generateBill } from '../services/billing.service';
 import Joi from 'joi';
 
@@ -22,28 +22,32 @@ router.use(authenticateToken);
 /**
  * Validation Schema
  */
+const optionalText = () => Joi.string().optional().allow('', null);
+const optionalEmail = () =>
+    Joi.string().email({ tlds: { allow: false } }).optional().allow('', null);
+
 const businessSchema = Joi.object({
     business_name: Joi.string().required().max(200),
     customer_id: Joi.string().uuid().required(),
     category_id: Joi.number().integer().optional().allow(null),
-    business_activity: Joi.string().required(),
-    business_contact: Joi.string().optional().allow('').max(20),
-    business_type_main: Joi.string().optional().allow(''),
-    business_type_sub: Joi.string().optional().allow(''),
-    business_category_class: Joi.string().valid('Category A', 'Category B', 'Category C', 'Category D', '').optional().allow(''),
-    business_email: Joi.string().email().optional().allow(''),
-    description: Joi.string().optional().allow(''),
-    account_number: Joi.string().optional().allow(''),
-    division_number: Joi.string().optional().allow(''),
-    block_number: Joi.string().optional().allow(''),
+    business_activity: optionalText(),
+    business_contact: Joi.string().optional().allow('', null).max(20),
+    business_type_main: optionalText(),
+    business_type_sub: optionalText(),
+    business_category_class: Joi.string().valid('Category A', 'Category B', 'Category C', 'Category D', '').optional().allow('', null),
+    business_email: optionalEmail(),
+    description: optionalText(),
+    account_number: optionalText(),
+    division_number: optionalText(),
+    block_number: optionalText(),
     property_id: Joi.string().uuid().optional().allow('', null),
-    street_name: Joi.string().optional().allow(''),
-    gps_address: Joi.string().optional().allow('').max(50),
+    street_name: optionalText(),
+    gps_address: Joi.string().optional().allow('', null).max(50),
     latitude: Joi.number().precision(8).min(-90).max(90).optional().allow(null, ''),
     longitude: Joi.number().precision(8).min(-180).max(180).optional().allow(null, ''),
-    town: Joi.string().optional().allow(''),
-    physical_location: Joi.string().optional().allow(''),
-    landmark: Joi.string().optional().allow(''),
+    town: optionalText(),
+    physical_location: optionalText(),
+    landmark: optionalText(),
     electoral_area_id: Joi.number().integer().optional().allow(null, ''),
     local_area_id: Joi.number().integer().optional().allow(null, ''),
     year_registered: Joi.number().integer().min(2000).max(2100).optional(),
@@ -51,6 +55,21 @@ const businessSchema = Joi.object({
     assessed_amount: Joi.number().min(0).optional().allow(null, ''),
     arrears: Joi.number().min(0).optional().allow(null, ''),
 });
+
+/** Coerce null/undefined optional strings so Joi never sees bare null as non-string. */
+function normalizeBusinessPayload(body: Record<string, any>) {
+    const out = { ...body };
+    const textKeys = [
+        'business_activity', 'business_contact', 'business_type_main', 'business_type_sub',
+        'business_category_class', 'business_email', 'description', 'account_number',
+        'division_number', 'block_number', 'street_name', 'gps_address', 'town',
+        'physical_location', 'landmark',
+    ];
+    for (const key of textKeys) {
+        if (out[key] === null || out[key] === undefined) out[key] = '';
+    }
+    return out;
+}
 
 async function applyArrearsToLatestBill(
     entityColumn: 'property_id' | 'business_id',
@@ -94,7 +113,7 @@ async function applyArrearsToLatestBill(
  */
 router.post('/', authorize(['register_business']), async (req: AuthRequest, res: Response) => {
     try {
-        const { error, value } = businessSchema.validate(req.body);
+        const { error, value } = businessSchema.validate(normalizeBusinessPayload(req.body));
 
         if (error) {
             return res.status(400).json({
@@ -125,13 +144,15 @@ router.post('/', authorize(['register_business']), async (req: AuthRequest, res:
             town,
             physical_location,
             landmark,
-            electoral_area_id,
+            electoral_area_id: electoralAreaRaw,
             local_area_id,
             year_registered,
             fee_item_id,
             assessed_amount,
             arrears,
         } = value;
+
+        const electoral_area_id = await resolveElectoralAreaId(electoralAreaRaw, local_area_id);
 
         const currentYear = new Date().getFullYear();
         const regYear = year_registered || currentYear;
@@ -158,7 +179,7 @@ router.post('/', authorize(['register_business']), async (req: AuthRequest, res:
                 business_name,
                 customer_id,
                 category_id || null,
-                business_activity,
+                business_activity || '',
                 business_contact || null,
                 business_type_main || null,
                 business_type_sub || null,
@@ -331,7 +352,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
             FROM businesses b
             LEFT JOIN customers c ON b.customer_id = c.id
             LEFT JOIN business_categories bc ON b.category_id = bc.id
-            LEFT JOIN electoral_areas ea ON b.electoral_area_id = ea.id
+            LEFT JOIN local_areas la ON b.local_area_id = la.id
+            LEFT JOIN electoral_areas ea ON COALESCE(b.electoral_area_id, la.electoral_area_id) = ea.id
             WHERE 1=1
         `;
 
@@ -362,7 +384,12 @@ router.get('/', async (req: AuthRequest, res: Response) => {
             paramIndex++;
         }
 
-        const areaFilter = getCollectorAreaFilter(req, 'b.electoral_area_id', paramIndex);
+        const areaFilter = getCollectorAreaFilter(
+            req,
+            'COALESCE(b.electoral_area_id, la.electoral_area_id)',
+            paramIndex,
+            'b.local_area_id'
+        );
         query += areaFilter.clause;
         queryParams.push(...areaFilter.params);
         paramIndex = areaFilter.nextIndex;
@@ -417,23 +444,23 @@ router.put('/:id', authorize(['edit_business']), async (req: AuthRequest, res: R
         const updateSchema = Joi.object({
             business_name: Joi.string().optional().max(200),
             category_id: Joi.number().integer().optional().allow(null),
-            business_activity: Joi.string().optional(),
-            business_contact: Joi.string().optional().allow('').max(20),
-            business_type_main: Joi.string().optional().allow(''),
-            business_type_sub: Joi.string().optional().allow(''),
-            business_category_class: Joi.string().valid('Category A', 'Category B', 'Category C', 'Category D', '').optional().allow(''),
-            business_email: Joi.string().email().optional().allow(''),
-            description: Joi.string().optional().allow(''),
-            account_number: Joi.string().optional().allow(''),
-            division_number: Joi.string().optional().allow(''),
-            block_number: Joi.string().optional().allow(''),
-            street_name: Joi.string().optional().allow(''),
-            gps_address: Joi.string().optional().allow('').max(50),
+            business_activity: optionalText(),
+            business_contact: Joi.string().optional().allow('', null).max(20),
+            business_type_main: optionalText(),
+            business_type_sub: optionalText(),
+            business_category_class: Joi.string().valid('Category A', 'Category B', 'Category C', 'Category D', '').optional().allow('', null),
+            business_email: optionalEmail(),
+            description: optionalText(),
+            account_number: optionalText(),
+            division_number: optionalText(),
+            block_number: optionalText(),
+            street_name: optionalText(),
+            gps_address: Joi.string().optional().allow('', null).max(50),
             latitude: Joi.number().precision(8).min(-90).max(90).optional().allow(null, ''),
             longitude: Joi.number().precision(8).min(-180).max(180).optional().allow(null, ''),
-            town: Joi.string().optional().allow(''),
-            physical_location: Joi.string().optional().allow(''),
-            landmark: Joi.string().optional().allow(''),
+            town: optionalText(),
+            physical_location: optionalText(),
+            landmark: optionalText(),
             electoral_area_id: Joi.number().integer().optional().allow(null, ''),
             local_area_id: Joi.number().integer().optional().allow(null, ''),
             fee_item_id: Joi.number().integer().optional().allow(null, ''),
@@ -442,7 +469,7 @@ router.put('/:id', authorize(['edit_business']), async (req: AuthRequest, res: R
             status: Joi.string().valid('ACTIVE', 'INACTIVE', 'CLOSED').optional(),
         });
 
-        const { error, value } = updateSchema.validate(req.body);
+        const { error, value } = updateSchema.validate(normalizeBusinessPayload(req.body));
 
         if (error) {
             return res.status(400).json({
@@ -461,6 +488,23 @@ router.put('/:id', authorize(['edit_business']), async (req: AuthRequest, res: R
             value.assessed_amount = null;
         } else {
             value.assessed_amount = Number(value.assessed_amount);
+        }
+
+        // Empty optional text → null (except business_activity which is NOT NULL)
+        for (const key of Object.keys(value)) {
+            if (typeof value[key] === 'string' && value[key].trim() === '' && key !== 'business_activity') {
+                value[key] = null;
+            }
+        }
+        if (value.business_activity === null || value.business_activity === undefined) {
+            value.business_activity = '';
+        }
+
+        if ('electoral_area_id' in value || 'local_area_id' in value) {
+            value.electoral_area_id = await resolveElectoralAreaId(
+                value.electoral_area_id,
+                value.local_area_id
+            );
         }
 
         const fields = Object.keys(value);

@@ -20,6 +20,7 @@ export default function CustomerDetailPage() {
     const [loading, setLoading] = useState(true);
     const [deleting, setDeleting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [regMenuOpen, setRegMenuOpen] = useState(false);
 
     useEffect(() => {
         const loadCustomer = async () => {
@@ -114,16 +115,45 @@ export default function CustomerDetailPage() {
                             <span>{deleting ? 'Deleting…' : 'Delete customer'}</span>
                         </button>
                     )}
-                    <div className="relative group">
-                        <button className="btn-primary flex items-center space-x-2">
+                    <div className="relative">
+                        <button
+                            type="button"
+                            className="btn-primary flex items-center space-x-2"
+                            onClick={() => setRegMenuOpen((open) => !open)}
+                            aria-expanded={regMenuOpen}
+                            aria-haspopup="menu"
+                        >
                             <Plus className="w-4 h-4" />
                             <span>New Registration</span>
                         </button>
-                        <div className="absolute right-0 mt-2 w-48 bg-white border rounded-lg shadow-xl hidden group-hover:block z-10">
-                            <Link href={`/properties/new?customer_id=${id}`} className="block px-4 py-2 hover:bg-gray-50 text-gray-700">Residential Property</Link>
-                            <Link href={`/business-properties/new?customer_id=${id}`} className="block px-4 py-2 hover:bg-gray-50 text-gray-700">Business Property</Link>
-                            <Link href={`/businesses/new?customer_id=${id}`} className="block px-4 py-2 hover:bg-gray-50 text-gray-700">Business Permit (BOP)</Link>
-                        </div>
+                        {regMenuOpen && (
+                            <div
+                                className="absolute right-0 mt-2 w-56 bg-white border rounded-lg shadow-xl z-20"
+                                role="menu"
+                            >
+                                <Link
+                                    href={`/properties/new?customer_id=${id}`}
+                                    className="block px-4 py-2.5 hover:bg-gray-50 text-gray-700"
+                                    onClick={() => setRegMenuOpen(false)}
+                                >
+                                    Residential Property
+                                </Link>
+                                <Link
+                                    href={`/business-properties/new?customer_id=${id}`}
+                                    className="block px-4 py-2.5 hover:bg-gray-50 text-gray-700"
+                                    onClick={() => setRegMenuOpen(false)}
+                                >
+                                    Business Property
+                                </Link>
+                                <Link
+                                    href={`/businesses/new?customer_id=${id}`}
+                                    className="block px-4 py-2.5 hover:bg-gray-50 text-gray-700"
+                                    onClick={() => setRegMenuOpen(false)}
+                                >
+                                    Business Permit (BOP)
+                                </Link>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

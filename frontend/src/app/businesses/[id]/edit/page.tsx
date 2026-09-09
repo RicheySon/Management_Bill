@@ -149,10 +149,11 @@ export default function EditBusinessPage() {
                 const b = businessData.business;
                 let c = businessData.customer;
 
-                // Fill business fields
+                // Fill business fields — coerce nulls to '' so optional string validators accept them
                 Object.keys(b).forEach(key => {
                     if (key !== 'id' && key !== 'created_at' && key !== 'updated_at') {
-                        setValue(key as any, b[key]);
+                        const val = b[key];
+                        setValue(key as any, val === null || val === undefined ? '' : val);
                     }
                 });
 
@@ -249,26 +250,28 @@ export default function EditBusinessPage() {
                 });
             }
 
+            const emptyToStr = (v: any) => (v == null ? '' : String(v));
+
             // Update business
             await updateBusiness(id as string, {
                 business_name: data.business_name,
                 category_id: null,
-                business_activity: data.business_activity,
-                business_contact: data.business_contact,
-                business_type_main: data.business_type_main,
-                business_type_sub: data.business_type_sub,
-                business_category_class: data.business_category_class,
-                business_email: data.business_email,
-                description: data.description,
-                account_number: data.account_number,
-                division_number: data.division_number,
-                block_number: data.block_number,
-                gps_address: data.gps_address,
+                business_activity: emptyToStr(data.business_activity),
+                business_contact: emptyToStr(data.business_contact),
+                business_type_main: emptyToStr(data.business_type_main),
+                business_type_sub: emptyToStr(data.business_type_sub),
+                business_category_class: emptyToStr(data.business_category_class),
+                business_email: emptyToStr(data.business_email),
+                description: emptyToStr(data.description || data.business_activity),
+                account_number: emptyToStr(data.account_number),
+                division_number: emptyToStr(data.division_number),
+                block_number: emptyToStr(data.block_number),
+                gps_address: emptyToStr(data.gps_address),
                 latitude: toOptionalNumber(data.latitude),
                 longitude: toOptionalNumber(data.longitude),
-                town: data.town,
-                street_name: data.street_name,
-                landmark: data.landmark,
+                town: emptyToStr(data.town),
+                street_name: emptyToStr(data.street_name),
+                landmark: emptyToStr(data.landmark),
                 electoral_area_id: toNullableId(data.electoral_area_id),
                 local_area_id: toNullableId(data.local_area_id),
                 fee_item_id: selectedFeeItemId ? parseInt(selectedFeeItemId) : null,
@@ -528,14 +531,13 @@ export default function EditBusinessPage() {
                         </div>
 
                         <div>
-                            <label className="label">Business Email</label>
+                            <label className="label">Business Email (optional)</label>
                             <input type="email" {...register('business_email')} className="input-field" placeholder="Business Email" />
                         </div>
 
                         <div className="md:col-span-2">
-                            <label className="label">Description / Business Activity <span className="text-municipal-red">*</span></label>
-                            <textarea {...register('business_activity', { required: 'Please describe business activity' })} className="input-field" rows={3} placeholder="Description / Business Activity" />
-                            {errors.business_activity && <p className="text-red-500 text-sm mt-1">{errors.business_activity.message}</p>}
+                            <label className="label">Description / Business Activity (optional)</label>
+                            <textarea {...register('business_activity')} className="input-field" rows={3} placeholder="Description / Business Activity" />
                         </div>
 
                         <div>

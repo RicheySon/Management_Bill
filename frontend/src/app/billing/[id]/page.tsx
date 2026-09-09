@@ -171,7 +171,16 @@ export default function BillDetailPage() {
     };
 
     if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-municipal-red"></div></div>;
-    if (!bill) return <div className="text-center py-20 text-red-500">Bill not found</div>;
+    if (!bill) {
+        return (
+            <div className="text-center py-20 space-y-3">
+                <p className="text-red-600 font-semibold">{error || 'Bill not found'}</p>
+                <button onClick={() => router.push('/billing')} className="btn-secondary">
+                    Back to Billing
+                </button>
+            </div>
+        );
+    }
 
     const balance = parseFloat(bill.total_amount) - parseFloat(bill.amount_paid);
     const pendingChequeTotal = payments

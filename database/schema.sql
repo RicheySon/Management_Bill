@@ -780,6 +780,7 @@ INSERT INTO electoral_areas (name, code) VALUES
 ('POKUASE', 'POK'),
 ('TANTRA', 'TAN'),
 ('TROBU', 'TRO'),
-('ABENSU', 'ABN');
+('ABENSU', 'ABN'),
+('ACP', 'ACP');
 
 COMMENT ON DATABASE postgres IS 'Municipal Revenue Management System - Production Database';
