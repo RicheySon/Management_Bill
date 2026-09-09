@@ -1,4 +1,5 @@
 import pool from '../config/database';
+import { ensureAcpElectoralArea } from './electoral-areas.service';
 
 /**
  * Ensure Supervisor role always has Fee Configuration access.
@@ -79,6 +80,7 @@ export const loadUserRolesAndPermissions = async (
     await ensureSupervisorConfigureRates();
     await ensureRevenueOfficerChequeClearance();
     await ensureRevenueCollectorRecordPayment();
+    await ensureAcpElectoralArea();
 
     const result = await pool.query(
         `SELECT
