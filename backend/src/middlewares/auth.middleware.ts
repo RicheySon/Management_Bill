@@ -69,6 +69,8 @@ export const authorize = (requiredPermissions: string[]) => {
             if (perms.includes(perm)) return true;
             // Supervisors always allowed to configure fee schedules
             if (perm === 'configure_rates' && roles.includes('Supervisor')) return true;
+            // Collectors may record payments (bill APIs still enforce assigned areas)
+            if (perm === 'record_payment' && roles.includes('Revenue Collector')) return true;
             return false;
         });
 

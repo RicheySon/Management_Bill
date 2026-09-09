@@ -55,6 +55,22 @@ export const ensureRevenueOfficerChequeClearance = async (): Promise<void> => {
 };
 
 /**
+ * Revenue Collectors can record payments on bills in their assigned areas.
+ * Self-heals DBs that never ran the collector record_payment migration.
+ */
+export const ensureRevenueCollectorRecordPayment = async (): Promise<void> => {
+    await pool.query(
+        `INSERT INTO role_permissions (role_id, permission_id)
+         SELECT r.id, p.id
+         FROM roles r
+         CROSS JOIN permissions p
+         WHERE r.name = 'Revenue Collector'
+           AND p.code = 'record_payment'
+         ON CONFLICT DO NOTHING`
+    );
+};
+
+/**
  * Load roles + permission codes for a user (after optional role grants).
  */
 export const loadUserRolesAndPermissions = async (
@@ -62,6 +78,7 @@ export const loadUserRolesAndPermissions = async (
 ): Promise<{ roles: string[]; permissions: string[] }> => {
     await ensureSupervisorConfigureRates();
     await ensureRevenueOfficerChequeClearance();
+    await ensureRevenueCollectorRecordPayment();
 
     const result = await pool.query(
         `SELECT
@@ -84,6 +101,11 @@ export const loadUserRolesAndPermissions = async (
     // Belt-and-suspenders: Supervisors always get configure_rates in the session
     if (roles.includes('Supervisor') && !permissions.includes('configure_rates')) {
         permissions = [...permissions, 'configure_rates'];
+    }
+
+    // Collectors always get record_payment in the session (area checks still apply on APIs)
+    if (roles.includes('Revenue Collector') && !permissions.includes('record_payment')) {
+        permissions = [...permissions, 'record_payment'];
     }
 
     // Cheque clearance is role-gated to Revenue Officer only (strip stale Admin JWT grants)
