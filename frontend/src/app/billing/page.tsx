@@ -177,7 +177,15 @@ export default function BillingPage() {
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {bills.map((bill) => (
+                                {bills.map((bill) => {
+                                    const outstanding =
+                                        parseFloat(bill.total_amount || 0) - parseFloat(bill.amount_paid || 0);
+                                    const canCollect =
+                                        canPayBill &&
+                                        bill.payment_status !== 'PAID' &&
+                                        outstanding > 0;
+
+                                    return (
                                     <tr key={bill.id} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm font-bold text-municipal-red">{bill.bill_number}</div>
@@ -191,14 +199,15 @@ export default function BillingPage() {
                                             <div className="text-sm font-bold text-gray-900">GHS {parseFloat(bill.total_amount).toFixed(2)}</div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className={`text-sm font-bold ${(parseFloat(bill.total_amount) - parseFloat(bill.amount_paid)) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                                GHS {(parseFloat(bill.total_amount) - parseFloat(bill.amount_paid)).toFixed(2)}
+                                            <div className={`text-sm font-bold ${outstanding > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                GHS {outstanding.toFixed(2)}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <StatusBadge status={bill.payment_status} />
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm space-x-1">
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                                            <div className="inline-flex items-center justify-end gap-1 flex-wrap">
                                             {canPrintDirect && (
                                                 <>
                                                     <button
@@ -246,13 +255,14 @@ export default function BillingPage() {
                                                 </Link>
                                             )}
 
-                                            {canPayBill && (
+                                            {canCollect && (
                                                 <Link
-                                                    href={`/billing/${bill.id}`}
-                                                    className="inline-flex items-center p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
-                                                    title="Record payment"
+                                                    href={`/billing/${bill.id}#payment`}
+                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-all shadow-sm"
+                                                    title="Make payment"
                                                 >
-                                                    <CreditCard className="w-5 h-5" />
+                                                    <CreditCard className="w-4 h-4" />
+                                                    <span>Pay</span>
                                                 </Link>
                                             )}
 
@@ -265,9 +275,11 @@ export default function BillingPage() {
                                                     <Trash className="w-5 h-5" />
                                                 </button>
                                             )}
+                                            </div>
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>

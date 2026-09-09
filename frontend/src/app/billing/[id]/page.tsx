@@ -83,6 +83,16 @@ export default function BillDetailPage() {
         loadBill();
     }, [id]);
 
+    useEffect(() => {
+        if (loading || !bill || !canPay) return;
+        if (typeof window === 'undefined') return;
+        if (window.location.hash !== '#payment') return;
+        const el = document.getElementById('payment');
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, [loading, bill, canPay]);
+
     const handlePayment = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -485,7 +495,7 @@ export default function BillDetailPage() {
 
                 <div className="space-y-6">
                     {canPay && (
-                        <div className="card sticky top-6">
+                        <div id="payment" className="card sticky top-6 scroll-mt-24">
                             <h3 className="text-lg font-bold mb-4 flex items-center space-x-2">
                                 <CreditCard className="w-5 h-5 text-municipal-red" />
                                 <span>Record Payment</span>
