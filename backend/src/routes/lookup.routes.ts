@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import pool from '../config/database';
 import { authenticateToken, authorize, AuthRequest } from '../middlewares/auth.middleware';
+import { ensureAcpElectoralArea } from '../services/electoral-areas.service';
 
 const router = Router();
 
@@ -13,6 +14,9 @@ router.use(authenticateToken);
 router.get('/electoral-areas', async (req: Request, res: Response) => {
     console.log('GET /api/lookups/electoral-areas - Fetching electoral areas');
     try {
+        // Self-heal: ensure ACP exists even if production skipped the migration
+        await ensureAcpElectoralArea();
+
         const result = await pool.query(
             'SELECT id, name, code FROM electoral_areas ORDER BY name'
         );
