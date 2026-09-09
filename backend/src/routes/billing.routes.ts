@@ -1,7 +1,13 @@
 import { Router, Response } from 'express';
 import Joi from 'joi';
 import { generateBill, recordPayment, normalizeGcrNumber, isValidGcrNumber, billTotal, BASIC_RATE_GHC } from '../services/billing.service';
-import { authenticateToken, authorize, AuthRequest, getCollectorAreaFilter } from '../middlewares/auth.middleware';
+import {
+    authenticateToken,
+    authorize,
+    AuthRequest,
+    getCollectorAreaFilter,
+    assertCollectorCanAccessBill,
+} from '../middlewares/auth.middleware';
 import pool from '../config/database';
 import { createAmountChangeRequest } from '../services/amount-change.service';
 import { getAuditContext, logAction } from '../services/audit.service';
@@ -241,6 +247,14 @@ router.post('/preview', authenticateToken, async (req: AuthRequest, res: Respons
 router.get('/:id([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})', authenticateToken, async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
+
+        const access = await assertCollectorCanAccessBill(req, id);
+        if (!access.allowed) {
+            return res.status(access.status).json({
+                success: false,
+                error: access.error,
+            });
+        }
 
         const result = await pool.query(
             `SELECT b.*,
@@ -517,6 +531,14 @@ router.delete('/:id', authenticateToken, authorize(['delete_bill']), async (req:
 router.post('/:id/payment', authenticateToken, authorize(['record_payment']), async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
+
+        const access = await assertCollectorCanAccessBill(req, id);
+        if (!access.allowed) {
+            return res.status(access.status).json({
+                success: false,
+                error: access.error,
+            });
+        }
 
         const schema = Joi.object({
             customer_id: Joi.string().uuid().required(),

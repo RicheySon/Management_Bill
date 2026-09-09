@@ -237,7 +237,8 @@ WHERE r.name = 'Revenue Collector' AND p.code IN (
     'create_customer', 'view_customer',
     'register_property',
     'register_business',
-    'print_bill'
+    'print_bill',
+    'record_payment'
 );
 
 -- Map Permissions to Approver (additive approval rule)
