@@ -607,8 +607,8 @@ export default function EditPropertyPage() {
                         </div>
 
                         <div>
-                            <label className="label">Account Number</label>
-                            <input type="text" {...register('account_number')} className="input-field" placeholder="Account Number" />
+                            <label className="label">Old Account Number <span className="text-gray-400 font-normal">(optional)</span></label>
+                            <input type="text" {...register('account_number')} className="input-field" placeholder="Previous / legacy account number" />
                         </div>
 
                         <div>

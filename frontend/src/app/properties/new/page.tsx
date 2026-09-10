@@ -784,12 +784,12 @@ function NewPropertyPageContent() {
                         </div>
 
                         <div>
-                            <label className="label">Account Number <span className="text-gray-400 font-normal">(optional)</span></label>
+                            <label className="label">Old Account Number <span className="text-gray-400 font-normal">(optional)</span></label>
                             <input
                                 type="text"
                                 {...register('account_number')}
                                 className="input-field"
-                                placeholder="Account Number"
+                                placeholder="Previous / legacy account number"
                             />
                         </div>
 

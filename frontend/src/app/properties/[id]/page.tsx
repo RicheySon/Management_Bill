@@ -152,7 +152,9 @@ export default function PropertyDetailPage() {
                         <div className="space-y-4">
                             <div className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
                                 <span className="text-gray-500">Account Number</span>
-                                <span className="font-semibold font-mono text-gray-900">{property.account_number || '—'}</span>
+                                <span className="font-semibold font-mono text-gray-900">
+                                    {property.account_number?.trim() || property.property_number || '—'}
+                                </span>
                             </div>
                             <div className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
                                 <span className="text-gray-500 flex items-center"><Tag className="w-3.5 h-3.5 mr-1.5" /> Type</span>

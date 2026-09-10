@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { fetchProperties } from '@/lib/api-client';
+import { displayAccountNumber } from '@/lib/account-number';
 import { sectorFromPath } from '@/lib/property-sector';
 import { Plus, Search, Building2, MapPin, User, Tag } from 'lucide-react';
 import Link from 'next/link';
@@ -114,7 +115,7 @@ export default function PropertiesPage() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">
-                                        {prop.account_number || '—'}
+                                        {displayAccountNumber(prop.account_number, prop.property_number)}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="flex items-center text-sm text-gray-700">

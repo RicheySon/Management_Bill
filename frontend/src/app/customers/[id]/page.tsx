@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { fetchCustomer, downloadBillPDF, deleteCustomer } from '@/lib/api-client';
+import { displayAccountNumber } from '@/lib/account-number';
 import { useAuth } from '@/context/AuthContext';
 import {
     User, Mail, Phone, MapPin, Navigation,
@@ -229,7 +230,7 @@ export default function CustomerDetailPage() {
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-municipal-red">
                                                     <Link href={`/properties/${prop.id}`}>{prop.property_number}</Link>
                                                 </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-mono text-gray-600">{prop.account_number || '—'}</td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-mono text-gray-600">{displayAccountNumber(prop.account_number, prop.property_number)}</td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{prop.classification_name}</td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 truncate max-w-[150px]">{prop.physical_location}</td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-right font-bold text-red-600">GHS {parseFloat(prop.total_outstanding || 0).toFixed(2)}</td>
@@ -272,7 +273,7 @@ export default function CustomerDetailPage() {
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-municipal-red">
                                                     <Link href={`/business-properties/${prop.id}`}>{prop.property_number}</Link>
                                                 </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-mono text-gray-600">{prop.account_number || '—'}</td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-mono text-gray-600">{displayAccountNumber(prop.account_number, prop.property_number)}</td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{prop.classification_name}</td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 truncate max-w-[150px]">{prop.physical_location}</td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-right font-bold text-red-600">GHS {parseFloat(prop.total_outstanding || 0).toFixed(2)}</td>
@@ -315,7 +316,7 @@ export default function CustomerDetailPage() {
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-municipal-red">
                                                     <Link href={`/businesses/${biz.id}`}>{biz.business_number}</Link>
                                                 </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-mono text-gray-600">{biz.account_number || '—'}</td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-mono text-gray-600">{displayAccountNumber(biz.account_number, biz.business_number)}</td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">{biz.business_name}</td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{biz.business_category_class || biz.category_name || '—'}</td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-right font-bold text-red-600">GHS {parseFloat(biz.total_outstanding || 0).toFixed(2)}</td>
