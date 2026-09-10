@@ -104,7 +104,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                             <span className="font-semibold text-sm">Logout</span>
                         </button>
                         <div className="mt-4 text-sm text-center text-municipal-teal font-medium">
-                            Version 1.0.5
+                            Version 1.0.7
                         </div>
                     </div>
                 </aside>
@@ -265,7 +265,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                         <span className="font-semibold text-sm">Logout</span>
                     </button>
                     <div className="mt-4 text-[10px] text-center text-gray-400 font-medium uppercase tracking-widest">
-                        v1.0.5
+                        v1.0.7
                     </div>
                 </div>
             </aside>
