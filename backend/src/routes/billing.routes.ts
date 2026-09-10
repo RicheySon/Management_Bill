@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import Joi from 'joi';
-import { generateBill, recordPayment, normalizeGcrNumber, isValidGcrNumber, billTotal, BASIC_RATE_GHC } from '../services/billing.service';
+import { generateBill, recordPayment, normalizeGcrNumber, isValidGcrNumber, billTotal, BASIC_RATE_GHC, syncBillDetailsAmounts } from '../services/billing.service';
 import {
     authenticateToken,
     authorize,
@@ -119,14 +119,24 @@ router.put('/:id/amounts', async (req: AuthRequest, res: Response) => {
             const arrears = proposed.arrears !== undefined ? Number(proposed.arrears) : Number(bill.arrears);
             const rebate = proposed.rebate !== undefined ? Number(proposed.rebate) : Number(bill.rebate);
             const total_amount =
-                proposed.total_amount !== undefined
-                    ? Number(proposed.total_amount)
-                    : billTotal(current_rate, arrears, rebate, BASIC_RATE_GHC);
+                proposed.current_rate !== undefined ||
+                proposed.arrears !== undefined ||
+                proposed.rebate !== undefined ||
+                proposed.total_amount === undefined
+                    ? billTotal(current_rate, arrears, rebate, BASIC_RATE_GHC)
+                    : Number(proposed.total_amount);
             const amount_paid = Number(bill.amount_paid || 0);
             const amount_due = Math.max(total_amount - amount_paid, 0);
             let payment_status = 'UNPAID';
             if (amount_due <= 0) payment_status = 'PAID';
             else if (amount_paid > 0) payment_status = 'PARTIAL';
+
+            const bill_details = syncBillDetailsAmounts(bill.bill_details, {
+                current_rate,
+                arrears,
+                rebate,
+                basic_rate: BASIC_RATE_GHC,
+            });
 
             const updated = await pool.query(
                 `UPDATE bills SET
@@ -136,10 +146,20 @@ router.put('/:id/amounts', async (req: AuthRequest, res: Response) => {
                     total_amount = $4,
                     amount_due = $5,
                     payment_status = $6,
+                    bill_details = $7,
                     updated_at = NOW()
-                 WHERE id = $7
+                 WHERE id = $8
                  RETURNING *`,
-                [current_rate, arrears, rebate, total_amount, amount_due, payment_status, req.params.id]
+                [
+                    current_rate,
+                    arrears,
+                    rebate,
+                    total_amount,
+                    amount_due,
+                    payment_status,
+                    JSON.stringify(bill_details),
+                    req.params.id,
+                ]
             );
 
             // Keep assessed amount in sync on the related property/business

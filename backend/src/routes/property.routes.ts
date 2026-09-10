@@ -1,7 +1,8 @@
 import { Router, Response } from 'express';
 import pool from '../config/database';
 import { authenticateToken, authorize, AuthRequest, getCollectorAreaFilter, resolveElectoralAreaId } from '../middlewares/auth.middleware';
-import { generateBill } from '../services/billing.service';
+import { generateBill, billTotal, BASIC_RATE_GHC, syncBillDetailsAmounts } from '../services/billing.service';
+import { ensurePropertyKindSchema } from '../services/property-kind-schema.service';
 import Joi from 'joi';
 
 const outstandingStatuses = new Set(['UNPAID', 'PARTIAL', 'OVERDUE']);
@@ -67,7 +68,7 @@ async function applyArrearsToLatestBill(
     arrears: number
 ) {
     const latest = await pool.query(
-        `SELECT id, current_rate, rebate, amount_paid
+        `SELECT id, current_rate, rebate, amount_paid, bill_details
          FROM bills
          WHERE ${entityColumn} = $1
          ORDER BY bill_period_year DESC, created_at DESC
@@ -79,20 +80,27 @@ async function applyArrearsToLatestBill(
     const current_rate = Number(bill.current_rate || 0);
     const rebate = Number(bill.rebate || 0);
     const amount_paid = Number(bill.amount_paid || 0);
-    const total_amount = current_rate + arrears - rebate;
+    const total_amount = billTotal(current_rate, arrears, rebate, BASIC_RATE_GHC);
     const amount_due = Math.max(total_amount - amount_paid, 0);
     const payment_status =
         amount_due <= 0 ? 'PAID' : amount_paid > 0 ? 'PARTIAL' : 'UNPAID';
+    const bill_details = syncBillDetailsAmounts(bill.bill_details, {
+        current_rate,
+        arrears,
+        rebate,
+        basic_rate: BASIC_RATE_GHC,
+    });
     const updated = await pool.query(
         `UPDATE bills SET
             arrears = $1,
             total_amount = $2,
             amount_due = $3,
             payment_status = $4,
+            bill_details = $5,
             updated_at = NOW()
-         WHERE id = $5
+         WHERE id = $6
          RETURNING id, bill_number, arrears, total_amount, amount_due`,
-        [arrears, total_amount, amount_due, payment_status, bill.id]
+        [arrears, total_amount, amount_due, payment_status, JSON.stringify(bill_details), bill.id]
     );
     return updated.rows[0] || null;
 }
@@ -103,6 +111,7 @@ async function applyArrearsToLatestBill(
  */
 router.post('/', authorize(['register_property']), async (req: AuthRequest, res: Response) => {
     try {
+        await ensurePropertyKindSchema();
         const { error, value } = propertySchema.validate(req.body);
 
         if (error) {
@@ -290,6 +299,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
  */
 router.get('/', async (req: AuthRequest, res: Response) => {
     try {
+        await ensurePropertyKindSchema();
         const {
             search,
             classification_id,
@@ -325,7 +335,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
         }
 
         if (property_kind) {
-            query += ` AND p.property_kind = $${paramIndex}`;
+            // Treat legacy NULL / empty as residential so old rows still appear
+            query += ` AND COALESCE(NULLIF(TRIM(p.property_kind), ''), 'RESIDENTIAL') = $${paramIndex}`;
             queryParams.push(property_kind);
             paramIndex++;
         }

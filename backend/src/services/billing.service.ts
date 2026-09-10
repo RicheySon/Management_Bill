@@ -22,6 +22,39 @@ interface BillCalculation {
 export const billTotal = (current_rate: number, arrears: number, rebate: number, basicRate = BASIC_RATE_GHC) =>
     Number(current_rate || 0) + Number(basicRate || 0) + Number(arrears || 0) - Number(rebate || 0);
 
+/**
+ * Keep bill_details JSON aligned with money columns after an edit.
+ * Without this, PDFs / UI can show a stale basic rate or drop it from the total story.
+ */
+export const syncBillDetailsAmounts = (
+    existingDetails: any,
+    amounts: { current_rate: number; arrears: number; rebate: number; basic_rate?: number }
+) => {
+    const basic_rate = Number(
+        amounts.basic_rate !== undefined ? amounts.basic_rate : BASIC_RATE_GHC
+    );
+    const details =
+        existingDetails && typeof existingDetails === 'object'
+            ? JSON.parse(JSON.stringify(existingDetails))
+            : { items: [] };
+
+    details.basic_rate = basic_rate;
+
+    if (!Array.isArray(details.items) || details.items.length === 0) {
+        details.items = [{}];
+    }
+
+    const item = details.items[0] || {};
+    item.current_rate = Number(amounts.current_rate || 0).toFixed(2);
+    item.basic_rate = basic_rate.toFixed(2);
+    item.arrears = Number(amounts.arrears || 0).toFixed(2);
+    item.rebate = Number(amounts.rebate || 0).toFixed(2);
+    item.total = Number(amounts.current_rate || 0).toFixed(2);
+    details.items[0] = item;
+
+    return details;
+};
+
 /** Normalize GCR: digits-only input becomes YY/####### for mobile keyboards without "/". */
 export const normalizeGcrNumber = (value: string): string => {
     const digits = String(value || '').replace(/\D/g, '').slice(0, 9);
@@ -845,6 +878,7 @@ export const listChequePayments = async (status = 'PENDING', limit = 100): Promi
 export default {
     BASIC_RATE_GHC,
     billTotal,
+    syncBillDetailsAmounts,
     normalizeGcrNumber,
     isValidGcrNumber,
     normalizePaymentMethod,

@@ -1,6 +1,6 @@
 import pool from '../config/database';
 import { logAction, AuditContext } from './audit.service';
-import { BASIC_RATE_GHC, billTotal } from './billing.service';
+import { BASIC_RATE_GHC, billTotal, syncBillDetailsAmounts } from './billing.service';
 
 export type AmountEntityType = 'BILL' | 'PROPERTY_RATE_ZONE' | 'BUSINESS_FEE_ITEM';
 
@@ -199,28 +199,27 @@ export const approveAmountChange = async (
                 : request.new_values;
 
         if (request.entity_type === 'BILL') {
+            const billRow = (
+                await client.query('SELECT amount_paid, bill_details FROM bills WHERE id = $1', [
+                    request.entity_id,
+                ])
+            ).rows[0];
+            const amountPaid = Number(billRow?.amount_paid || 0);
             const amountDue =
                 newValues.amount_due != null
                     ? Number(newValues.amount_due)
-                    : Math.max(
-                          Number(newValues.total_amount) -
-                              Number(
-                                  (
-                                      await client.query('SELECT amount_paid FROM bills WHERE id = $1', [
-                                          request.entity_id,
-                                      ])
-                                  ).rows[0]?.amount_paid || 0
-                              ),
-                          0
-                      );
+                    : Math.max(Number(newValues.total_amount) - amountPaid, 0);
 
             let paymentStatus = 'UNPAID';
-            const paidResult = await client.query('SELECT amount_paid FROM bills WHERE id = $1', [
-                request.entity_id,
-            ]);
-            const amountPaid = Number(paidResult.rows[0]?.amount_paid || 0);
             if (amountDue <= 0) paymentStatus = 'PAID';
             else if (amountPaid > 0) paymentStatus = 'PARTIAL';
+
+            const bill_details = syncBillDetailsAmounts(billRow?.bill_details, {
+                current_rate: Number(newValues.current_rate),
+                arrears: Number(newValues.arrears),
+                rebate: Number(newValues.rebate),
+                basic_rate: BASIC_RATE_GHC,
+            });
 
             await client.query(
                 `UPDATE bills SET
@@ -230,8 +229,9 @@ export const approveAmountChange = async (
                     total_amount = $4,
                     amount_due = $5,
                     payment_status = $6,
+                    bill_details = $7,
                     updated_at = NOW()
-                 WHERE id = $7`,
+                 WHERE id = $8`,
                 [
                     Number(newValues.current_rate),
                     Number(newValues.arrears),
@@ -239,6 +239,7 @@ export const approveAmountChange = async (
                     Number(newValues.total_amount),
                     amountDue,
                     paymentStatus,
+                    JSON.stringify(bill_details),
                     request.entity_id,
                 ]
             );

@@ -19,11 +19,35 @@ import {
     recordPayment,
     feeAmountForPropertyClass,
     feeAmountForBusinessCategory,
+    billTotal,
+    BASIC_RATE_GHC,
+    syncBillDetailsAmounts,
 } from './billing.service';
 
 describe('billing.service smoke', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+    });
+
+    it('billTotal always includes the annual basic rate', () => {
+        expect(billTotal(1000, 0, 0)).toBe(1008);
+        expect(billTotal(150, 20, 0, BASIC_RATE_GHC)).toBe(178);
+        expect(billTotal(100, 0, 5)).toBe(103);
+    });
+
+    it('syncBillDetailsAmounts keeps basic_rate on edited bills', () => {
+        const synced = syncBillDetailsAmounts(
+            {
+                bill_type: 'PROPERTY_RATE',
+                basic_rate: 8,
+                items: [{ description: 'Property Rate', current_rate: '100.00', basic_rate: '8.00' }],
+            },
+            { current_rate: 150, arrears: 20, rebate: 0 }
+        );
+        expect(synced.basic_rate).toBe(8);
+        expect(synced.items[0].basic_rate).toBe('8.00');
+        expect(synced.items[0].current_rate).toBe('150.00');
+        expect(synced.items[0].arrears).toBe('20.00');
     });
 
     it('feeAmountForPropertyClass maps 1st–3rd class to CAT columns', () => {
