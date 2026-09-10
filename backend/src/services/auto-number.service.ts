@@ -2,11 +2,24 @@ import pool from '../config/database';
 
 /**
  * Auto Number Service
- * Generates unique sequential numbers for properties, businesses, bills, and receipts
- * Format: PREFIX-YEAR-NNNNNN (e.g., GN-PR-2026-000123)
+ *
+ * Customer codes (property / business property / BOP):
+ *   PREFIX + EA3 + COMMUNITY3 + NNNNNN
+ *   e.g. GNPROTANBAA000001
+ * Sequence is per electoral area (and per code type).
+ *
+ * Bill / receipt numbers remain PREFIX-YEAR-NNNNNN
+ *   e.g. GN-BILL-2026-000123
  */
 
-export type SequenceType = 'PROPERTY' | 'BUSINESS' | 'BILL' | 'RECEIPT';
+export type SequenceType = 'PROPERTY' | 'BUSINESS_PROPERTY' | 'BUSINESS' | 'BILL' | 'RECEIPT';
+export type CustomerCodeType = 'PROPERTY' | 'BUSINESS_PROPERTY' | 'BUSINESS';
+
+export const CUSTOMER_CODE_PREFIXES: Record<CustomerCodeType, string> = {
+    PROPERTY: 'GNPRO',
+    BUSINESS_PROPERTY: 'GNBPRO',
+    BUSINESS: 'GNBOP',
+};
 
 interface AutoNumberResult {
     success: boolean;
@@ -14,9 +27,69 @@ interface AutoNumberResult {
     error?: string;
 }
 
+/** First 3 A–Z letters of a place name, uppercased (pad with X if shorter). */
+export const areaCodeFromName = (name: string | null | undefined): string => {
+    const letters = String(name || '')
+        .replace(/[^A-Za-z]/g, '')
+        .toUpperCase();
+    if (!letters) {
+        return 'XXX';
+    }
+    return (letters + 'XXX').slice(0, 3);
+};
+
+/** Build customer code string from parts (does not allocate a sequence). */
+export const formatCustomerCode = (
+    type: CustomerCodeType,
+    electoralAreaName: string,
+    communityName: string,
+    sequence: number
+): string => {
+    const prefix = CUSTOMER_CODE_PREFIXES[type];
+    const ea = areaCodeFromName(electoralAreaName);
+    const community = areaCodeFromName(communityName);
+    return `${prefix}${ea}${community}${String(sequence).padStart(6, '0')}`;
+};
+
 /**
- * Generate next auto number for the specified type
- * Uses PostgreSQL function with row-level locking to prevent duplicates
+ * Generate next customer code for property / business property / BOP.
+ * Uses PostgreSQL generate_customer_code with row-level locking.
+ */
+export const generateCustomerCode = async (
+    type: CustomerCodeType,
+    electoralAreaId: number,
+    localAreaId: number
+): Promise<AutoNumberResult> => {
+    const client = await pool.connect();
+
+    try {
+        const result = await client.query(
+            'SELECT generate_customer_code($1, $2, $3) as customer_code',
+            [type, electoralAreaId, localAreaId]
+        );
+
+        const customerCode = result.rows[0].customer_code;
+        console.log(`✅ Generated ${type} customer code: ${customerCode}`);
+
+        return {
+            success: true,
+            number: customerCode,
+        };
+    } catch (error: any) {
+        console.error(`❌ Error generating ${type} customer code:`, error);
+        return {
+            success: false,
+            number: '',
+            error: error.message,
+        };
+    } finally {
+        client.release();
+    }
+};
+
+/**
+ * Generate next auto number for BILL / RECEIPT (year-based).
+ * Prefer generateCustomerCode for PROPERTY / BUSINESS_PROPERTY / BUSINESS.
  */
 export const generateAutoNumber = async (
     type: SequenceType,
@@ -27,7 +100,6 @@ export const generateAutoNumber = async (
     try {
         const targetYear = year || new Date().getFullYear();
 
-        // Call PostgreSQL function to generate number
         const result = await client.query(
             'SELECT generate_auto_number($1, $2) as auto_number',
             [type, targetYear]
@@ -54,7 +126,28 @@ export const generateAutoNumber = async (
 };
 
 /**
- * Get the current sequence number without incrementing
+ * Get the current area sequence number without incrementing
+ */
+export const getCurrentAreaSequence = async (
+    type: CustomerCodeType,
+    electoralAreaId: number
+): Promise<number> => {
+    try {
+        const result = await pool.query(
+            `SELECT last_number FROM area_sequences
+             WHERE sequence_type = $1 AND electoral_area_id = $2`,
+            [type, electoralAreaId]
+        );
+
+        return result.rows.length > 0 ? result.rows[0].last_number : 0;
+    } catch (error) {
+        console.error('Error getting current area sequence:', error);
+        return 0;
+    }
+};
+
+/**
+ * Get the current year sequence number without incrementing (bills/receipts)
  */
 export const getCurrentSequence = async (
     type: SequenceType,
@@ -76,14 +169,48 @@ export const getCurrentSequence = async (
 };
 
 /**
- * Parse an auto number to extract components
+ * Parse a customer code (GNPROTANBAA000001) into components
  */
-export const parseAutoNumber = (autoNumber: string): {
+export const parseCustomerCode = (
+    customerCode: string
+): {
+    prefix: string;
+    type: CustomerCodeType | null;
+    electoralAreaCode: string;
+    communityCode: string;
+    sequence: number;
+} | null => {
+    const match = customerCode.match(/^(GNPRO|GNBPRO|GNBOP)([A-Z]{3})([A-Z]{3})(\d{6})$/);
+    if (!match) {
+        return null;
+    }
+
+    const prefix = match[1];
+    const typeByPrefix: Record<string, CustomerCodeType> = {
+        GNPRO: 'PROPERTY',
+        GNBPRO: 'BUSINESS_PROPERTY',
+        GNBOP: 'BUSINESS',
+    };
+
+    return {
+        prefix,
+        type: typeByPrefix[prefix] || null,
+        electoralAreaCode: match[2],
+        communityCode: match[3],
+        sequence: parseInt(match[4], 10),
+    };
+};
+
+/**
+ * Parse a legacy or bill/receipt auto number (PREFIX-YEAR-SEQ)
+ */
+export const parseAutoNumber = (
+    autoNumber: string
+): {
     prefix: string;
     year: number;
     sequence: number;
 } | null => {
-    // Format: GN-PR-2026-000123
     const parts = autoNumber.split('-');
 
     if (parts.length !== 4) {
@@ -92,13 +219,24 @@ export const parseAutoNumber = (autoNumber: string): {
 
     return {
         prefix: `${parts[0]}-${parts[1]}`,
-        year: parseInt(parts[2]),
-        sequence: parseInt(parts[3]),
+        year: parseInt(parts[2], 10),
+        sequence: parseInt(parts[3], 10),
     };
 };
 
 /**
- * Validate auto number format
+ * Validate customer code format for a given type
+ */
+export const validateCustomerCode = (
+    customerCode: string,
+    type: CustomerCodeType
+): boolean => {
+    const parsed = parseCustomerCode(customerCode);
+    return !!parsed && parsed.type === type;
+};
+
+/**
+ * Validate year-based auto number format (bills / receipts / legacy)
  */
 export const validateAutoNumber = (autoNumber: string, type: SequenceType): boolean => {
     const parsed = parseAutoNumber(autoNumber);
@@ -107,19 +245,35 @@ export const validateAutoNumber = (autoNumber: string, type: SequenceType): bool
         return false;
     }
 
-    // Check prefix matches type
     const expectedPrefixes: Record<SequenceType, string> = {
-        PROPERTY: 'GN-PR',
-        BUSINESS: 'GN-BOP',
+        PROPERTY: 'GNPRO',
+        BUSINESS_PROPERTY: 'GNBPRO',
+        BUSINESS: 'GNBOP',
         BILL: 'GN-BILL',
         RECEIPT: 'GN-RCT',
     };
 
-    return parsed.prefix === expectedPrefixes[type];
+    // Legacy hyphenated customer codes still validate via parseAutoNumber shape
+    if (type === 'BILL' || type === 'RECEIPT') {
+        return parsed.prefix === expectedPrefixes[type];
+    }
+
+    // New customer codes are not hyphenated — accept either legacy or new
+    if (validateCustomerCode(autoNumber, type as CustomerCodeType)) {
+        return true;
+    }
+
+    const legacyPrefixes: Record<string, string> = {
+        PROPERTY: 'GN-PR',
+        BUSINESS_PROPERTY: 'GN-BP',
+        BUSINESS: 'GN-BOP',
+    };
+
+    return parsed.prefix === legacyPrefixes[type];
 };
 
 /**
- * Reset sequence for a new year (admin function)
+ * Reset year sequence for bills/receipts (admin function)
  */
 export const resetSequenceForYear = async (
     type: SequenceType,
@@ -127,8 +281,9 @@ export const resetSequenceForYear = async (
 ): Promise<boolean> => {
     try {
         const prefixes: Record<SequenceType, string> = {
-            PROPERTY: 'GN-PR',
-            BUSINESS: 'GN-BOP',
+            PROPERTY: 'GNPRO',
+            BUSINESS_PROPERTY: 'GNBPRO',
+            BUSINESS: 'GNBOP',
             BILL: 'GN-BILL',
             RECEIPT: 'GN-RCT',
         };
@@ -149,9 +304,16 @@ export const resetSequenceForYear = async (
 };
 
 export default {
+    areaCodeFromName,
+    formatCustomerCode,
+    generateCustomerCode,
     generateAutoNumber,
+    getCurrentAreaSequence,
     getCurrentSequence,
+    parseCustomerCode,
     parseAutoNumber,
+    validateCustomerCode,
     validateAutoNumber,
     resetSequenceForYear,
+    CUSTOMER_CODE_PREFIXES,
 };
