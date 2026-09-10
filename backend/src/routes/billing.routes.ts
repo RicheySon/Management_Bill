@@ -11,6 +11,7 @@ import {
 import pool from '../config/database';
 import { createAmountChangeRequest } from '../services/amount-change.service';
 import { getAuditContext, logAction } from '../services/audit.service';
+import { fetchBillPayments, ensurePaymentClearanceSchema } from '../services/payment-clearance-schema.service';
 
 const router = Router();
 
@@ -285,17 +286,7 @@ router.get('/:id([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-
             });
         }
 
-        const paymentsResult = await pool.query(
-            `SELECT p.*,
-                u.full_name as recorded_by_name,
-                clr.full_name as cleared_by_name
-             FROM payments p
-             LEFT JOIN system_users u ON p.recorded_by = u.id
-             LEFT JOIN system_users clr ON p.cleared_by = clr.id
-             WHERE p.bill_id = $1
-             ORDER BY p.payment_date DESC, p.created_at DESC`,
-            [id]
-        );
+        const paymentsResult = await fetchBillPayments(id);
 
         res.json({
             success: true,
@@ -305,10 +296,11 @@ router.get('/:id([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-
             },
         });
     } catch (error: any) {
-        console.error('Error fetching bill:', error);
+        console.error('Error fetching bill:', error?.message || error, error?.code);
         res.status(500).json({
             success: false,
             error: 'Failed to fetch bill details',
+            detail: process.env.NODE_ENV === 'production' ? undefined : error?.message,
         });
     }
 });
@@ -531,6 +523,9 @@ router.delete('/:id', authenticateToken, authorize(['delete_bill']), async (req:
 router.post('/:id/payment', authenticateToken, authorize(['record_payment']), async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
+
+        // Ensure clearance columns exist before recording (cheque PENDING path uses them)
+        await ensurePaymentClearanceSchema();
 
         const access = await assertCollectorCanAccessBill(req, id);
         if (!access.allowed) {

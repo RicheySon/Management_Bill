@@ -111,29 +111,32 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
                 {/* Main Content Area */}
                 <div className="flex-1 ml-0 md:ml-64 flex flex-col transition-all duration-300">
-                    <header className="bg-white border-b h-16 flex items-center px-4 md:px-8 justify-between sticky top-0 z-10">
-                        <div className="flex items-center text-gray-400 gap-3">
-                            <button className="md:hidden p-1 hover:bg-gray-100 rounded-md" onClick={() => setIsSidebarOpen(true)}>
+                    <header className="bg-white border-b h-14 sm:h-16 flex items-center px-3 sm:px-4 md:px-8 justify-between sticky top-0 z-10 gap-2">
+                        <div className="flex items-center text-gray-400 gap-1.5 sm:gap-3 min-w-0">
+                            <button className="md:hidden p-1 hover:bg-gray-100 rounded-md shrink-0" onClick={() => setIsSidebarOpen(true)}>
                                 <Menu className="w-6 h-6 text-gray-600" />
                             </button>
                             <BackButton />
-                            <span className="text-sm font-medium hidden sm:inline-block">Municipal Revenue Management System</span>
-                            <span className="text-sm font-medium sm:hidden">MRMS</span>
+                            <span className="text-sm font-medium hidden md:inline-block">Municipal Revenue Management System</span>
+                            <span className="text-sm font-medium hidden sm:inline md:hidden">MRMS</span>
                         </div>
-                        <div className="flex items-center space-x-4">
-                            <div className="text-right">
+                        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+                            <div className="text-right hidden md:block">
                                 <p className="text-sm font-bold text-gray-900">{user.full_name}</p>
                                 <p className="text-[10px] text-municipal-teal font-bold uppercase tracking-tighter">
                                     Revenue Collector
                                 </p>
                             </div>
-                            <div className="w-10 h-10 bg-municipal-teal rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-teal-500/20">
+                            <div
+                                className="w-8 h-8 sm:w-10 sm:h-10 bg-municipal-teal rounded-xl flex items-center justify-center text-white text-xs sm:text-base font-bold shadow-lg shadow-teal-500/20"
+                                title={`${user.full_name} · Revenue Collector`}
+                            >
                                 {user.full_name.split(' ').map((n: string) => n[0]).join('')}
                             </div>
                         </div>
                     </header>
 
-                    <main className="flex-1 p-8">
+                    <main className="flex-1 p-4 sm:p-6 md:p-8">
                         <div className="container mx-auto">
                             {children}
                         </div>
@@ -270,16 +273,16 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             {/* Main Content Area */}
             <div className="flex-1 ml-0 md:ml-64 flex flex-col transition-all duration-300">
                 {/* Header */}
-                <header className="bg-white border-b h-16 flex items-center px-4 md:px-8 justify-between sticky top-0 z-10">
-                    <div className="flex items-center text-gray-400 gap-3">
-                        <button className="md:hidden p-1 hover:bg-gray-100 rounded-md" onClick={() => setIsSidebarOpen(true)}>
+                <header className="bg-white border-b h-14 sm:h-16 flex items-center px-3 sm:px-4 md:px-8 justify-between sticky top-0 z-10 gap-2">
+                    <div className="flex items-center text-gray-400 gap-1.5 sm:gap-3 min-w-0">
+                        <button className="md:hidden p-1 hover:bg-gray-100 rounded-md shrink-0" onClick={() => setIsSidebarOpen(true)}>
                             <Menu className="w-6 h-6 text-gray-600" />
                         </button>
                         <BackButton />
-                        <span className="text-sm font-medium hidden sm:inline-block">Municipal Revenue Management System</span>
-                        <span className="text-sm font-medium sm:hidden">MRMS</span>
+                        <span className="text-sm font-medium hidden md:inline-block truncate">Municipal Revenue Management System</span>
+                        <span className="text-sm font-medium hidden sm:inline md:hidden">MRMS</span>
                     </div>
-                    <div className="flex items-center space-x-3 md:space-x-4">
+                    <div className="flex items-center gap-1.5 sm:gap-3 md:gap-4 shrink-0">
                         {canSeeApprovals && (
                             <Link
                                 href="/admin/approvals"
@@ -295,19 +298,22 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                                 )}
                             </Link>
                         )}
-                        <div className="text-right">
-                            <p className="text-sm font-bold text-gray-900">{user.full_name}</p>
+                        <div className="text-right hidden md:block">
+                            <p className="text-sm font-bold text-gray-900 truncate max-w-[160px]">{user.full_name}</p>
                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">
                                 {user.roles && user.roles.length > 0 ? user.roles[0] : 'User'}
                             </p>
                         </div>
-                        <div className="w-10 h-10 bg-municipal-red rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-red-500/20">
+                        <div
+                            className="w-8 h-8 sm:w-10 sm:h-10 bg-municipal-red rounded-xl flex items-center justify-center text-white text-xs sm:text-base font-bold shadow-lg shadow-red-500/20"
+                            title={`${user.full_name} · ${user.roles?.[0] || 'User'}`}
+                        >
                             {user.full_name.split(' ').map((n: string) => n[0]).join('')}
                         </div>
                     </div>
                 </header>
 
-                <main className="flex-1 p-8">
+                <main className="flex-1 p-4 sm:p-6 md:p-8">
                     <div className="container mx-auto">
                         {children}
                     </div>

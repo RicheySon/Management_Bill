@@ -72,6 +72,26 @@ export const ensureRevenueCollectorRecordPayment = async (): Promise<void> => {
 };
 
 /**
+ * Roles that collect money must have record_payment.
+ * Self-heals Admin / Cashier / Revenue Officer / Collector on older DBs.
+ * Super Admin already receives every permission via seed.
+ */
+export const ensurePaymentRolesRecordPayment = async (): Promise<void> => {
+    await pool.query(
+        `INSERT INTO role_permissions (role_id, permission_id)
+         SELECT r.id, p.id
+         FROM roles r
+         CROSS JOIN permissions p
+         WHERE r.name IN ('Admin', 'Cashier', 'Revenue Officer', 'Revenue Collector')
+           AND p.code = 'record_payment'
+         ON CONFLICT DO NOTHING`
+    );
+};
+
+/** @deprecated use ensurePaymentRolesRecordPayment */
+export const ensureAdminRecordPayment = ensurePaymentRolesRecordPayment;
+
+/**
  * Load roles + permission codes for a user (after optional role grants).
  */
 export const loadUserRolesAndPermissions = async (
@@ -80,6 +100,7 @@ export const loadUserRolesAndPermissions = async (
     await ensureSupervisorConfigureRates();
     await ensureRevenueOfficerChequeClearance();
     await ensureRevenueCollectorRecordPayment();
+    await ensurePaymentRolesRecordPayment();
     await ensureAcpElectoralArea();
 
     const result = await pool.query(
@@ -105,8 +126,9 @@ export const loadUserRolesAndPermissions = async (
         permissions = [...permissions, 'configure_rates'];
     }
 
-    // Collectors always get record_payment in the session (area checks still apply on APIs)
-    if (roles.includes('Revenue Collector') && !permissions.includes('record_payment')) {
+    // Paying roles always get record_payment in the session (collector APIs still enforce areas)
+    const paymentRoles = ['Super Admin', 'Admin', 'Cashier', 'Revenue Officer', 'Revenue Collector'];
+    if (paymentRoles.some((r) => roles.includes(r)) && !permissions.includes('record_payment')) {
         permissions = [...permissions, 'record_payment'];
     }
 

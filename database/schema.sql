@@ -187,6 +187,7 @@ WHERE r.name = 'Admin' AND p.code IN (
     'register_property', 'edit_property',
     'register_business', 'edit_business',
     'generate_bill', 'delete_bill', 'print_bill', 'bulk_print', 'view_reports',
+    'record_payment',
     'approve_privileged_actions'
 );
 
@@ -436,7 +437,13 @@ CREATE TABLE payments (
     payment_date DATE NOT NULL DEFAULT CURRENT_DATE,
     notes TEXT,
     recorded_by UUID REFERENCES system_users(id) ON DELETE SET NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Cheque clearance (pending until Revenue Officer confirms)
+    clearance_status VARCHAR(20) NOT NULL DEFAULT 'CLEARED'
+        CHECK (clearance_status IN ('PENDING', 'CLEARED', 'REJECTED')),
+    cleared_by UUID REFERENCES system_users(id) ON DELETE SET NULL,
+    cleared_at TIMESTAMP,
+    clearance_note TEXT
 );
 
 CREATE INDEX idx_payments_receipt ON payments(receipt_number);
@@ -446,6 +453,7 @@ CREATE INDEX idx_payments_bill ON payments(bill_id);
 CREATE INDEX idx_payments_customer ON payments(customer_id);
 CREATE INDEX idx_payments_date ON payments(payment_date);
 CREATE INDEX idx_payments_recorded_by ON payments(recorded_by);
+CREATE INDEX idx_payments_clearance_status ON payments(clearance_status);
 
 -- Privileged action requests (print / delete need admin approval for some roles)
 CREATE TABLE privileged_action_requests (

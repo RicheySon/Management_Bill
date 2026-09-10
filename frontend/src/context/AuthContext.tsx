@@ -128,8 +128,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (user?.permissions?.includes(permission)) return true;
         // Supervisors always see/use Fee Configuration
         if (permission === 'configure_rates' && user?.roles?.includes('Supervisor')) return true;
-        // Collectors can record payments on bills in their assigned areas
-        if (permission === 'record_payment' && user?.roles?.includes('Revenue Collector')) return true;
+        // Paying roles can record payments (collector APIs still enforce assigned areas)
+        if (
+            permission === 'record_payment' &&
+            user?.roles?.some((r) =>
+                ['Super Admin', 'Admin', 'Cashier', 'Revenue Officer', 'Revenue Collector'].includes(r)
+            )
+        ) {
+            return true;
+        }
         return false;
     };
 

@@ -96,8 +96,8 @@ export default function BillingPage() {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Billing Management</h1>
-                    <p className="text-gray-600 mt-1">Manage invoices, payments and collection status</p>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Billing Management</h1>
+                    <p className="text-gray-600 mt-1 text-sm sm:text-base">Manage invoices, payments and collection status</p>
                 </div>
                 {canGenerate && (
                     <Link href="/billing/generate" className="btn-primary flex items-center space-x-2 self-start md:self-auto">
@@ -164,7 +164,69 @@ export default function BillingPage() {
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-municipal-red"></div>
                     </div>
                 ) : bills.length > 0 ? (
-                    <div className="overflow-x-auto">
+                    <>
+                    {/* Mobile card list */}
+                    <div className="md:hidden divide-y divide-gray-100">
+                        {bills.map((bill) => {
+                            const outstanding =
+                                parseFloat(bill.total_amount || 0) - parseFloat(bill.amount_paid || 0);
+                            const canCollect =
+                                canPayBill &&
+                                bill.payment_status !== 'PAID' &&
+                                outstanding > 0;
+                            return (
+                                <div key={bill.id} className="p-4 space-y-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <div className="text-sm font-bold text-municipal-red truncate">{bill.bill_number}</div>
+                                            <div className="text-xs text-gray-500">{bill.bill_type} ({bill.billing_year || bill.bill_period_year})</div>
+                                            <div className="text-sm font-semibold text-gray-900 mt-1 truncate">{bill.full_name}</div>
+                                            <div className="text-xs text-gray-500">{bill.property_number || bill.business_number}</div>
+                                        </div>
+                                        <StatusBadge status={bill.payment_status} />
+                                    </div>
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-gray-500">Total <span className="font-bold text-gray-900">GHS {parseFloat(bill.total_amount).toFixed(2)}</span></span>
+                                        <span className={`font-bold ${outstanding > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                            Bal GHS {outstanding.toFixed(2)}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        {canViewBill && (
+                                            <Link
+                                                href={`/billing/${bill.id}`}
+                                                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg"
+                                            >
+                                                <Eye className="w-4 h-4" />
+                                                View
+                                            </Link>
+                                        )}
+                                        {canCollect && (
+                                            <Link
+                                                href={`/billing/${bill.id}#payment`}
+                                                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg"
+                                            >
+                                                <CreditCard className="w-4 h-4" />
+                                                Pay
+                                            </Link>
+                                        )}
+                                        {canPrintDirect && (
+                                            <button
+                                                onClick={() => downloadBillPDF(bill.id)}
+                                                className="inline-flex items-center p-2 text-gray-600 hover:text-municipal-red hover:bg-red-50 rounded-lg"
+                                                title="Download PDF"
+                                            >
+                                                <FileDown className="w-5 h-5" />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Desktop table */}
+                    <div className="hidden md:block overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
@@ -283,6 +345,7 @@ export default function BillingPage() {
                             </tbody>
                         </table>
                     </div>
+                    </>
                 ) : (
                     <div className="py-12 text-center">
                         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 text-gray-400 mb-4">

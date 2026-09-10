@@ -5,6 +5,8 @@ import pool from '../config/database';
 import { JWT_SECRET, loadUserElectoralAreas } from '../middlewares/auth.middleware';
 import { getAuditContext, logAction } from '../services/audit.service';
 import { loadUserRolesAndPermissions } from '../services/role-permissions.service';
+import { ensurePaymentClearanceSchema } from '../services/payment-clearance-schema.service';
+import { ensureAcpElectoralArea } from '../services/electoral-areas.service';
 
 const router = express.Router();
 
@@ -64,6 +66,8 @@ router.post('/login', async (req, res) => {
         const electoralAreaIds = await loadUserElectoralAreas(user.id);
         // Self-heals Supervisor → configure_rates if migration was never applied on this DB
         const { roles, permissions } = await loadUserRolesAndPermissions(user.id);
+        // Self-heal payment clearance columns + ACP so bill detail/pay work in production
+        await Promise.all([ensurePaymentClearanceSchema(), ensureAcpElectoralArea()]);
 
         const token = jwt.sign(
             {
@@ -131,6 +135,7 @@ router.get('/validate', async (req, res) => {
         const dbUser = result.rows[0];
         const electoralAreaIds = await loadUserElectoralAreas(dbUser.id);
         const { roles, permissions } = await loadUserRolesAndPermissions(dbUser.id);
+        await Promise.all([ensurePaymentClearanceSchema(), ensureAcpElectoralArea()]);
 
         const freshToken = jwt.sign(
             {

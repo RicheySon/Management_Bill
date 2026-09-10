@@ -246,14 +246,14 @@ export default function BillDetailPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
                     <div className="card overflow-hidden">
-                        <div className={`px-6 py-4 flex justify-between items-center ${bill.payment_status === 'PAID' ? 'bg-green-600' : 'bg-municipal-red'} text-white`}>
-                            <div>
-                                <h2 className="text-2xl font-bold">{bill.bill_number}</h2>
-                                <p className="text-sm opacity-90">{bill.bill_type} Invoice - {bill.bill_period_year}</p>
+                        <div className={`px-4 sm:px-6 py-4 flex justify-between items-center gap-3 ${bill.payment_status === 'PAID' ? 'bg-green-600' : 'bg-municipal-red'} text-white`}>
+                            <div className="min-w-0">
+                                <h2 className="text-xl sm:text-2xl font-bold truncate">{bill.bill_number}</h2>
+                                <p className="text-sm opacity-90 truncate">{bill.bill_type} Invoice - {bill.bill_period_year}</p>
                             </div>
-                            <div className="text-right">
+                            <div className="text-right shrink-0">
                                 <span className="text-xs uppercase tracking-wider opacity-75">Status</span>
-                                <p className="text-lg font-bold">{bill.payment_status}</p>
+                                <p className="text-base sm:text-lg font-bold">{bill.payment_status}</p>
                             </div>
                         </div>
 
@@ -505,7 +505,7 @@ export default function BillDetailPage() {
 
                 <div className="space-y-6">
                     {canPay && (
-                        <div id="payment" className="card sticky top-6 scroll-mt-24">
+                        <div id="payment" className="card lg:sticky lg:top-6 scroll-mt-24">
                             <h3 className="text-lg font-bold mb-4 flex items-center space-x-2">
                                 <CreditCard className="w-5 h-5 text-municipal-red" />
                                 <span>Record Payment</span>
