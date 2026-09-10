@@ -245,6 +245,17 @@ export default function NewBusinessPage() {
                 return;
             }
 
+            if (!String(data.business_type_sub || '').trim()) {
+                setError('Business Sub Type is required (e.g. Hardware, Provisions). It prints on the BOP bill.');
+                return;
+            }
+
+            const assessedNum = toOptionalNumber(assessedAmount);
+            if (!assessedNum || assessedNum <= 0) {
+                setError('Bill Amount must be greater than 0 so the BOP bill is not issued for only the GHS 8 basic rate.');
+                return;
+            }
+
             const emptyToStr = (v: any) => (v == null ? '' : String(v));
 
             const result = await createBusiness({
@@ -270,9 +281,16 @@ export default function NewBusinessPage() {
                 electoral_area_id: toNullableId(data.electoral_area_id),
                 local_area_id: toNullableId(data.local_area_id),
                 fee_item_id: selectedFeeItemId ? parseInt(selectedFeeItemId) : null,
-                assessed_amount: toOptionalNumber(assessedAmount),
+                assessed_amount: assessedNum,
                 arrears: toOptionalNumber(arrearsAmount) ?? 0,
             });
+
+            if (!result.bill) {
+                setError(
+                    result.message ||
+                        'Business was saved but no BOP bill was issued. Open the business and use Issue BOP Bill, or edit the Bill Amount and save again.'
+                );
+            }
 
             setBusinessNumber(result.data.business_number);
             setSuccess(true);
@@ -558,13 +576,18 @@ export default function NewBusinessPage() {
                         </div>
 
                         <div>
-                            <label className="label">Business Type (Sub)</label>
+                            <label className="label">
+                                Business Sub Type <span className="text-municipal-red">*</span>
+                            </label>
                             <input
                                 type="text"
-                                {...register('business_type_sub')}
+                                {...register('business_type_sub', { required: true })}
                                 className="input-field"
-                                placeholder="Business Type (Sub)"
+                                placeholder="e.g. Hardware, Provisions, Salon"
                             />
+                            <p className="text-xs text-gray-500 mt-1">
+                                This is what prints on the BOP bill as Business Type. Pick a fee item below to fill it, or type a custom name.
+                            </p>
                         </div>
 
                         <div>
@@ -585,9 +608,8 @@ export default function NewBusinessPage() {
                                                     `${item.description} × ${v}: GHS ${Number(fee).toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
                                                 );
                                             } else {
-                                                setAssessedAmount('');
                                                 setSelectedFeeAmount(
-                                                    `${item.description} × ${v || 'category'} — no fee set for this category in Fee Configuration`
+                                                    `${item.description} × ${v || 'category'} — no fee set for this category in Fee Configuration (enter Bill Amount manually)`
                                                 );
                                             }
                                         }
@@ -610,8 +632,8 @@ export default function NewBusinessPage() {
                         {feeItems.length > 0 && (
                             <div className="md:col-span-2">
                                 <label className="label">
-                                    Fee Item <span className="text-gray-400 font-normal">(business type name)</span>{' '}
-                                    <span className="text-municipal-red">*</span>
+                                    Fee Item / Business Sub{' '}
+                                    <span className="text-gray-400 font-normal">(from fee fixing)</span>
                                 </label>
                                 <DropdownSelect
                                     value={selectedFeeItemId}
@@ -621,6 +643,10 @@ export default function NewBusinessPage() {
                                             const item = feeItems.find((fi: any) => fi.id === parseInt(v));
                                             const classVal = watch('business_category_class');
                                             if (item) {
+                                                // Bill prints this sub name (Hardware, Provisions, …) — not Construction
+                                                setValue('business_type_sub', item.description, {
+                                                    shouldValidate: true,
+                                                });
                                                 const fee = feeAmountForBusinessCategory(item, classVal);
                                                 if (fee > 0) {
                                                     setAssessedAmount(String(fee));
@@ -630,10 +656,9 @@ export default function NewBusinessPage() {
                                                             : `${item.description} — select Category A–D for the bill amount`
                                                     );
                                                 } else {
-                                                    setAssessedAmount('');
                                                     setSelectedFeeAmount(
                                                         classVal
-                                                            ? `${item.description} × ${classVal} — no fee set for this category`
+                                                            ? `${item.description} × ${classVal} — no fee set; enter Bill Amount manually`
                                                             : `${item.description} — select Category A–D for the bill amount`
                                                     );
                                                 }
@@ -642,7 +667,7 @@ export default function NewBusinessPage() {
                                             setSelectedFeeAmount('');
                                         }
                                     }}
-                                    placeholder="Select business type"
+                                    placeholder="Select fee item (e.g. Hardware, Provisions)"
                                     options={feeItems.filter((fi: any) => !fi.is_group_header).map((item: any) => ({
                                         value: String(item.id),
                                         label: item.description,
@@ -660,7 +685,7 @@ export default function NewBusinessPage() {
                             </label>
                             <input
                                 type="number"
-                                min="0"
+                                min="0.01"
                                 step="0.01"
                                 className="input-field"
                                 placeholder="Bill Amount (GHS)"
@@ -669,7 +694,7 @@ export default function NewBusinessPage() {
                                 required
                             />
                             <p className="text-xs text-gray-500 mt-1">
-                                Auto-fills from fee fixing when you pick Category A–D + Fee Item (editable).
+                                Auto-fills from fee fixing when you pick Category A–D + Fee Item. You can type a custom amount for a custom sub type. Total due = this amount + GHS 8 basic rate (+ arrears).
                             </p>
                         </div>
 

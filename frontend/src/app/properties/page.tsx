@@ -12,21 +12,35 @@ export default function PropertiesPage() {
     const sector = sectorFromPath(pathname);
     const [properties, setProperties] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
         const loadProperties = async () => {
+            setLoading(true);
+            setError(null);
             try {
                 const result = await fetchProperties({ property_kind: sector.kind });
-                setProperties(result.data || []);
-            } catch (error) {
-                console.error('Failed to fetch properties:', error);
+                if (result?.success === false) {
+                    setError(result.error || `Failed to load ${sector.listTitle.toLowerCase()}`);
+                    setProperties([]);
+                } else {
+                    setProperties(result.data || []);
+                }
+            } catch (err: any) {
+                console.error('Failed to fetch properties:', err);
+                setError(
+                    err?.response?.data?.error ||
+                        err?.message ||
+                        `Failed to load ${sector.listTitle.toLowerCase()}`
+                );
+                setProperties([]);
             } finally {
                 setLoading(false);
             }
         };
         loadProperties();
-    }, [sector.kind]);
+    }, [sector.kind, sector.listTitle]);
 
     const filteredProperties = properties.filter(prop =>
         prop.property_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -58,6 +72,12 @@ export default function PropertiesPage() {
                     />
                 </div>
             </div>
+
+            {error && (
+                <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {error}
+                </div>
+            )}
 
             {loading ? (
                 <div className="text-center py-20">

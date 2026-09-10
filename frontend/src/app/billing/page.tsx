@@ -187,6 +187,7 @@ export default function BillingPage() {
                                     </div>
                                     <div className="flex items-center justify-between text-sm">
                                         <span className="text-gray-500">Total <span className="font-bold text-gray-900">GHS {parseFloat(bill.total_amount).toFixed(2)}</span></span>
+                                        <span className="text-gray-500">Arrears <span className="font-bold text-amber-700">GHS {parseFloat(bill.arrears || 0).toFixed(2)}</span></span>
                                         <span className={`font-bold ${outstanding > 0 ? 'text-red-600' : 'text-green-600'}`}>
                                             Bal GHS {outstanding.toFixed(2)}
                                         </span>
@@ -233,6 +234,7 @@ export default function BillingPage() {
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bill Details</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Arrears</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Balance</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -259,6 +261,11 @@ export default function BillingPage() {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm font-bold text-gray-900">GHS {parseFloat(bill.total_amount).toFixed(2)}</div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm font-semibold text-amber-700">
+                                                GHS {parseFloat(bill.arrears || 0).toFixed(2)}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className={`text-sm font-bold ${outstanding > 0 ? 'text-red-600' : 'text-green-600'}`}>

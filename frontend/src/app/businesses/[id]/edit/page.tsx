@@ -409,8 +409,17 @@ export default function EditBusinessPage() {
                         </div>
 
                         <div>
-                            <label className="label">Business Type (Sub)</label>
-                            <input type="text" {...register('business_type_sub')} className="input-field" placeholder="Business Type (Sub)" />
+                            <label className="label">Business Sub Type <span className="text-municipal-red">*</span></label>
+                            <input
+                                type="text"
+                                {...register('business_type_sub', { required: 'Business sub type is required' })}
+                                className="input-field"
+                                placeholder="e.g. Hardware, Provisions, Salon"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Prints on the BOP bill as Business Type (not the main sector).</p>
+                            {errors.business_type_sub && (
+                                <p className="text-red-500 text-sm mt-1">{errors.business_type_sub.message}</p>
+                            )}
                         </div>
 
                         <div>
@@ -431,9 +440,8 @@ export default function EditBusinessPage() {
                                                     `${item.description} × ${v}: GHS ${Number(fee).toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
                                                 );
                                             } else {
-                                                setAssessedAmount('');
                                                 setSelectedFeeAmount(
-                                                    `${item.description} × ${v || 'category'} — no fee set for this category`
+                                                    `${item.description} × ${v || 'category'} — no fee set; enter Bill Amount manually`
                                                 );
                                             }
                                         }
@@ -453,7 +461,7 @@ export default function EditBusinessPage() {
                         {feeItems.length > 0 && (
                             <div className="md:col-span-2">
                                 <label className="label">
-                                    Fee Item <span className="text-gray-400 font-normal">(business type name)</span>
+                                    Fee Item / Business Sub <span className="text-gray-400 font-normal">(from fee fixing)</span>
                                 </label>
                                 <select className="input-field" value={selectedFeeItemId}
                                     onChange={(e) => {
@@ -464,6 +472,7 @@ export default function EditBusinessPage() {
                                             const item = feeItems.find((fi: any) => fi.id === parseInt(v));
                                             const classVal = watch('business_category_class');
                                             if (item) {
+                                                setValue('business_type_sub', item.description, { shouldValidate: true });
                                                 const fee = feeAmountForBusinessCategory(item, classVal);
                                                 if (fee > 0) {
                                                     setAssessedAmount(String(fee));
@@ -473,10 +482,9 @@ export default function EditBusinessPage() {
                                                             : `${item.description} — select Category A–D for the bill amount`
                                                     );
                                                 } else {
-                                                    setAssessedAmount('');
                                                     setSelectedFeeAmount(
                                                         classVal
-                                                            ? `${item.description} × ${classVal} — no fee set for this category`
+                                                            ? `${item.description} × ${classVal} — no fee set; enter Bill Amount manually`
                                                             : `${item.description} — select Category A–D for the bill amount`
                                                     );
                                                 }
@@ -485,7 +493,7 @@ export default function EditBusinessPage() {
                                             setSelectedFeeAmount('');
                                         }
                                     }}>
-                                    <option value="">Select business type</option>
+                                    <option value="">Select fee item (e.g. Hardware, Provisions)</option>
                                     {feeItems.filter((fi: any) => !fi.is_group_header).map((item: any) => (
                                         <option key={item.id} value={item.id}>
                                             {item.description}
@@ -499,18 +507,19 @@ export default function EditBusinessPage() {
                         )}
 
                         <div>
-                            <label className="label">Bill Amount (GHS)</label>
+                            <label className="label">Bill Amount (GHS) <span className="text-municipal-red">*</span></label>
                             <input
                                 type="number"
-                                min="0"
+                                min="0.01"
                                 step="0.01"
                                 className="input-field"
                                 value={assessedAmount}
                                 onChange={(e) => setAssessedAmount(e.target.value)}
                                 placeholder="Bill Amount (GHS)"
+                                required
                             />
                             <p className="text-xs text-gray-500 mt-1">
-                                Auto-fills from fee fixing when you pick Category A–D + Fee Item (editable).
+                                Auto-fills from fee fixing when you pick Category A–D + Fee Item. Saving also updates the latest unpaid bill (amount + GHS 8 basic rate).
                             </p>
                         </div>
 

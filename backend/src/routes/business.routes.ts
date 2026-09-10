@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import pool from '../config/database';
 import { authenticateToken, authorize, AuthRequest, getCollectorAreaFilter, resolveElectoralAreaId } from '../middlewares/auth.middleware';
-import { generateBill } from '../services/billing.service';
+import { generateBill, syncLatestBillAmounts } from '../services/billing.service';
 import Joi from 'joi';
 
 const outstandingStatuses = new Set(['UNPAID', 'PARTIAL', 'OVERDUE']);
@@ -76,35 +76,19 @@ async function applyArrearsToLatestBill(
     entityId: string,
     arrears: number
 ) {
-    const latest = await pool.query(
-        `SELECT id, current_rate, rebate, amount_paid
-         FROM bills
-         WHERE ${entityColumn} = $1
-         ORDER BY bill_period_year DESC, created_at DESC
-         LIMIT 1`,
-        [entityId]
-    );
-    if (latest.rows.length === 0) return null;
-    const bill = latest.rows[0];
-    const current_rate = Number(bill.current_rate || 0);
-    const rebate = Number(bill.rebate || 0);
-    const amount_paid = Number(bill.amount_paid || 0);
-    const total_amount = current_rate + arrears - rebate;
-    const amount_due = Math.max(total_amount - amount_paid, 0);
-    const payment_status =
-        amount_due <= 0 ? 'PAID' : amount_paid > 0 ? 'PARTIAL' : 'UNPAID';
-    const updated = await pool.query(
-        `UPDATE bills SET
-            arrears = $1,
-            total_amount = $2,
-            amount_due = $3,
-            payment_status = $4,
-            updated_at = NOW()
-         WHERE id = $5
-         RETURNING id, bill_number, arrears, total_amount, amount_due`,
-        [arrears, total_amount, amount_due, payment_status, bill.id]
-    );
-    return updated.rows[0] || null;
+    return syncLatestBillAmounts(entityColumn, entityId, { arrears });
+}
+
+async function applyAssessedAmountToLatestBill(
+    entityColumn: 'property_id' | 'business_id',
+    entityId: string,
+    current_rate: number,
+    description?: string
+) {
+    return syncLatestBillAmounts(entityColumn, entityId, {
+        current_rate,
+        description,
+    });
 }
 
 /**
@@ -221,6 +205,10 @@ router.post('/', authorize(['register_business']), async (req: AuthRequest, res:
             } catch (billError: any) {
                 console.error('Auto bill generation failed after business registration:', billError);
             }
+        } else if (!Number.isFinite(assessed as number) || (assessed as number) <= 0) {
+            console.warn(
+                `Business ${businessId} registered without a positive assessed_amount; no BOP bill auto-issued`
+            );
         }
 
         const businessWithDetails = await pool.query(
@@ -536,9 +524,35 @@ router.put('/:id', authorize(['edit_business']), async (req: AuthRequest, res: R
         }
 
         let updatedBill = null;
+        const billSyncNotes: string[] = [];
+        const subLabel =
+            String(resultRows[0].business_type_sub || '').trim() ||
+            undefined;
+
+        if (
+            value.assessed_amount !== undefined &&
+            value.assessed_amount !== null &&
+            Number.isFinite(Number(value.assessed_amount))
+        ) {
+            updatedBill = await applyAssessedAmountToLatestBill(
+                'business_id',
+                id,
+                Number(value.assessed_amount),
+                subLabel
+            );
+            if (updatedBill) {
+                billSyncNotes.push(
+                    `current rate set to GHS ${Number(updatedBill.current_rate).toFixed(2)}`
+                );
+            }
+        }
+
         if (arrearsInput !== undefined && arrearsInput !== '' && arrearsInput !== null) {
             const arrearsNum = Math.max(0, Number(arrearsInput) || 0);
             updatedBill = await applyArrearsToLatestBill('business_id', id, arrearsNum);
+            if (updatedBill) {
+                billSyncNotes.push(`arrears set to GHS ${Number(updatedBill.arrears).toFixed(2)}`);
+            }
         }
 
         res.json({
@@ -546,7 +560,7 @@ router.put('/:id', authorize(['edit_business']), async (req: AuthRequest, res: R
             data: resultRows[0],
             bill: updatedBill,
             message: updatedBill
-                ? `Business updated. Bill ${updatedBill.bill_number} arrears set to GHS ${Number(updatedBill.arrears).toFixed(2)}.`
+                ? `Business updated. Bill ${updatedBill.bill_number}: ${billSyncNotes.join('; ')} (total GHS ${Number(updatedBill.total_amount).toFixed(2)} incl. basic rate).`
                 : 'Business updated successfully',
         });
     } catch (error: any) {
