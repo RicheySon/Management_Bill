@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import pool from '../config/database';
 import { authenticateToken, authorize, AuthRequest, getCollectorAreaFilter, resolveElectoralAreaId } from '../middlewares/auth.middleware';
 import { generateBill, syncLatestBillAmounts } from '../services/billing.service';
+import { ensureCustomerCodesReady } from '../services/customer-code-schema.service';
 import Joi from 'joi';
 
 const outstandingStatuses = new Set(['UNPAID', 'PARTIAL', 'OVERDUE']);
@@ -97,6 +98,7 @@ async function applyAssessedAmountToLatestBill(
  */
 router.post('/', authorize(['register_business']), async (req: AuthRequest, res: Response) => {
     try {
+        await ensureCustomerCodesReady();
         const { error, value } = businessSchema.validate(normalizeBusinessPayload(req.body));
 
         if (error) {
