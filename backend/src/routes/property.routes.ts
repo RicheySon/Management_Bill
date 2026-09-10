@@ -3,6 +3,7 @@ import pool from '../config/database';
 import { authenticateToken, authorize, AuthRequest, getCollectorAreaFilter, resolveElectoralAreaId } from '../middlewares/auth.middleware';
 import { generateBill, syncLatestBillAmounts } from '../services/billing.service';
 import { ensurePropertyKindSchema } from '../services/property-kind-schema.service';
+import { ensureCustomerCodesReady } from '../services/customer-code-schema.service';
 import Joi from 'joi';
 
 const outstandingStatuses = new Set(['UNPAID', 'PARTIAL', 'OVERDUE']);
@@ -85,6 +86,7 @@ async function applyAssessedAmountToLatestBill(
 router.post('/', authorize(['register_property']), async (req: AuthRequest, res: Response) => {
     try {
         await ensurePropertyKindSchema();
+        await ensureCustomerCodesReady();
         const { error, value } = propertySchema.validate(req.body);
 
         if (error) {
