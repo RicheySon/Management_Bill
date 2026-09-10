@@ -335,7 +335,7 @@ export default function ReportsPage() {
                 <SummaryCard
                     title="Defaulters"
                     value={String(defaulters.length)}
-                    trend="Customers with unpaid balances"
+                    trend="Unpaid / partial / overdue balances > 0"
                     icon={<Users className="text-municipal-red" />}
                     color="border-l-4 border-l-municipal-red"
                 />

@@ -268,20 +268,35 @@ router.get('/defaulters', authorize(['view_reports']), async (req: Request, res:
         c.id,
         c.full_name,
         c.phone_number,
-        ea.name as electoral_area,
+        COALESCE(
+          MAX(ea.name),
+          MAX(ea_p.name),
+          MAX(ea_b.name)
+        ) as electoral_area,
         COUNT(b.id) as unpaid_bill_count,
         SUM(b.amount_due) as total_outstanding
       FROM customers c
       INNER JOIN bills b ON c.id = b.customer_id
       LEFT JOIN electoral_areas ea ON c.electoral_area_id = ea.id
+      LEFT JOIN properties p ON b.property_id = p.id
+      LEFT JOIN local_areas la_p ON p.local_area_id = la_p.id
+      LEFT JOIN electoral_areas ea_p ON COALESCE(p.electoral_area_id, la_p.electoral_area_id) = ea_p.id
+      LEFT JOIN businesses bus ON b.business_id = bus.id
+      LEFT JOIN local_areas la_b ON bus.local_area_id = la_b.id
+      LEFT JOIN electoral_areas ea_b ON COALESCE(bus.electoral_area_id, la_b.electoral_area_id) = ea_b.id
       WHERE b.payment_status IN ('UNPAID', 'PARTIAL', 'OVERDUE')
+        AND COALESCE(b.amount_due, 0) > 0
     `;
 
         const queryParams: any[] = [];
         let paramIndex = 1;
 
         if (electoral_area_id) {
-            query += ` AND c.electoral_area_id = $${paramIndex}`;
+            query += ` AND (
+                c.electoral_area_id = $${paramIndex}
+                OR COALESCE(p.electoral_area_id, la_p.electoral_area_id) = $${paramIndex}
+                OR COALESCE(bus.electoral_area_id, la_b.electoral_area_id) = $${paramIndex}
+            )`;
             queryParams.push(electoral_area_id);
             paramIndex++;
         }
@@ -291,7 +306,7 @@ router.get('/defaulters', authorize(['view_reports']), async (req: Request, res:
             queryParams.push(bill_type);
         }
 
-        query += ` GROUP BY c.id, c.full_name, c.phone_number, ea.name ORDER BY total_outstanding DESC`;
+        query += ` GROUP BY c.id, c.full_name, c.phone_number ORDER BY total_outstanding DESC`;
 
         const result = await pool.query(query, queryParams);
 
