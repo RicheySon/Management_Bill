@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import pool from '../config/database';
 import { authenticateToken, authorize, AuthRequest, getCollectorAreaFilter, resolveElectoralAreaId } from '../middlewares/auth.middleware';
-import { generateBill, billTotal, BASIC_RATE_GHC, syncBillDetailsAmounts } from '../services/billing.service';
+import { generateBill, syncLatestBillAmounts } from '../services/billing.service';
 import { ensurePropertyKindSchema } from '../services/property-kind-schema.service';
 import Joi from 'joi';
 
@@ -67,42 +67,15 @@ async function applyArrearsToLatestBill(
     entityId: string,
     arrears: number
 ) {
-    const latest = await pool.query(
-        `SELECT id, current_rate, rebate, amount_paid, bill_details
-         FROM bills
-         WHERE ${entityColumn} = $1
-         ORDER BY bill_period_year DESC, created_at DESC
-         LIMIT 1`,
-        [entityId]
-    );
-    if (latest.rows.length === 0) return null;
-    const bill = latest.rows[0];
-    const current_rate = Number(bill.current_rate || 0);
-    const rebate = Number(bill.rebate || 0);
-    const amount_paid = Number(bill.amount_paid || 0);
-    const total_amount = billTotal(current_rate, arrears, rebate, BASIC_RATE_GHC);
-    const amount_due = Math.max(total_amount - amount_paid, 0);
-    const payment_status =
-        amount_due <= 0 ? 'PAID' : amount_paid > 0 ? 'PARTIAL' : 'UNPAID';
-    const bill_details = syncBillDetailsAmounts(bill.bill_details, {
-        current_rate,
-        arrears,
-        rebate,
-        basic_rate: BASIC_RATE_GHC,
-    });
-    const updated = await pool.query(
-        `UPDATE bills SET
-            arrears = $1,
-            total_amount = $2,
-            amount_due = $3,
-            payment_status = $4,
-            bill_details = $5,
-            updated_at = NOW()
-         WHERE id = $6
-         RETURNING id, bill_number, arrears, total_amount, amount_due`,
-        [arrears, total_amount, amount_due, payment_status, JSON.stringify(bill_details), bill.id]
-    );
-    return updated.rows[0] || null;
+    return syncLatestBillAmounts(entityColumn, entityId, { arrears });
+}
+
+async function applyAssessedAmountToLatestBill(
+    entityColumn: 'property_id' | 'business_id',
+    entityId: string,
+    current_rate: number
+) {
+    return syncLatestBillAmounts(entityColumn, entityId, { current_rate });
 }
 
 /**
@@ -506,9 +479,31 @@ router.put('/:id', authorize(['edit_property']), async (req: AuthRequest, res: R
         }
 
         let updatedBill = null;
+        const billSyncNotes: string[] = [];
+
+        if (
+            value.assessed_amount !== undefined &&
+            value.assessed_amount !== null &&
+            Number.isFinite(Number(value.assessed_amount))
+        ) {
+            updatedBill = await applyAssessedAmountToLatestBill(
+                'property_id',
+                id,
+                Number(value.assessed_amount)
+            );
+            if (updatedBill) {
+                billSyncNotes.push(
+                    `current rate set to GHS ${Number(updatedBill.current_rate).toFixed(2)}`
+                );
+            }
+        }
+
         if (arrearsInput !== undefined && arrearsInput !== '' && arrearsInput !== null) {
             const arrearsNum = Math.max(0, Number(arrearsInput) || 0);
             updatedBill = await applyArrearsToLatestBill('property_id', id, arrearsNum);
+            if (updatedBill) {
+                billSyncNotes.push(`arrears set to GHS ${Number(updatedBill.arrears).toFixed(2)}`);
+            }
         }
 
         res.json({
@@ -516,7 +511,7 @@ router.put('/:id', authorize(['edit_property']), async (req: AuthRequest, res: R
             data: resultRows[0],
             bill: updatedBill,
             message: updatedBill
-                ? `Property updated. Bill ${updatedBill.bill_number} arrears set to GHS ${Number(updatedBill.arrears).toFixed(2)}.`
+                ? `Property updated. Bill ${updatedBill.bill_number}: ${billSyncNotes.join('; ')} (total GHS ${Number(updatedBill.total_amount).toFixed(2)} incl. basic rate).`
                 : 'Property updated successfully',
         });
     } catch (error: any) {

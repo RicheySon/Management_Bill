@@ -77,19 +77,21 @@ const fetchBillData = async (billId: string): Promise<BillData> => {
             .map((v: any) => (v != null ? String(v).trim() : ''))
             .find(Boolean) || '';
 
-    // Prefer fee-fixing item description, then category / typed activity
+    // Prefer the specific business sub / fee-fixing item (e.g. Hardware, Provisions),
+    // not the broad sector dropdown (e.g. Construction / FOOD/DRINKS).
     const businessType =
         [
+            row.business_type_sub,
             row.business_fee_item_name,
-            row.business_category,
-            [row.business_type_main, row.business_type_sub].filter(Boolean).join(' - '),
             row.business_activity,
+            [row.business_type_main, row.business_type_sub].filter(Boolean).join(' - '),
+            row.business_category,
         ]
             .map((v: any) => (v != null ? String(v).trim() : ''))
             .filter(Boolean)
             .filter((v: string, i: number, arr: string[]) => arr.indexOf(v) === i)
-            .slice(0, 2)
-            .join(' / ') || '';
+            .slice(0, 1)
+            .join('') || '';
 
     return {
         bill: row,
@@ -337,14 +339,19 @@ const drawBill = async (doc: typeof PDFDocument, billId: string): Promise<void> 
 
     // Bill Item Row
     const defaultDescription = isBOP
-        ? (business?.business_type || 'Business Operating Permit')
+        ? (business?.business_type || business?.business_activity || 'Business Operating Permit')
         : (property?.property_type || property?.zone_name || 'Property Rate');
     const item = billDetails.items[0] || {
         description: defaultDescription,
         current_rate: bill.current_rate || 0,
     };
+    // For BOP, prefer the specific sub/fee name over generic "Assessed BOP fee..."
     const billTypeLabel = isBOP
-        ? (item.description || defaultDescription)
+        ? (business?.business_type ||
+              (item.description && !/assessed bop fee/i.test(String(item.description))
+                  ? item.description
+                  : null) ||
+              defaultDescription)
         : (item.description || defaultDescription);
     const basicRate = Number(
         billDetails.basic_rate ?? item.basic_rate ?? 8

@@ -28,7 +28,7 @@ export const billTotal = (current_rate: number, arrears: number, rebate: number,
  */
 export const syncBillDetailsAmounts = (
     existingDetails: any,
-    amounts: { current_rate: number; arrears: number; rebate: number; basic_rate?: number }
+    amounts: { current_rate: number; arrears: number; rebate: number; basic_rate?: number; description?: string }
 ) => {
     const basic_rate = Number(
         amounts.basic_rate !== undefined ? amounts.basic_rate : BASIC_RATE_GHC
@@ -50,9 +50,77 @@ export const syncBillDetailsAmounts = (
     item.arrears = Number(amounts.arrears || 0).toFixed(2);
     item.rebate = Number(amounts.rebate || 0).toFixed(2);
     item.total = Number(amounts.current_rate || 0).toFixed(2);
+    if (amounts.description) {
+        item.description = amounts.description;
+    }
     details.items[0] = item;
 
     return details;
+};
+
+/**
+ * Push money-field changes onto the latest bill for a property/business.
+ * Keeps the annual basic rate in the total so outstanding cards stay correct.
+ */
+export const syncLatestBillAmounts = async (
+    entityColumn: 'property_id' | 'business_id',
+    entityId: string,
+    updates: { current_rate?: number; arrears?: number; rebate?: number; description?: string }
+) => {
+    const latest = await pool.query(
+        `SELECT id, current_rate, arrears, rebate, amount_paid, bill_details
+         FROM bills
+         WHERE ${entityColumn} = $1
+         ORDER BY bill_period_year DESC, created_at DESC
+         LIMIT 1`,
+        [entityId]
+    );
+    if (latest.rows.length === 0) return null;
+
+    const bill = latest.rows[0];
+    const current_rate =
+        updates.current_rate !== undefined ? Number(updates.current_rate) : Number(bill.current_rate || 0);
+    const arrears =
+        updates.arrears !== undefined ? Number(updates.arrears) : Number(bill.arrears || 0);
+    const rebate =
+        updates.rebate !== undefined ? Number(updates.rebate) : Number(bill.rebate || 0);
+    const amount_paid = Number(bill.amount_paid || 0);
+    const total_amount = billTotal(current_rate, arrears, rebate, BASIC_RATE_GHC);
+    const amount_due = Math.max(total_amount - amount_paid, 0);
+    const payment_status =
+        amount_due <= 0 ? 'PAID' : amount_paid > 0 ? 'PARTIAL' : 'UNPAID';
+    const bill_details = syncBillDetailsAmounts(bill.bill_details, {
+        current_rate,
+        arrears,
+        rebate,
+        basic_rate: BASIC_RATE_GHC,
+        description: updates.description,
+    });
+
+    const updated = await pool.query(
+        `UPDATE bills SET
+            current_rate = $1,
+            arrears = $2,
+            rebate = $3,
+            total_amount = $4,
+            amount_due = $5,
+            payment_status = $6,
+            bill_details = $7,
+            updated_at = NOW()
+         WHERE id = $8
+         RETURNING id, bill_number, current_rate, arrears, rebate, total_amount, amount_due, payment_status`,
+        [
+            current_rate,
+            arrears,
+            rebate,
+            total_amount,
+            amount_due,
+            payment_status,
+            JSON.stringify(bill_details),
+            bill.id,
+        ]
+    );
+    return updated.rows[0] || null;
 };
 
 /** Normalize GCR: digits-only input becomes YY/####### for mobile keyboards without "/". */
@@ -336,9 +404,11 @@ export const calculateBusinessBill = async (
 ): Promise<BillCalculation> => {
     // Get business details
     const businessResult = await pool.query(
-        `SELECT b.*, bc.base_fee, bc.name as category_name
+        `SELECT b.*, bc.base_fee, bc.name as category_name,
+                bfi.description as fee_item_description
      FROM businesses b
      LEFT JOIN business_categories bc ON b.category_id = bc.id
+     LEFT JOIN business_fee_items bfi ON b.fee_item_id = bfi.id
      WHERE b.id = $1`,
         [businessId]
     );
@@ -349,12 +419,15 @@ export const calculateBusinessBill = async (
 
     const business = businessResult.rows[0];
     let current_rate: number;
+    const subOrFee =
+        String(business.business_type_sub || '').trim() ||
+        String(business.fee_item_description || '').trim();
     let feeDescription = '';
 
     const assessedAmount = parseFloat(business.assessed_amount);
     if (!isNaN(assessedAmount) && assessedAmount > 0) {
         current_rate = assessedAmount;
-        feeDescription = 'Assessed BOP fee (from registration)';
+        feeDescription = subOrFee || 'Assessed BOP fee (from registration)';
     } else if (business.fee_item_id) {
         // Look up fee item by id first (do not require matching schedule year)
         const feeItemResult = await pool.query(
@@ -368,19 +441,21 @@ export const calculateBusinessBill = async (
                 feeItem,
                 business.business_category_class || 'Category A'
             );
-            feeDescription = `${feeItem.description} - ${business.business_category_class || 'Category A'}`;
+            feeDescription =
+                subOrFee ||
+                `${feeItem.description} - ${business.business_category_class || 'Category A'}`;
             if (!current_rate) {
                 current_rate = parseFloat(business.base_fee) || 0;
-                feeDescription = `${feeItem.description} - fee schedule amount`;
+                feeDescription = subOrFee || `${feeItem.description} - fee schedule amount`;
             }
         } else {
             current_rate = parseFloat(business.base_fee) || 0;
-            feeDescription = `Legacy: ${business.category_name}`;
+            feeDescription = subOrFee || `Legacy: ${business.category_name}`;
         }
     } else {
         // No fee_item_id - use legacy base_fee
         current_rate = parseFloat(business.base_fee) || 0;
-        feeDescription = `Legacy: ${business.category_name}`;
+        feeDescription = subOrFee || `Legacy: ${business.category_name}`;
     }
 
     // Check for arrears (exclude bills already rolled into a newer bill)
@@ -511,6 +586,12 @@ export const generateBill = async (
                 );
             }
         }
+    }
+
+    if (billType === 'BOP' && Number(calculation.current_rate || 0) <= 0) {
+        throw new Error(
+            'Cannot issue a BOP bill with no permit fee. Set Bill Amount on the business (fee item × category, or a custom amount), then try again. The GHS 8 basic rate alone is not enough.'
+        );
     }
 
     // Check if bill already exists for this period
@@ -879,6 +960,7 @@ export default {
     BASIC_RATE_GHC,
     billTotal,
     syncBillDetailsAmounts,
+    syncLatestBillAmounts,
     normalizeGcrNumber,
     isValidGcrNumber,
     normalizePaymentMethod,

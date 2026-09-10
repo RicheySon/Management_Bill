@@ -150,6 +150,18 @@ export default function BusinessDetailPage() {
                                 <span className="font-semibold text-gray-900 text-right">{business.business_category_class || business.category_name || '—'}</span>
                             </div>
                             <div className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
+                                <span className="text-gray-500">Business Sub Type</span>
+                                <span className="font-semibold text-gray-900 text-right">
+                                    {business.business_type_sub || '—'}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
+                                <span className="text-gray-500">Sector (Main)</span>
+                                <span className="font-semibold text-gray-900 text-right">
+                                    {business.business_type_main || '—'}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
                                 <span className="text-gray-500">Electoral Area</span>
                                 <span className="font-semibold text-gray-900 text-right">{business.electoral_area_name || '—'}</span>
                             </div>
@@ -201,6 +213,37 @@ export default function BusinessDetailPage() {
                         <div className="card border-l-4 border-l-municipal-red">
                             <p className="text-xs text-gray-400 font-bold uppercase mb-1">Total Outstanding</p>
                             <h4 className="text-3xl font-black text-gray-900">GHS {totalOutstanding.toFixed(2)}</h4>
+                            {(() => {
+                                const latestOpen = bills.find((b: any) =>
+                                    ['UNPAID', 'PARTIAL', 'OVERDUE'].includes(b.payment_status)
+                                );
+                                if (!latestOpen) return null;
+                                return (
+                                    <div className="mt-3 space-y-1 text-xs text-gray-600">
+                                        <div className="flex justify-between">
+                                            <span>Current rate</span>
+                                            <span>GHS {parseFloat(latestOpen.current_rate || 0).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Basic rate</span>
+                                            <span>
+                                                GHS{' '}
+                                                {parseFloat(
+                                                    latestOpen.bill_details?.basic_rate ?? 8
+                                                ).toFixed(2)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Arrears</span>
+                                            <span>GHS {parseFloat(latestOpen.arrears || 0).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between font-semibold text-gray-800 pt-1 border-t border-gray-100">
+                                            <span>Amount due</span>
+                                            <span>GHS {parseFloat(latestOpen.amount_due || 0).toFixed(2)}</span>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
                         <div className="card border-l-4 border-l-green-500">
                             <p className="text-xs text-gray-400 font-bold uppercase mb-1">Total Paid (All Time)</p>
@@ -233,6 +276,16 @@ export default function BusinessDetailPage() {
                                         <div className="flex items-center space-x-6">
                                             <div className="text-right">
                                                 <p className="font-bold text-gray-900">GHS {parseFloat(bill.total_amount).toFixed(2)}</p>
+                                                <p className="text-[11px] text-gray-500">
+                                                    Rate {parseFloat(bill.current_rate || 0).toFixed(2)}
+                                                    {' + '}Basic {parseFloat(bill.bill_details?.basic_rate ?? 8).toFixed(2)}
+                                                    {parseFloat(bill.arrears || 0) > 0
+                                                        ? ` + Arrears ${parseFloat(bill.arrears || 0).toFixed(2)}`
+                                                        : ''}
+                                                </p>
+                                                <p className="text-[11px] text-gray-500">
+                                                    Due GHS {parseFloat(bill.amount_due || 0).toFixed(2)}
+                                                </p>
                                                 <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${bill.payment_status === 'PAID' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
                                                     }`}>
                                                     {bill.payment_status}
