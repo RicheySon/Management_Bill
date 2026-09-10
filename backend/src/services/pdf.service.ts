@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit';
 import pool from '../config/database';
 import { format } from 'date-fns';
 import path from 'path';
+import bwipjs from 'bwip-js';
 
 /**
  * PDF Generation Service
@@ -130,6 +131,23 @@ const fetchBillData = async (billId: string): Promise<BillData> => {
         electoral_area: row.property_electoral_area || row.business_electoral_area,
         landmark: row.property_landmark || row.business_landmark,
     };
+};
+
+/**
+ * Unique authenticity barcode for a bill (Code128 encoding the bill number).
+ */
+const buildBillBarcodePng = async (billNumber: string, billId: string): Promise<Buffer> => {
+    const text = String(billNumber || '').trim() || String(billId);
+    return bwipjs.toBuffer({
+        bcid: 'code128',
+        text,
+        scale: 2,
+        height: 10,
+        includetext: true,
+        textxalign: 'center',
+        textsize: 8,
+        backgroundcolor: 'FFFFFF',
+    });
 };
 
 /**
@@ -376,24 +394,47 @@ const drawBill = async (doc: typeof PDFDocument, billId: string): Promise<void> 
 
     currentY += 70;
 
-    // Amount Paid & Due
+    // Authenticity barcode (left of Amount Paid / Due) — unique per bill number
+    const amountBlockTop = currentY;
+    try {
+        const barcodePng = await buildBillBarcodePng(bill.bill_number, bill.id);
+        const barcodeWidth = 150;
+        const barcodeHeight = 42;
+        doc.image(barcodePng, margin + 12, amountBlockTop + 2, {
+            width: barcodeWidth,
+            height: barcodeHeight,
+        });
+        doc.fontSize(5).font('Helvetica').fillColor('#444444')
+            .text('AUTHENTICITY CODE', margin + 12, amountBlockTop + barcodeHeight + 2, {
+                width: barcodeWidth,
+                align: 'center',
+            });
+        doc.fillColor('#000000');
+    } catch (e) {
+        console.warn('Could not render bill authenticity barcode:', e);
+        doc.fontSize(7).font('Helvetica').fillColor('#666666')
+            .text(`AUTH: ${bill.bill_number}`, margin + 12, amountBlockTop + 18, { width: 150 });
+        doc.fillColor('#000000');
+    }
+
+    // Amount Paid & Due (right side — barcode occupies the secured left space)
     const labelX = margin + 180;
     const valueX = margin + 260;
     const rowWidth = 100;
 
-    doc.rect(valueX, currentY, rowWidth, 20).stroke();
+    doc.rect(valueX, amountBlockTop, rowWidth, 20).stroke();
     doc.fontSize(10).font('Helvetica-Bold');
-    doc.text('Amount Paid : GHS', labelX, currentY + 5, { width: valueX - labelX - 5, align: 'right' });
-    doc.font('Helvetica').text(parseFloat(bill.amount_paid || 0).toFixed(2), valueX, currentY + 5, { width: rowWidth, align: 'center' });
+    doc.text('Amount Paid : GHS', labelX, amountBlockTop + 5, { width: valueX - labelX - 5, align: 'right' });
+    doc.font('Helvetica').text(parseFloat(bill.amount_paid || 0).toFixed(2), valueX, amountBlockTop + 5, { width: rowWidth, align: 'center' });
 
-    currentY += 25;
+    currentY = amountBlockTop + 25;
 
     doc.rect(valueX, currentY, rowWidth, 20).stroke();
     doc.font('Helvetica-Bold');
     doc.text('Amount Due : GHS', labelX, currentY + 5, { width: valueX - labelX - 5, align: 'right' });
     doc.text(parseFloat(bill.amount_due || 0).toFixed(2), valueX, currentY + 5, { width: rowWidth, align: 'center' });
 
-    currentY += 30;
+    currentY = amountBlockTop + 55;
 
     // Please Note Footer
     doc.fontSize(7).font('Helvetica-Bold').text('PLEASE NOTE', margin + 10, currentY);
