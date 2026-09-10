@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { fetchProperties } from '@/lib/api-client';
-import { displayAccountNumber } from '@/lib/account-number';
 import { sectorFromPath } from '@/lib/property-sector';
 import { Plus, Search, Building2, MapPin, User, Tag } from 'lucide-react';
 import Link from 'next/link';
@@ -91,7 +90,7 @@ export default function PropertiesPage() {
                         <thead className="bg-gray-50">
                             <tr>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Number</th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Account Number</th>
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Electoral Area</th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Owner</th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Location</th>
@@ -114,8 +113,8 @@ export default function PropertiesPage() {
                                             <span className="font-mono font-bold text-gray-900">{prop.property_number}</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">
-                                        {displayAccountNumber(prop.account_number, prop.property_number)}
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                        {prop.electoral_area_name || '—'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="flex items-center text-sm text-gray-700">

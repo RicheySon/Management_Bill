@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { fetchBusiness, deleteBusiness } from '@/lib/api-client';
-import { displayAccountNumber } from '@/lib/account-number';
 import {
     ShoppingBag, User, MapPin, Tag, Calendar,
     ArrowLeft, History, FileText, Plus, AlertCircle,
@@ -142,12 +141,6 @@ export default function BusinessDetailPage() {
                     <div className="card">
                         <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Business Details</h3>
                         <div className="space-y-4">
-                            <div className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
-                                <span className="text-gray-500">Account Number</span>
-                                <span className="font-semibold font-mono text-gray-900">
-                                    {displayAccountNumber(business.account_number, business.business_number)}
-                                </span>
-                            </div>
                             <div className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
                                 <span className="text-gray-500 flex items-center"><Tag className="w-3.5 h-3.5 mr-1.5" /> Category Class</span>
                                 <span className="font-semibold text-gray-900 text-right">{business.business_category_class || business.category_name || '—'}</span>

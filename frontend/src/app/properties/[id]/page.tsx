@@ -151,9 +151,9 @@ export default function PropertyDetailPage() {
                         <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Property Specs</h3>
                         <div className="space-y-4">
                             <div className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
-                                <span className="text-gray-500">Account Number</span>
-                                <span className="font-semibold font-mono text-gray-900">
-                                    {property.account_number?.trim() || property.property_number || '—'}
+                                <span className="text-gray-500">Electoral Area</span>
+                                <span className="font-semibold text-gray-900">
+                                    {property.electoral_area_name || '—'}
                                 </span>
                             </div>
                             <div className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">

@@ -139,18 +139,24 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res: Response) =>
 
         // Get properties
         const propertiesResult = await pool.query(
-            `SELECT p.*, pc.name as classification_name
+            `SELECT p.*, pc.name as classification_name,
+                    ea.name as electoral_area_name
        FROM properties p
        LEFT JOIN property_classifications pc ON p.classification_id = pc.id
+       LEFT JOIN local_areas la ON p.local_area_id = la.id
+       LEFT JOIN electoral_areas ea ON COALESCE(p.electoral_area_id, la.electoral_area_id) = ea.id
        WHERE p.customer_id = $1 AND p.status = 'ACTIVE'`,
             [id]
         );
 
         // Get businesses
         const businessesResult = await pool.query(
-            `SELECT b.*, bc.name as category_name
+            `SELECT b.*, bc.name as category_name,
+                    ea.name as electoral_area_name
        FROM businesses b
        LEFT JOIN business_categories bc ON b.category_id = bc.id
+       LEFT JOIN local_areas la ON b.local_area_id = la.id
+       LEFT JOIN electoral_areas ea ON COALESCE(b.electoral_area_id, la.electoral_area_id) = ea.id
        WHERE b.customer_id = $1 AND b.status = 'ACTIVE'`,
             [id]
         );
