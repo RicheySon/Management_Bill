@@ -2,7 +2,7 @@ import PDFDocument from 'pdfkit';
 import pool from '../config/database';
 import { format } from 'date-fns';
 import path from 'path';
-import bwipjs from 'bwip-js';
+import QRCode from 'qrcode';
 
 /**
  * PDF Generation Service
@@ -134,19 +134,28 @@ const fetchBillData = async (billId: string): Promise<BillData> => {
 };
 
 /**
- * Unique authenticity barcode for a bill (Code128 encoding the bill number).
+ * Authenticity QR code: scanning shows customer name, customer code, electoral area.
  */
-const buildBillBarcodePng = async (billNumber: string, billId: string): Promise<Buffer> => {
-    const text = String(billNumber || '').trim() || String(billId);
-    return bwipjs.toBuffer({
-        bcid: 'code128',
-        text,
-        scale: 2,
-        height: 10,
-        includetext: true,
-        textxalign: 'center',
-        textsize: 8,
-        backgroundcolor: 'FFFFFF',
+const buildBillQrPng = async (payload: {
+    customerName: string;
+    customerCode: string;
+    electoralArea: string;
+}): Promise<Buffer> => {
+    const text = [
+        `Customer Name: ${payload.customerName || 'N/A'}`,
+        `Customer Code: ${payload.customerCode || 'N/A'}`,
+        `Electoral Area: ${payload.electoralArea || 'N/A'}`,
+    ].join('\n');
+
+    return QRCode.toBuffer(text, {
+        type: 'png',
+        errorCorrectionLevel: 'M',
+        margin: 1,
+        width: 180,
+        color: {
+            dark: '#000000',
+            light: '#FFFFFF',
+        },
     });
 };
 
@@ -394,30 +403,38 @@ const drawBill = async (doc: typeof PDFDocument, billId: string): Promise<void> 
 
     currentY += 70;
 
-    // Authenticity barcode (left of Amount Paid / Due) — unique per bill number
+    // Authenticity QR (left of Amount Paid / Due) — encodes name, customer code, electoral area
     const amountBlockTop = currentY;
+    const billToName = isBOP
+        ? (business?.business_name || customer.full_name || '')
+        : (customer.full_name || '');
+    const customerCode = String(customer.customer_number || '').trim();
+    const areaName = String(electoral_area || '').trim();
     try {
-        const barcodePng = await buildBillBarcodePng(bill.bill_number, bill.id);
-        const barcodeWidth = 150;
-        const barcodeHeight = 42;
-        doc.image(barcodePng, margin + 12, amountBlockTop + 2, {
-            width: barcodeWidth,
-            height: barcodeHeight,
+        const qrPng = await buildBillQrPng({
+            customerName: billToName,
+            customerCode,
+            electoralArea: areaName,
+        });
+        const qrSize = 48;
+        doc.image(qrPng, margin + 12, amountBlockTop, {
+            width: qrSize,
+            height: qrSize,
         });
         doc.fontSize(5).font('Helvetica').fillColor('#444444')
-            .text('AUTHENTICITY CODE', margin + 12, amountBlockTop + barcodeHeight + 2, {
-                width: barcodeWidth,
-                align: 'center',
+            .text('AUTHENTICITY QR', margin + 12, amountBlockTop + qrSize + 1, {
+                width: Math.max(qrSize, 70),
+                align: 'left',
             });
         doc.fillColor('#000000');
     } catch (e) {
-        console.warn('Could not render bill authenticity barcode:', e);
+        console.warn('Could not render bill authenticity QR code:', e);
         doc.fontSize(7).font('Helvetica').fillColor('#666666')
-            .text(`AUTH: ${bill.bill_number}`, margin + 12, amountBlockTop + 18, { width: 150 });
+            .text(`AUTH: ${customerCode || bill.bill_number}`, margin + 12, amountBlockTop + 18, { width: 150 });
         doc.fillColor('#000000');
     }
 
-    // Amount Paid & Due (right side — barcode occupies the secured left space)
+    // Amount Paid & Due (right side — QR occupies the secured left space)
     const labelX = margin + 180;
     const valueX = margin + 260;
     const rowWidth = 100;
