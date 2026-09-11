@@ -160,6 +160,23 @@ const buildBillQrPng = async (payload: {
 };
 
 /**
+ * Outstanding-amount QR: scanning shows only the amount due.
+ */
+const buildOutstandingQrPng = async (amountDue: number): Promise<Buffer> => {
+    const text = `Outstanding Amount: GHS ${Number(amountDue || 0).toFixed(2)}`;
+    return QRCode.toBuffer(text, {
+        type: 'png',
+        errorCorrectionLevel: 'M',
+        margin: 1,
+        width: 180,
+        color: {
+            dark: '#000000',
+            light: '#FFFFFF',
+        },
+    });
+};
+
+/**
  * Draw a single bill onto the provided PDF document
  */
 const drawBill = async (doc: typeof PDFDocument, billId: string): Promise<void> => {
@@ -486,6 +503,35 @@ const drawBill = async (doc: typeof PDFDocument, billId: string): Promise<void> 
     points.forEach((point, i) => {
         doc.text(point, margin + 40, currentY + 10 + (i * 8));
     });
+
+    // Second QR — outstanding amount only, bottom-right corner (Mr. Rockson request)
+    const outstandingAmount = parseFloat(bill.amount_due || 0);
+    try {
+        const outstandingQrPng = await buildOutstandingQrPng(outstandingAmount);
+        const outstandingQrSize = 52;
+        const outstandingQrX = pageWidth - margin - outstandingQrSize - 12;
+        const outstandingQrY = pageHeight - margin - outstandingQrSize - 18;
+        doc.image(outstandingQrPng, outstandingQrX, outstandingQrY, {
+            width: outstandingQrSize,
+            height: outstandingQrSize,
+        });
+        doc.fontSize(5).font('Helvetica').fillColor('#444444')
+            .text('OUTSTANDING QR', outstandingQrX - 8, outstandingQrY + outstandingQrSize + 1, {
+                width: outstandingQrSize + 16,
+                align: 'center',
+            });
+        doc.fillColor('#000000');
+    } catch (e) {
+        console.warn('Could not render outstanding-amount QR code:', e);
+        doc.fontSize(6).font('Helvetica').fillColor('#666666')
+            .text(
+                `DUE: GHS ${outstandingAmount.toFixed(2)}`,
+                pageWidth - margin - 90,
+                pageHeight - margin - 20,
+                { width: 80, align: 'right' }
+            );
+        doc.fillColor('#000000');
+    }
 };
 
 /**
