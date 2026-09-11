@@ -405,7 +405,7 @@ const drawBill = async (doc: typeof PDFDocument, billId: string): Promise<void> 
 
     currentY += 70;
 
-    // Single bill QR (left of Amount Paid / Due) — name, customer code, electoral area, amount due
+    // Amount Paid & Due (right side)
     const amountBlockTop = currentY;
     const billToName = isBOP
         ? (business?.business_name || customer.full_name || '')
@@ -413,32 +413,7 @@ const drawBill = async (doc: typeof PDFDocument, billId: string): Promise<void> 
     const customerCode = String(customer.customer_number || '').trim();
     const areaName = String(electoral_area || '').trim();
     const amountDue = parseFloat(bill.amount_due || 0);
-    try {
-        const qrPng = await buildBillQrPng({
-            customerName: billToName,
-            customerCode,
-            electoralArea: areaName,
-            amountDue,
-        });
-        const qrSize = 48;
-        doc.image(qrPng, margin + 12, amountBlockTop, {
-            width: qrSize,
-            height: qrSize,
-        });
-        doc.fontSize(5).font('Helvetica').fillColor('#444444')
-            .text('BILL QR', margin + 12, amountBlockTop + qrSize + 1, {
-                width: Math.max(qrSize, 70),
-                align: 'left',
-            });
-        doc.fillColor('#000000');
-    } catch (e) {
-        console.warn('Could not render bill QR code:', e);
-        doc.fontSize(7).font('Helvetica').fillColor('#666666')
-            .text(`QR: ${customerCode || bill.bill_number}`, margin + 12, amountBlockTop + 18, { width: 150 });
-        doc.fillColor('#000000');
-    }
 
-    // Amount Paid & Due (right side — QR occupies the secured left space)
     const labelX = margin + 180;
     const valueX = margin + 260;
     const rowWidth = 100;
@@ -472,13 +447,14 @@ const drawBill = async (doc: typeof PDFDocument, billId: string): Promise<void> 
 
     currentY += 5;
     notes.forEach((note) => {
-        doc.text(`•  ${note}`, margin + 50, currentY, { width: pageWidth - margin - 60 });
-        currentY = doc.y + 2; // Move currentY to the next line with a small gap
+        // Leave room on the right for the bottom-right bill QR
+        doc.text(`•  ${note}`, margin + 50, currentY, { width: pageWidth - margin - 130 });
+        currentY = doc.y + 2;
     });
 
     currentY += 5;
 
-    // Payment Points
+    // Payment Points (left)
     doc.fontSize(7).font('Helvetica-Bold').text('NB:-  Payments Points', margin + 10, currentY);
     const points = [
         '*Revenue Collection Point',
@@ -490,6 +466,40 @@ const drawBill = async (doc: typeof PDFDocument, billId: string): Promise<void> 
     points.forEach((point, i) => {
         doc.text(point, margin + 40, currentY + 10 + (i * 8));
     });
+
+    // Single bill QR — bottom-right corner (pen-marked position)
+    // Encodes: customer name, customer code, electoral area, outstanding amount
+    try {
+        const qrPng = await buildBillQrPng({
+            customerName: billToName,
+            customerCode,
+            electoralArea: areaName,
+            amountDue,
+        });
+        const qrSize = 56;
+        const qrX = pageWidth - margin - qrSize - 12;
+        const qrY = pageHeight - margin - qrSize - 18;
+        doc.image(qrPng, qrX, qrY, {
+            width: qrSize,
+            height: qrSize,
+        });
+        doc.fontSize(5).font('Helvetica').fillColor('#444444')
+            .text('BILL QR', qrX - 6, qrY + qrSize + 1, {
+                width: qrSize + 12,
+                align: 'center',
+            });
+        doc.fillColor('#000000');
+    } catch (e) {
+        console.warn('Could not render bill QR code:', e);
+        doc.fontSize(6).font('Helvetica').fillColor('#666666')
+            .text(
+                `QR: ${customerCode || bill.bill_number}`,
+                pageWidth - margin - 90,
+                pageHeight - margin - 20,
+                { width: 80, align: 'right' }
+            );
+        doc.fillColor('#000000');
+    }
 };
 
 /**
