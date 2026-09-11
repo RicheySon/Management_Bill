@@ -134,36 +134,21 @@ const fetchBillData = async (billId: string): Promise<BillData> => {
 };
 
 /**
- * Authenticity QR code: scanning shows customer name, customer code, electoral area.
+ * Single bill QR: scanning shows customer name, customer code, electoral area, and amount due.
  */
 const buildBillQrPng = async (payload: {
     customerName: string;
     customerCode: string;
     electoralArea: string;
+    amountDue: number;
 }): Promise<Buffer> => {
     const text = [
         `Customer Name: ${payload.customerName || 'N/A'}`,
         `Customer Code: ${payload.customerCode || 'N/A'}`,
         `Electoral Area: ${payload.electoralArea || 'N/A'}`,
+        `Outstanding Amount: GHS ${Number(payload.amountDue || 0).toFixed(2)}`,
     ].join('\n');
 
-    return QRCode.toBuffer(text, {
-        type: 'png',
-        errorCorrectionLevel: 'M',
-        margin: 1,
-        width: 180,
-        color: {
-            dark: '#000000',
-            light: '#FFFFFF',
-        },
-    });
-};
-
-/**
- * Outstanding-amount QR: scanning shows only the amount due.
- */
-const buildOutstandingQrPng = async (amountDue: number): Promise<Buffer> => {
-    const text = `Outstanding Amount: GHS ${Number(amountDue || 0).toFixed(2)}`;
     return QRCode.toBuffer(text, {
         type: 'png',
         errorCorrectionLevel: 'M',
@@ -420,18 +405,20 @@ const drawBill = async (doc: typeof PDFDocument, billId: string): Promise<void> 
 
     currentY += 70;
 
-    // Authenticity QR (left of Amount Paid / Due) — encodes name, customer code, electoral area
+    // Single bill QR (left of Amount Paid / Due) — name, customer code, electoral area, amount due
     const amountBlockTop = currentY;
     const billToName = isBOP
         ? (business?.business_name || customer.full_name || '')
         : (customer.full_name || '');
     const customerCode = String(customer.customer_number || '').trim();
     const areaName = String(electoral_area || '').trim();
+    const amountDue = parseFloat(bill.amount_due || 0);
     try {
         const qrPng = await buildBillQrPng({
             customerName: billToName,
             customerCode,
             electoralArea: areaName,
+            amountDue,
         });
         const qrSize = 48;
         doc.image(qrPng, margin + 12, amountBlockTop, {
@@ -439,15 +426,15 @@ const drawBill = async (doc: typeof PDFDocument, billId: string): Promise<void> 
             height: qrSize,
         });
         doc.fontSize(5).font('Helvetica').fillColor('#444444')
-            .text('AUTHENTICITY QR', margin + 12, amountBlockTop + qrSize + 1, {
+            .text('BILL QR', margin + 12, amountBlockTop + qrSize + 1, {
                 width: Math.max(qrSize, 70),
                 align: 'left',
             });
         doc.fillColor('#000000');
     } catch (e) {
-        console.warn('Could not render bill authenticity QR code:', e);
+        console.warn('Could not render bill QR code:', e);
         doc.fontSize(7).font('Helvetica').fillColor('#666666')
-            .text(`AUTH: ${customerCode || bill.bill_number}`, margin + 12, amountBlockTop + 18, { width: 150 });
+            .text(`QR: ${customerCode || bill.bill_number}`, margin + 12, amountBlockTop + 18, { width: 150 });
         doc.fillColor('#000000');
     }
 
@@ -503,35 +490,6 @@ const drawBill = async (doc: typeof PDFDocument, billId: string): Promise<void> 
     points.forEach((point, i) => {
         doc.text(point, margin + 40, currentY + 10 + (i * 8));
     });
-
-    // Second QR — outstanding amount only, bottom-right corner (Mr. Rockson request)
-    const outstandingAmount = parseFloat(bill.amount_due || 0);
-    try {
-        const outstandingQrPng = await buildOutstandingQrPng(outstandingAmount);
-        const outstandingQrSize = 52;
-        const outstandingQrX = pageWidth - margin - outstandingQrSize - 12;
-        const outstandingQrY = pageHeight - margin - outstandingQrSize - 18;
-        doc.image(outstandingQrPng, outstandingQrX, outstandingQrY, {
-            width: outstandingQrSize,
-            height: outstandingQrSize,
-        });
-        doc.fontSize(5).font('Helvetica').fillColor('#444444')
-            .text('OUTSTANDING QR', outstandingQrX - 8, outstandingQrY + outstandingQrSize + 1, {
-                width: outstandingQrSize + 16,
-                align: 'center',
-            });
-        doc.fillColor('#000000');
-    } catch (e) {
-        console.warn('Could not render outstanding-amount QR code:', e);
-        doc.fontSize(6).font('Helvetica').fillColor('#666666')
-            .text(
-                `DUE: GHS ${outstandingAmount.toFixed(2)}`,
-                pageWidth - margin - 90,
-                pageHeight - margin - 20,
-                { width: 80, align: 'right' }
-            );
-        doc.fillColor('#000000');
-    }
 };
 
 /**
